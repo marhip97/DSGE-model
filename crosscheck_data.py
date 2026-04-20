@@ -76,6 +76,32 @@ def _make_session() -> requests.Session:
 SESSION = _make_session()
 
 
+# ── FRED-spesifikk session ────────────────────────────────────────────────────
+# FRED svarer ofte tregt fra GitHub-runners. Bruk kort timeout og få retries
+# slik at pipelinen raskt faller tilbake til CSV hvis serien ikke er tilgjengelig.
+FRED_TIMEOUT = 20
+
+
+def _make_fred_session() -> requests.Session:
+    session = requests.Session()
+    retry = Retry(
+        total=2,
+        backoff_factor=1,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET"],
+    )
+    session.mount("https://", HTTPAdapter(max_retries=retry))
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                      "(KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+        "Accept": "text/csv, */*",
+    })
+    return session
+
+
+FRED_SESSION = _make_fred_session()
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # HJELPEFUNKSJONER
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -128,7 +154,7 @@ def resample_monthly_to_quarterly(s: pd.Series,
     """Aggreger månedlig serie til kvartal."""
     if not isinstance(s.index, pd.DatetimeIndex):
         s.index = pd.to_datetime(s.index)
-    return getattr(s.resample("Q"), agg)().to_period("Q")
+    return getattr(s.resample("QE"), agg)().to_period("Q")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -186,7 +212,7 @@ def fetch_bnp_fastland() -> pd.Series:
     """BNP Fastlands-Norge, volumindeks (2020=100), kvartalsvis — SSB 09190."""
     q = {
         "query": [
-            {"code": "NACE2007", "selection": {"filter": "item", "values": ["nr23_9fn"]}},
+            {"code": "Makrost", "selection": {"filter": "item", "values": ["nr23_9fn"]}},
             {"code": "ContentsCode", "selection": {"filter": "item", "values": ["BNPB"]}},
             {"code": "Tid", "selection": {"filter": "all", "values": ["*"]}},
         ],
@@ -212,7 +238,7 @@ def fetch_privat_konsum() -> pd.Series:
     """Privat konsum, volumindeks — SSB 09190."""
     q = {
         "query": [
-            {"code": "NACE2007", "selection": {"filter": "item", "values": ["nr23_9fn"]}},
+            {"code": "Makrost", "selection": {"filter": "item", "values": ["nr23_9fn"]}},
             {"code": "ContentsCode", "selection": {"filter": "item", "values": ["PK"]}},
             {"code": "Tid", "selection": {"filter": "all", "values": ["*"]}},
         ],
@@ -227,7 +253,7 @@ def fetch_investering() -> pd.Series:
     """Bruttoinvestering fastland, volumindeks — SSB 09190."""
     q = {
         "query": [
-            {"code": "NACE2007", "selection": {"filter": "item", "values": ["nr23_9fn"]}},
+            {"code": "Makrost", "selection": {"filter": "item", "values": ["nr23_9fn"]}},
             {"code": "ContentsCode", "selection": {"filter": "item", "values": ["BINV"]}},
             {"code": "Tid", "selection": {"filter": "all", "values": ["*"]}},
         ],
@@ -242,7 +268,7 @@ def fetch_eksport() -> pd.Series:
     """Eksport tradisjonelle varer og tjenester — SSB 09190."""
     q = {
         "query": [
-            {"code": "NACE2007", "selection": {"filter": "item", "values": ["nr23_9fn"]}},
+            {"code": "Makrost", "selection": {"filter": "item", "values": ["nr23_9fn"]}},
             {"code": "ContentsCode", "selection": {"filter": "item", "values": ["EKSPORT"]}},
             {"code": "Tid", "selection": {"filter": "all", "values": ["*"]}},
         ],
@@ -257,7 +283,7 @@ def fetch_import() -> pd.Series:
     """Import — SSB 09190."""
     q = {
         "query": [
-            {"code": "NACE2007", "selection": {"filter": "item", "values": ["nr23_9fn"]}},
+            {"code": "Makrost", "selection": {"filter": "item", "values": ["nr23_9fn"]}},
             {"code": "ContentsCode", "selection": {"filter": "item", "values": ["IMPORT"]}},
             {"code": "Tid", "selection": {"filter": "all", "values": ["*"]}},
         ],
@@ -272,7 +298,7 @@ def fetch_kpi() -> pd.Series:
     """KPI alle varer, månedlig → kvartalsgjennomsnitt — SSB 03013."""
     q = {
         "query": [
-            {"code": "Gruppe", "selection": {"filter": "item", "values": ["TOTAL"]}},
+            {"code": "Konsumgrp", "selection": {"filter": "item", "values": ["TOTAL"]}},
             {"code": "ContentsCode", "selection": {"filter": "item",
                                                     "values": ["KpiIndMnd"]}},
             {"code": "Tid", "selection": {"filter": "all", "values": ["*"]}},
@@ -287,7 +313,7 @@ def fetch_kpi() -> pd.Series:
             index=pd.period_range(s.index[0], periods=len(s), freq="M"),
             dtype=float,
         )
-        s = s_monthly.resample("Q").mean()
+        s = s_monthly.resample("QE").mean()
     log.info(f"  KPI:            {len(s)} kvartaler (SSB 03013)")
     return s
 
@@ -355,7 +381,7 @@ def nb_api(series_key: str, label: str) -> pd.Series:
         # Dagsdata → kvartalsgjennomsnitt
         if len(s) > 200:
             s.index = pd.to_datetime(s.index)
-            s = s.resample("Q").mean().to_period("Q")
+            s = s.resample("QE").mean().to_period("Q")
         else:
             s = to_period_index(s)
         log.info(f"  {label:<20} {len(s)} kvartaler (Norges Bank)")
@@ -366,11 +392,15 @@ def nb_api(series_key: str, label: str) -> pd.Series:
 
 
 def fetch_styringsrente() -> pd.Series:
-    return nb_api("POLICY_RATE", "Styringsrente:")
+    # Norges Bank SDMX: Interest Rates dataflow, styringsrente (Key Policy Rate)
+    return nb_api("IR/B.KPRA.SD.R", "Styringsrente:")
 
 
 def fetch_nibor_3m() -> pd.Series:
-    return nb_api("NIBOR/3M", "NIBOR 3M:")
+    # NIBOR publiseres ikke lenger av Norges Bank (overført til NoRe i 2022).
+    # Bruk NOWA (Norwegian Overnight Weighted Average) som erstatning for 3M-renter
+    # i nye serier. Fallback-CSV brukes hvis serien har for få observasjoner.
+    return nb_api("IR/B.NOWA.SD.R", "NOWA (proxy 3M):")
 
 
 def fetch_nok_eur() -> pd.Series:
@@ -378,7 +408,9 @@ def fetch_nok_eur() -> pd.Series:
 
 
 def fetch_kredittvekst() -> pd.Series:
-    return nb_api("CREDIT_INDICATOR/K2.HH", "K2 husholdninger:")
+    # K2 husholdninger (sesongjusterte indekser), månedlig vekst i indeks.
+    # Ny SDMX-sti etter API-restrukturering.
+    return nb_api("K2/M.A.B.A1.A.CA.Z5.A", "K2 husholdninger:")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -389,16 +421,16 @@ def fred_csv(series_id: str, label: str) -> pd.Series:
     """Hent serie fra FRED via CSV-endepunkt."""
     url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
     try:
-        resp = SESSION.get(url, timeout=TIMEOUT)
+        resp = FRED_SESSION.get(url, timeout=FRED_TIMEOUT)
         resp.raise_for_status()
         df = pd.read_csv(StringIO(resp.text), parse_dates=["DATE"], index_col="DATE")
         s = df.iloc[:, 0].dropna()
         s.index = pd.DatetimeIndex(s.index)
         # Resampler til kvartal avhengig av frekvens
         if len(s) > 300:
-            s = s.resample("Q").mean().to_period("Q")
+            s = s.resample("QE").mean().to_period("Q")
         else:
-            s = s.resample("Q").last().to_period("Q")
+            s = s.resample("QE").last().to_period("Q")
         log.info(f"  {label:<20} {len(s)} kvartaler (FRED)")
         return s
     except Exception as e:
