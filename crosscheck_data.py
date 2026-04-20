@@ -15,11 +15,12 @@ Kjøring:
 Avhengigheter:
     pip install requests pandas numpy statsmodels
 
-Datakilder (ingen autentisering nødvendig):
-    SSB Statistikkbanken  — https://data.ssb.no/api/v0/
+Datakilder:
+    SSB PxWebApi v2       — https://data.ssb.no/api/pxwebapi/v2/tables/{id}/data
+    SSB Statistikkbanken  — https://data.ssb.no/api/v0/ (fallback)
     Norges Bank API       — https://data.norges-bank.no/api/
     IMF DataMapper        — https://www.imf.org/external/datamapper/api/v1/
-    FRED (St. Louis Fed)  — https://fred.stlouisfed.org/graph/fredgraph.csv
+    FRED (St. Louis Fed)  — https://api.stlouisfed.org/fred/ (krever FRED_API_KEY)
 ================================================================================
 """
 
@@ -100,6 +101,7 @@ def _make_fred_session() -> requests.Session:
 
 
 FRED_SESSION = _make_fred_session()
+FRED_API_KEY = os.getenv("FRED_API_KEY", "").strip()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -161,26 +163,12 @@ def resample_monthly_to_quarterly(s: pd.Series,
 # DATAKILDER — SSB
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def ssb_post(table_id: str, query: dict) -> pd.Series:
-    """
-    Hent en enkelt tidsserie fra SSB JSON-stat API (POST).
-    Forventer at query returnerer én variabel × tid.
-    """
-    url = f"https://data.ssb.no/api/v0/no/table/{table_id}"
-    try:
-        resp = SESSION.post(url, json=query, timeout=TIMEOUT)
-        resp.raise_for_status()
-        data = resp.json()
-    except Exception as e:
-        log.warning(f"SSB {table_id}: {e}")
-        return pd.Series(dtype=float)
-
-    # JSON-stat parsing
+def _parse_ssb_jsonstat(data: dict) -> pd.Series:
+    """Felles JSON-stat parser for v0 og v2 responser."""
     ids   = data["id"]
     dims  = data["dimension"]
     vals  = data["value"]
 
-    # Finn tidsdimensjon
     tid_key = next(
         (d for d in ids
          if "tid" in d.lower() or "kvartal" in d.lower() or "year" in d.lower()),
@@ -188,164 +176,173 @@ def ssb_post(table_id: str, query: dict) -> pd.Series:
     )
     time_cats = list(dims[tid_key]["category"]["label"].values())
 
-    # Konverter SSB-kvartalformat (2001K1) til pandas Period
-    def parse_ssb_period(s: str) -> Optional[pd.Period]:
+    def parse_period(s: str) -> Optional[pd.Period]:
         try:
             if "K" in s:
                 y, q = s.split("K")
                 return pd.Period(f"{y}Q{q}", freq="Q")
+            if "M" in s:
+                y, m = s.split("M")
+                return pd.Period(f"{y}-{m}", freq="M")
             return pd.Period(s, freq="Q")
         except Exception:
             return None
 
-    periods = [parse_ssb_period(t) for t in time_cats]
+    periods = [parse_period(t) for t in time_cats]
     valid = [(p, v) for p, v in zip(periods, vals)
              if p is not None and v is not None]
     if not valid:
         return pd.Series(dtype=float)
-    idx, vals_clean = zip(*valid)
-    return pd.Series(list(vals_clean), index=pd.PeriodIndex(idx, freq="Q"),
+    idx, clean = zip(*valid)
+    # Behold frekvens fra perioden (kvartal eller måned)
+    return pd.Series(list(clean), index=pd.PeriodIndex(idx),
                      dtype=float).sort_index()
 
 
-def fetch_bnp_fastland() -> pd.Series:
-    """BNP Fastlands-Norge, volumindeks (2020=100), kvartalsvis — SSB 09190."""
-    q = {
+def ssb_v2_get(table_id: str, value_codes: dict) -> pd.Series:
+    """
+    Hent tidsserie fra SSB PxWebApi v2 (GET).
+    value_codes = {"ContentsCode": ["BNPB"], "Tid": ["*"], ...}
+    """
+    url = f"https://data.ssb.no/api/pxwebapi/v2/tables/{table_id}/data"
+    params = [("format", "json-stat2"), ("lang", "no")]
+    for var, vals in value_codes.items():
+        params.append((f"valueCodes[{var}]", ",".join(vals)))
+    try:
+        resp = SESSION.get(url, params=params, timeout=TIMEOUT)
+        resp.raise_for_status()
+        return _parse_ssb_jsonstat(resp.json())
+    except Exception as e:
+        log.warning(f"SSB v2 {table_id}: {e}")
+        return pd.Series(dtype=float)
+
+
+def ssb_post(table_id: str, query: dict) -> pd.Series:
+    """
+    Hent en enkelt tidsserie fra SSB JSON-stat API v0 (POST, fallback).
+    """
+    url = f"https://data.ssb.no/api/v0/no/table/{table_id}"
+    try:
+        resp = SESSION.post(url, json=query, timeout=TIMEOUT)
+        resp.raise_for_status()
+        return _parse_ssb_jsonstat(resp.json())
+    except Exception as e:
+        log.warning(f"SSB v0 {table_id}: {e}")
+        return pd.Series(dtype=float)
+
+
+def ssb_fetch(table_id: str, value_codes: dict,
+              v0_fallback_codes: Optional[dict] = None) -> pd.Series:
+    """
+    Fetch SSB serie: prøv PxWebApi v2 (GET) først, så v0 (POST) som fallback.
+    value_codes: {"ContentsCode": ["BNPB"], "Tid": ["*"], ...}
+    """
+    s = ssb_v2_get(table_id, value_codes)
+    if not s.empty:
+        return s
+    codes_for_v0 = v0_fallback_codes or value_codes
+    v0_query = {
         "query": [
-            {"code": "Makrost", "selection": {"filter": "item", "values": ["nr23_9fn"]}},
-            {"code": "ContentsCode", "selection": {"filter": "item", "values": ["BNPB"]}},
-            {"code": "Tid", "selection": {"filter": "all", "values": ["*"]}},
+            {"code": var,
+             "selection": {
+                 "filter": "all" if vals == ["*"] else "item",
+                 "values": vals,
+             }}
+            for var, vals in codes_for_v0.items()
         ],
         "response": {"format": "json-stat2"},
     }
-    s = ssb_post("09190", q)
-    if s.empty:
-        # Fallback: tabell 09189 (nasjonalregnskap kvartalsvis)
-        q2 = {
-            "query": [
-                {"code": "ContentsCode",
-                 "selection": {"filter": "item", "values": ["BNPfastland"]}},
-                {"code": "Tid", "selection": {"filter": "all", "values": ["*"]}},
-            ],
-            "response": {"format": "json-stat2"},
-        }
-        s = ssb_post("09189", q2)
-    log.info(f"  BNP fastland:   {len(s)} kvartaler (SSB)")
+    return ssb_post(table_id, v0_query)
+
+
+def _ssb_09190(content_code: str, label: str) -> pd.Series:
+    """Hent én makroøkonomisk størrelse fra SSB 09190 (nasjonalregnskap)."""
+    s = ssb_fetch(
+        "09190",
+        {
+            "Makrost": ["nr23_9fn"],
+            "ContentsCode": [content_code],
+            "Tid": ["*"],
+        },
+    )
+    log.info(f"  {label:<16} {len(s)} kvartaler (SSB 09190)")
     return s
+
+
+def fetch_bnp_fastland() -> pd.Series:
+    """BNP Fastlands-Norge, volumindeks — SSB 09190."""
+    return _ssb_09190("BNPB", "BNP fastland:")
 
 
 def fetch_privat_konsum() -> pd.Series:
     """Privat konsum, volumindeks — SSB 09190."""
-    q = {
-        "query": [
-            {"code": "Makrost", "selection": {"filter": "item", "values": ["nr23_9fn"]}},
-            {"code": "ContentsCode", "selection": {"filter": "item", "values": ["PK"]}},
-            {"code": "Tid", "selection": {"filter": "all", "values": ["*"]}},
-        ],
-        "response": {"format": "json-stat2"},
-    }
-    s = ssb_post("09190", q)
-    log.info(f"  Privat konsum:  {len(s)} kvartaler (SSB)")
-    return s
+    return _ssb_09190("PK", "Privat konsum:")
 
 
 def fetch_investering() -> pd.Series:
     """Bruttoinvestering fastland, volumindeks — SSB 09190."""
-    q = {
-        "query": [
-            {"code": "Makrost", "selection": {"filter": "item", "values": ["nr23_9fn"]}},
-            {"code": "ContentsCode", "selection": {"filter": "item", "values": ["BINV"]}},
-            {"code": "Tid", "selection": {"filter": "all", "values": ["*"]}},
-        ],
-        "response": {"format": "json-stat2"},
-    }
-    s = ssb_post("09190", q)
-    log.info(f"  Investering:    {len(s)} kvartaler (SSB)")
-    return s
+    return _ssb_09190("BINV", "Investering:")
 
 
 def fetch_eksport() -> pd.Series:
-    """Eksport tradisjonelle varer og tjenester — SSB 09190."""
-    q = {
-        "query": [
-            {"code": "Makrost", "selection": {"filter": "item", "values": ["nr23_9fn"]}},
-            {"code": "ContentsCode", "selection": {"filter": "item", "values": ["EKSPORT"]}},
-            {"code": "Tid", "selection": {"filter": "all", "values": ["*"]}},
-        ],
-        "response": {"format": "json-stat2"},
-    }
-    s = ssb_post("09190", q)
-    log.info(f"  Eksport:        {len(s)} kvartaler (SSB)")
-    return s
+    """Eksport — SSB 09190."""
+    return _ssb_09190("EKSPORT", "Eksport:")
 
 
 def fetch_import() -> pd.Series:
     """Import — SSB 09190."""
-    q = {
-        "query": [
-            {"code": "Makrost", "selection": {"filter": "item", "values": ["nr23_9fn"]}},
-            {"code": "ContentsCode", "selection": {"filter": "item", "values": ["IMPORT"]}},
-            {"code": "Tid", "selection": {"filter": "all", "values": ["*"]}},
-        ],
-        "response": {"format": "json-stat2"},
-    }
-    s = ssb_post("09190", q)
-    log.info(f"  Import:         {len(s)} kvartaler (SSB)")
-    return s
+    return _ssb_09190("IMPORT", "Import:")
 
 
 def fetch_kpi() -> pd.Series:
     """KPI alle varer, månedlig → kvartalsgjennomsnitt — SSB 03013."""
-    q = {
-        "query": [
-            {"code": "Konsumgrp", "selection": {"filter": "item", "values": ["TOTAL"]}},
-            {"code": "ContentsCode", "selection": {"filter": "item",
-                                                    "values": ["KpiIndMnd"]}},
-            {"code": "Tid", "selection": {"filter": "all", "values": ["*"]}},
-        ],
-        "response": {"format": "json-stat2"},
-    }
-    s = ssb_post("03013", q)
+    s = ssb_fetch(
+        "03013",
+        {
+            "Konsumgrp": ["TOTAL"],
+            "ContentsCode": ["KpiIndMnd"],
+            "Tid": ["*"],
+        },
+    )
     if not s.empty:
         # Månedlig → kvartal
-        s_monthly = pd.Series(
-            s.values,
-            index=pd.period_range(s.index[0], periods=len(s), freq="M"),
-            dtype=float,
-        )
-        s = s_monthly.resample("QE").mean()
-    log.info(f"  KPI:            {len(s)} kvartaler (SSB 03013)")
+        if isinstance(s.index, pd.PeriodIndex) and s.index.freq == "M":
+            s = s.resample("QE").mean()
+        else:
+            s_monthly = pd.Series(
+                s.values,
+                index=pd.period_range(s.index[0], periods=len(s), freq="M"),
+                dtype=float,
+            )
+            s = s_monthly.resample("QE").mean()
+    log.info(f"  KPI:             {len(s)} kvartaler (SSB 03013)")
     return s
 
 
 def fetch_lonnsindeks() -> pd.Series:
     """Lønn per normalårsverk (kvartalsvise lønnsstatistikk) — SSB 09786."""
-    q = {
-        "query": [
-            {"code": "ContentsCode", "selection": {"filter": "item",
-                                                    "values": ["Fortjeneste"]}},
-            {"code": "Tid", "selection": {"filter": "all", "values": ["*"]}},
-        ],
-        "response": {"format": "json-stat2"},
-    }
-    s = ssb_post("09786", q)
-    log.info(f"  Lønnsindeks:    {len(s)} kvartaler (SSB 09786)")
+    s = ssb_fetch(
+        "09786",
+        {
+            "ContentsCode": ["Fortjeneste"],
+            "Tid": ["*"],
+        },
+    )
+    log.info(f"  Lønnsindeks:     {len(s)} kvartaler (SSB 09786)")
     return s
 
 
 def fetch_boligpris() -> pd.Series:
     """Boligprisindeks, kvartalsvis — SSB 07241."""
-    q = {
-        "query": [
-            {"code": "Boligtype", "selection": {"filter": "item", "values": ["00"]}},
-            {"code": "ContentsCode", "selection": {"filter": "item",
-                                                    "values": ["BoligprIS"]}},
-            {"code": "Tid", "selection": {"filter": "all", "values": ["*"]}},
-        ],
-        "response": {"format": "json-stat2"},
-    }
-    s = ssb_post("07241", q)
-    log.info(f"  Boligpris:      {len(s)} kvartaler (SSB 07241)")
+    s = ssb_fetch(
+        "07241",
+        {
+            "Boligtype": ["00"],
+            "ContentsCode": ["BoligprIS"],
+            "Tid": ["*"],
+        },
+    )
+    log.info(f"  Boligpris:       {len(s)} kvartaler (SSB 07241)")
     return s
 
 
@@ -417,21 +414,47 @@ def fetch_kredittvekst() -> pd.Series:
 # DATAKILDER — FRED (via CSV-nedlasting, ingen API-nøkkel)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def fred_csv(series_id: str, label: str) -> pd.Series:
-    """Hent serie fra FRED via CSV-endepunkt."""
+def _fred_fetch_json(series_id: str) -> pd.Series:
+    """Hent serie via autentisert FRED JSON-API (krever FRED_API_KEY)."""
+    url = (
+        "https://api.stlouisfed.org/fred/series/observations"
+        f"?series_id={series_id}&api_key={FRED_API_KEY}&file_type=json"
+    )
+    resp = FRED_SESSION.get(url, timeout=FRED_TIMEOUT)
+    resp.raise_for_status()
+    obs = resp.json().get("observations", [])
+    data = {o["date"]: (float(o["value"]) if o["value"] not in (".", "", None) else np.nan)
+            for o in obs}
+    s = pd.Series(data, dtype=float).dropna()
+    s.index = pd.to_datetime(s.index)
+    return s
+
+
+def _fred_fetch_csv(series_id: str) -> pd.Series:
+    """Fallback: hent serie fra FRED via CSV-endepunkt (uten nøkkel)."""
     url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
+    resp = FRED_SESSION.get(url, timeout=FRED_TIMEOUT)
+    resp.raise_for_status()
+    df = pd.read_csv(StringIO(resp.text), parse_dates=["DATE"], index_col="DATE")
+    s = df.iloc[:, 0].dropna()
+    s.index = pd.DatetimeIndex(s.index)
+    return s
+
+
+def fred_csv(series_id: str, label: str) -> pd.Series:
+    """Hent serie fra FRED (JSON-API hvis nøkkel, ellers CSV-scraping)."""
     try:
-        resp = FRED_SESSION.get(url, timeout=FRED_TIMEOUT)
-        resp.raise_for_status()
-        df = pd.read_csv(StringIO(resp.text), parse_dates=["DATE"], index_col="DATE")
-        s = df.iloc[:, 0].dropna()
-        s.index = pd.DatetimeIndex(s.index)
-        # Resampler til kvartal avhengig av frekvens
+        if FRED_API_KEY:
+            s = _fred_fetch_json(series_id)
+            source = "FRED-API"
+        else:
+            s = _fred_fetch_csv(series_id)
+            source = "FRED-CSV"
         if len(s) > 300:
             s = s.resample("QE").mean().to_period("Q")
         else:
             s = s.resample("QE").last().to_period("Q")
-        log.info(f"  {label:<20} {len(s)} kvartaler (FRED)")
+        log.info(f"  {label:<20} {len(s)} kvartaler ({source})")
         return s
     except Exception as e:
         log.warning(f"  FRED {series_id}: {e}")

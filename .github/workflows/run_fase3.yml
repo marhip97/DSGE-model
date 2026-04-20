@@ -40,6 +40,8 @@ jobs:
         run: pip install numpy scipy pandas statsmodels requests urllib3
 
       - name: Hent ferske makrodata (SSB, Norges Bank, FRED)
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: |
           python crosscheck_data.py \
             --output-dir . \
