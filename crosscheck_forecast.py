@@ -212,8 +212,10 @@ def _rmse_weights(fitted: Dict,
                 continue
             fv_arr = np.array(fv, dtype=float)
             n_fit  = len(fv_arr)
-            obs_tr = obs[p: p + n_fit]
-            mask   = covid_mask[p: p + n_fit]
+            obs_tr = obs[-n_fit:]
+            mask   = covid_mask[-n_fit:]
+            n      = min(len(obs_tr), len(fv_arr), len(mask))
+            obs_tr = obs_tr[:n]; mask = mask[:n]; fv_arr = fv_arr[:n]
             valid  = ~mask & ~np.isnan(obs_tr) & ~np.isnan(fv_arr)
             if valid.sum() < 4:
                 rmse_vals.append(np.inf)
@@ -313,9 +315,9 @@ def build_historical_fit(fitted: Dict,
         fv_mean = np.mean(fv_list, axis=0)
         n_fit   = len(fv_mean)
 
-        # Juster til riktig lengde mot observasjoner
-        obs_aligned = obs[p: p + n_fit]
-        covid_aligned = covid_mask[p: p + n_fit]
+        # Aligner fra slutten for konsistens med variabel lagorden
+        obs_aligned = obs[-n_fit:]
+        covid_aligned = covid_mask[-n_fit:]
 
         # Residual (ekskl. COVID)
         resid = obs_aligned - fv_mean
@@ -335,6 +337,7 @@ def build_historical_fit(fitted: Dict,
                               for x in resid_no_covid],
             "rmse":          round(rmse, 5) if not np.isnan(rmse) else None,
             "covid_periods": covid_aligned.tolist(),
+            "periods":       [str(idx) for idx in data.index[-n_fit:]],
         }
     return out
 
@@ -524,11 +527,6 @@ class EnsembleForecaster:
             fitted_raw, self.data, self.variables,
             self.covid_mask, self.p
         )
-
-        # Legg til periode-indeks på historisk data
-        hist_periods = [str(p) for p in self.data.index[self.p:]]
-        for var, hdata in historical.items():
-            hdata["periods"] = hist_periods[:len(hdata["observed"])]
 
         # ── Evalueringsoppsummering ───────────────────────────────────────────
         eval_summary = self._evaluation_summary(historical)
