@@ -33,6 +33,11 @@ import sys
 from datetime import datetime
 from typing import Any, Dict, Optional
 
+try:
+    import requests
+except ImportError:
+    requests = None
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)-8s  %(message)s",
@@ -259,6 +264,33 @@ def merge(dsge_path: str, ck_path: str) -> Dict:
 
 INJECT_MARKER = "/* __NEMO_DASHBOARD_DATA__ */"
 
+# Chart.js-CDN som brukes i template — bakes inn slik at dashboardet fungerer
+# offline (file://-protokoll) og uten blokkering av eksterne nettverk.
+CDN_CHARTJS_URL = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"
+CDN_CHARTJS_TAG = '<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>'
+
+
+def inline_chartjs(html: str) -> str:
+    """Bak Chart.js inn i HTML slik at dashboardet fungerer offline."""
+    if CDN_CHARTJS_TAG not in html:
+        return html
+    if requests is None:
+        log.warning("  requests ikke installert — Chart.js lastes fortsatt fra CDN")
+        return html
+    try:
+        resp = requests.get(
+            CDN_CHARTJS_URL,
+            timeout=30,
+            headers={"User-Agent": "NEMO-Dashboard-Builder/1.0"},
+        )
+        resp.raise_for_status()
+        inline_tag = f"<script>\n{resp.text}\n</script>"
+        log.info(f"  Chart.js inlinet ({len(resp.text) // 1024} KB)")
+        return html.replace(CDN_CHARTJS_TAG, inline_tag)
+    except Exception as exc:
+        log.warning(f"  Chart.js ikke innebygd (CDN feilet: {exc}) — bruker CDN-link")
+        return html
+
 def inject_into_html(data: Dict, template_path: str, output_path: str) -> None:
     """
     Injiser data-JSON direkte i HTML-template.
@@ -284,10 +316,17 @@ def inject_into_html(data: Dict, template_path: str, output_path: str) -> None:
 
     json_str = json.dumps(data, ensure_ascii=False, separators=(",", ":"),
                           default=_serialize)
+    # Escape tegn som bryter <script>-blokker (U+2028/U+2029 er ugyldige i JS
+    # strengliteraler, og </ må brytes for å unngå tidlig </script>-lukking)
+    json_str = (json_str
+                .replace("\u2028", "\\u2028")
+                .replace("\u2029", "\\u2029")
+                .replace("</", "<\\/"))
 
     # Erstatt markøren med data-tilordning
     inject_block = f"const __NEMO_DATA__ = {json_str};"
     html_out = html.replace(INJECT_MARKER, inject_block)
+    html_out = inline_chartjs(html_out)
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(html_out)
