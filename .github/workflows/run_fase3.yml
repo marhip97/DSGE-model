@@ -1,0 +1,89 @@
+name: Kjør Fase III — Kryssjekkmodeller og ensemble
+
+on:
+  workflow_dispatch:
+    inputs:
+      draws:
+        description: 'Antall Gibbs-draws per BVAR (høyere = bedre, men tregere)'
+        required: false
+        default: '1000'
+      burnin:
+        description: 'Burn-in perioder'
+        required: false
+        default: '500'
+      horizon:
+        description: 'Prognosehorisont i kvartaler'
+        required: false
+        default: '12'
+
+jobs:
+  fase3:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    timeout-minutes: 45
+
+    steps:
+      - name: Hent kode
+        uses: actions/checkout@v4
+
+      - name: Sett opp Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Installer avhengigheter
+        run: pip install numpy scipy pandas statsmodels
+
+      - name: Kjør kryssjekkmodeller (BVAR + AR)
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          python crosscheck_models.py \
+            --data nemo_data_faktisk_v2.csv \
+            --output crosscheck_results.json \
+            --horizon ${{ github.event.inputs.horizon }} \
+            --draws ${{ github.event.inputs.draws }} \
+            --burnin ${{ github.event.inputs.burnin }} \
+            --lag 4
+
+      - name: Kjør ensemble-aggregering
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          python crosscheck_forecast.py \
+            --results crosscheck_results.json \
+            --data nemo_data_faktisk_v2.csv \
+            --output crosscheck_ensemble.json \
+            --horizon ${{ github.event.inputs.horizon }} \
+            --weighting rmse
+
+      - name: Bygg kombinert dashboard (DSGE + kryssjekk)
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          python crosscheck_dashboard_builder.py \
+            --dsge analyse_resultater.json \
+            --ck crosscheck_ensemble.json \
+            --template nemo_dashboard.html \
+            --output nemo_dashboard_built.html \
+            --json-out nemo_dashboard_data.json
+
+      - name: Last opp resultater som artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fase3_resultater
+          path: |
+            crosscheck_results.json
+            crosscheck_ensemble.json
+            nemo_dashboard_built.html
+            nemo_dashboard_data.json
+          retention-days: 14
+
+      - name: Commit output til repoet
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add crosscheck_results.json crosscheck_ensemble.json nemo_dashboard_built.html nemo_dashboard_data.json
+          git diff --cached --quiet || git commit -m "Fase III: oppdater kryssjekkresultater og dashboard [automatisk]"
+          git push
