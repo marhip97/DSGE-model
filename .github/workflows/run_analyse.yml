@@ -28,7 +28,12 @@ jobs:
       - name: Installer avhengigheter
         run: pip install numpy scipy pandas statsmodels
 
+      - name: Fiks Infinity i posterior JSON (ugyldig JSON-verdi)
+        run: sed -i 's/: Infinity/: 1e308/g; s/: -Infinity/: -1e308/g' ${{ github.event.inputs.posterior_file }}
+
       - name: Kjør NEMO analyse
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           python nemo_analyse.py \
             --posterior ${{ github.event.inputs.posterior_file }} \

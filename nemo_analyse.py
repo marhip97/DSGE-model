@@ -376,8 +376,8 @@ if __name__ == "__main__":
         sigma = sigma_vals[sidx]
         irf = compute_irf(T, R, sidx, sigma, args.n_irf)
         irf_results[sname] = {
-            vn: [round(float(irf[t, vidx]), 6) for t in range(args.n_irf)]
-            for vn, vidx in VAR_NAMES.items()
+            vname: [round(float(irf[t, vidx]), 6) for t in range(args.n_irf)]
+            for vidx, vname in VAR_NAMES.items()
         }
     print(f"  Beregnet {len(irf_results)} IRF-er, {args.n_irf} perioder.")
 
