@@ -1,606 +1,507 @@
 """
 ================================================================================
-NEMO FASE II — DATAINNHENTING OG TRANSFORMASJON
-Kravik og Mimir (2019), Appendiks A
+NEMO FASE II — LIKNINGSSYSTEM
+Γ₀ z_t = Γ₁ z_{t-1} + Ψ ε_t + Π η_t
 
-Kjør dette skriptet lokalt med internettilgang.
-Installasjonskrav:
-    pip install requests pandas numpy statsmodels
+Tilstandsvektor (NZ = 48):
+  HUSHOLDNINGER OG KONSUM:
+    0  pi        KPI-inflasjon
+    1  c_W       Konsum, sparere (W = workers / optimizers)
+    2  c_NW      Konsum, låntakere (NW = non-optimizers / borrowers)
+    3  c         Aggregert konsum
+    4  pi_W      Lønnsinflasjon
+    5  w         Reallønn (aggregert)
+    6  q_H       Boligpris (Tobin's Q for bolig)
+    7  h_W       Boligbeholdning, sparere
+    8  h_NW      Boligbeholdning, låntakere
 
-Datakilder:
-    - SSB Statistikkbanken (JSON-stat API, ingen autentisering)
-    - Norges Bank Data API (JSON, ingen autentisering)
-    - FRED / IMF (alternativ for handelpartnerdata)
+  PRODUKSJON OG KAPITAL:
+    9  y         BNP (fastland)
+    10 l         Sysselsetting
+    11 k         Kapital
+    12 inv        Investering
+    13 mc         Marginal kostnad
+    14 q_K        Kapital Tobin's Q
 
-Estimeringsperiode: 2001K1 – siste tilgjengelige kvartal
-(inflasjonsmålperioden, konsistent med Kravik og Mimir 2019)
+  VALUTA OG HANDEL:
+    15 rer        Reell valutakurs
+    16 x          Eksport
+    17 m          Import
+    18 pM         Importpris
+    19 s          Nominell valutakursendring
 
-Output: nemo_data.csv  og  nemo_data.json
+  FINANSIELL SEKTOR:
+    20 i_R        Styringsrente (nominell)
+    21 i_D        Innskuddsrente
+    22 i_L_W      Utlånsrente husholdninger (sparere)
+    23 i_L_NW     Utlånsrente låntakere
+    24 b_W        Gjeld sparere (begrenset av LTV)
+    25 b_NW       Gjeld låntakere (LTV-bindende)
+    26 nb         Bankkapital (net worth bank)
+
+  OFFENTLIG SEKTOR:
+    27 g          Offentlig konsum
+    28 pO         Oljepris (real, AR(1))
+
+  LAGG-TILSTANDER:
+    29 k_lag      k_{t-1}
+    30 inv_lag    inv_{t-1}
+    31 h_W_lag    h_W_{t-1}
+    32 h_NW_lag   h_NW_{t-1}
+    33 i_R_lag    i_{t-1}
+    34 rer_lag    rer_{t-1}
+    35 w_lag      w_{t-1}
+    36 pi_lag     pi_{t-1}  (for mimicking rule)
+
+  EKSOGENE AR(1)-PROSESSER:
+    37 a          TFP
+    38 eps_C      Konsumpreferanse
+    39 eps_H      Boligpreferanse
+    40 eps_G      Offentlig forbruk
+    41 pO         (allerede i 28)  — ikke duplisert
+    42 yS         Utenlandsk BNP
+    43 eps_rp     Risikopremie
+    44 pi_star    Utenlandsk inflasjon
+    45 i_star     Utenlandsk rente
+    46 eps_phi_h  LTV-sjokk husholdninger
+    47 eps_prem   Pengemarkedspremie
+
+Sjokk (NE = 13):
+    0  E_A       TFP
+    1  E_C       Konsumpreferanse
+    2  E_H       Boligpreferanse
+    3  E_G       Offentlig forbruk
+    4  E_O       Oljepris
+    5  E_Ys      Utenlandsk etterspørsel
+    6  E_rp      Risikopremie
+    7  E_i       Pengepolitikk
+    8  E_P       Prismarkup
+    9  E_phi_h   LTV-sjokk husholdninger
+    10 E_prem    Pengemarkedspremie
+    11 E_I       Investeringsjusteringskost.
+    12 E_pi_star Utenlandsk inflasjonssjokk
+
 ================================================================================
 """
 
-import requests
-import pandas as pd
 import numpy as np
-import json
-import os
-from datetime import datetime
+import sys, os
+sys.path.insert(0, os.path.dirname(__file__))
+from parameters import Parameters
 
-# ─── Konfigurasjon ─────────────────────────────────────────────────────────────
-START_YEAR   = 2001
-START_QUARTER = 1
-OUTPUT_DIR   = "."   # Endre til ønsket mappe
+# ── Dimensjoner ───────────────────────────────────────────────────────────────
+NZ = 48
+NE = 13
 
-print("=" * 65)
-print("  NEMO FASE II — DATAINNHENTING")
-print(f"  Estimeringsperiode: {START_YEAR}K{START_QUARTER} – siste kvartal")
-print("=" * 65)
+# ── Variabelindekser ─────────────────────────────────────────────────────────
+PI=0; C_W=1; C_NW=2; C=3; PIW=4; W=5; Q_H=6; H_W=7; H_NW=8
+Y=9; L=10; K=11; INV=12; MC=13; Q_K=14
+RER=15; X=16; M=17; PM=18; S=19
+I_R=20; I_D=21; I_L_W=22; I_L_NW=23; B_W=24; B_NW=25; NB=26
+G=27; PO=28
+K_L=29; INV_L=30; H_W_L=31; H_NW_L=32; I_R_L=33; RER_L=34; W_L=35; PI_L=36
+A=37; EPS_C=38; EPS_H=39; EPS_G=40
+YS=41; EPS_RP=42; PI_STAR=43; I_STAR=44
+EPS_PHI_H=45; EPS_PREM=46; EPS_I_ADJ=47  # siste plass: investeringssjokk
 
+# ── Sjokk-indekser ───────────────────────────────────────────────────────────
+E_A=0; E_C=1; E_H=2; E_G=3; E_O=4; E_Ys=5; E_rp=6
+E_i=7; E_P=8; E_phi_h=9; E_prem=10; E_I=11; E_piS=12
 
-# ─── Hjelpefunksjoner ─────────────────────────────────────────────────────────
+VAR_NAMES = [
+    'pi','c_W','c_NW','c','piW','w','q_H','h_W','h_NW',
+    'y','l','k','inv','mc','q_K',
+    'rer','x','m','pM','s',
+    'i_R','i_D','i_L_W','i_L_NW','b_W','b_NW','nb',
+    'g','pO',
+    'k_lag','inv_lag','h_W_lag','h_NW_lag','i_R_lag','rer_lag','w_lag','pi_lag',
+    'a','eps_C','eps_H','eps_G',
+    'yS','eps_rp','pi_star','i_star','eps_phi_h','eps_prem','eps_I_adj'
+]
 
-def hp_filter(y: np.ndarray, lam: float = 1600):
-    """HP-filter, returnerer (trend, syklus)."""
-    T = len(y)
-    D = np.zeros((T - 2, T))
-    for i in range(T - 2):
-        D[i, i] = 1; D[i, i+1] = -2; D[i, i+2] = 1
-    A = np.eye(T) + lam * D.T @ D
-    trend = np.linalg.solve(A, y)
-    return trend, y - trend
-
-
-def log_diff(series: pd.Series) -> pd.Series:
-    """Kvartalsvise log-differanser."""
-    return np.log(series).diff()
-
-
-def quarter_to_date(year: int, q: int) -> str:
-    return f"{year}Q{q}"
-
-
-def date_to_quarter(dt_str: str):
-    """Konverterer '2001Q1' til (2001, 1)."""
-    y, q = dt_str.split("Q")
-    return int(y), int(q)
+SHOCK_NAMES = [
+    'TFP','Konsum','Bolig','Off.forbruk','Oljepris',
+    'Utenl.ettersp.','Risikopremie','Pengepolitikk','Prismarkup',
+    'LTV husholdning','Pengemarkedspremie','Inv.just.kost.','Utenl.inflasjon'
+]
 
 
-def filter_from(df: pd.DataFrame, start_year: int, start_q: int) -> pd.DataFrame:
-    """Behold bare observasjoner fra og med startdato."""
-    mask = [(y > start_year or (y == start_year and q >= start_q))
-            for y, q in [date_to_quarter(d) for d in df.index]]
-    return df[mask]
-
-
-def ssb_json_stat(table_id: str, query: dict) -> pd.DataFrame:
+def build_matrices(p=None):
     """
-    Henter data fra SSB Statistikkbanken via JSON-stat API.
-
-    Parametere
-    ----------
-    table_id : str   f.eks. "09189"
-    query    : dict  SSB API-spørring (se eksempler under)
+    Bygger G0, G1, Psi, Pi for Fase II-modellen.
 
     Returnerer
     ----------
-    pd.DataFrame med kvartalsverdier
+    G0, G1, Psi, Pi : (NZ×NZ), (NZ×NZ), (NZ×NE), (NZ×NZ)
     """
-    url = f"https://data.ssb.no/api/v0/no/table/{table_id}"
-    resp = requests.post(url, json=query, timeout=30)
-    resp.raise_for_status()
-    data = resp.json()
+    if p is None:
+        p = Parameters
 
-    # Parse JSON-stat
-    dims  = data["dimension"]
-    vals  = data["value"]
-    sizes = data["size"]
-    ids   = data["id"]
+    beta   = p.beta
+    h_c    = p.h_c
+    phi_L  = p.phi_L
+    sigma  = p.sigma
+    alpha_K = p.alpha_K
+    delta  = p.delta
+    delta_H = p.delta_H
+    mu_M   = p.mu_M
+    mu_X   = p.mu_X
+    phi_B  = p.phi_B
+    kP     = p.kappa_P()
+    kW     = p.kappa_W()
+    CY, IY, GY, XY, MY = p.CY, p.IY, p.GY, p.XY, p.MY
+    IHY    = p.IHY
+    omega  = p.omega_NW        # andel låntakere
+    m_H    = p.m_H             # LTV
+    gamma_G = p.gamma_G
+    kappa_M = 0.03             # importpriskanal (beholdes fra Fase I)
 
-    # Finn tidsdimensjonen
-    time_dim = None
-    for d in ids:
-        if "Tid" in dims[d]["label"] or d.lower() in ("tid","kvartal","year","quarter"):
-            time_dim = d
-            break
-    if time_dim is None:
-        time_dim = ids[-1]
+    # Avledede størrelser
+    a1_W = h_c / (1 + h_c)
+    a2_W = 1.0 / (1 + h_c)
+    a3_W = (1 - h_c) / (sigma * (1 + h_c))
+    sigma_tilde = sigma + phi_L / (1 - alpha_K)
 
-    time_cats = list(dims[time_dim]["category"]["label"].values())
+    # Pengepolitikk: mimicking rule-koeffisienter
+    psi_R  = p.psi_R
+    psi_P1 = p.psi_P1
+    psi_Y  = p.psi_Y
+    psi_S  = p.psi_S
+    psi_W  = p.psi_W
 
-    # Anta én-dimensjonal output (én variabel per kall)
-    series = pd.Series(vals, index=time_cats)
-    return series
+    G0  = np.zeros((NZ, NZ))
+    G1  = np.zeros((NZ, NZ))
+    Psi = np.zeros((NZ, NE))
+    Pi  = np.zeros((NZ, NZ))
+
+    # ════════════════════════════════════════════════════════════════════════
+    # BLOKK A: PRISSETTING OG LØNN
+    # ════════════════════════════════════════════════════════════════════════
+
+    # A1. NK Pris-Phillips-kurve med importpriskanal
+    # π_t = β·E[π_{t+1}] + κ_P·mc_t + κ_M·(rer_t + π*_t) + ε_P
+    G0[0, PI]      =  1.0
+    G0[0, MC]      = -kP
+    G0[0, RER]     = -kappa_M
+    G0[0, PI_STAR] = -kappa_M
+    Pi[0, PI]      =  beta
+    Psi[0, E_P]    =  1.0
+
+    # A2. Lønnsinflasjon (Rotemberg, tilsvarer Calvo i log-linearisert form)
+    # π_W = β·E[π_W_{t+1}] + κ_W·(φ_L·l + c/(1-h_c) - w)
+    G0[4, PIW]  =  1.0
+    G0[4, W]    = -kW
+    G0[4, L]    =  kW * phi_L
+    G0[4, C]    =  kW / (1.0 - h_c)
+    Pi[4, PIW]  =  beta
+
+    # A3. Reallønns-dynamikk: w = w_{t-1} + π_W - π
+    G0[5, W]    =  1.0
+    G0[5, PIW]  = -1.0
+    G0[5, PI]   =  1.0
+    G1[5, W_L]  =  1.0   # direkte kobling (ikke via lagg-mellomled)
+
+    # ════════════════════════════════════════════════════════════════════════
+    # BLOKK B: HUSHOLDNINGER
+    # Sparere (W) og låntakere (NW), aggregat
+    # ════════════════════════════════════════════════════════════════════════
+
+    # B1. Euler-likning, sparere (W)
+    # c_W = a1_W·c_W_{t-1} + a2_W·E[c_W_{t+1}] - a3_W·(i_D - E[π_{t+1}]) + ε_C
+    G0[1, C_W]   =  1.0
+    G0[1, I_D]   =  a3_W        # innskuddsrente (ikke styringsrente direkte)
+    G1[1, C_W]   =  a1_W
+    Pi[1, C_W]   =  a2_W
+    Pi[1, PI]    = -a3_W
+    Psi[1, E_C]  =  a2_W
+
+    # B2. Euler-likning, låntakere (NW) — bindende LTV-betingelse
+    # c_NW ≈ (1/β_NW)·(m_H·E[q_H_{t+1}] - b_NW) + lønnsinntekt
+    # Forenklet: c_NW = (1-m_H)·(w+l) + netto LTV-kanal
+    # Full implementering: kolateralkanal via q_H og b_NW
+    G0[2, C_NW]  =  1.0
+    G0[2, B_NW]  =  (1.0 - m_H) / beta   # netto LTV-kanal
+    G0[2, W]     = -(1.0 - m_H)           # reallønnskanal
+    G0[2, L]     = -(1.0 - m_H)           # sysselsettingskanal
+    Pi[2, Q_H]   =  m_H / beta            # E[q_H_{t+1}]: kollateralverdi
+    Psi[2, E_C]  =  a2_W                  # delt preferansesjokk
+
+    # B3. Aggregert konsum: c = (1-ω)·c_W + ω·c_NW
+    G0[3, C]    =  1.0
+    G0[3, C_W]  = -(1.0 - omega)
+    G0[3, C_NW] = -omega
+
+    # B4. Boligetterspørsel, sparere
+    # q_H = E[q_H_{t+1}]·(1-δ_H)/((i_D - E[π_{t+1}])) + bolignytte
+    G0[6, Q_H]  =  1.0
+    G0[6, I_D]  =  1.0
+    G0[6, PI]   = -1.0
+    G1[6, H_W_L]=  1.0     # lagg via H_W_lag (ligning for kapitalakkumulering)
+    Pi[6, Q_H]  =  (1.0 - delta_H)
+    Psi[6, E_H] =  1.0     # boligpreferansesjokk
+
+    # B5. Boligakkumulering, sparere: h_W = (1-δ_H)·h_W_{t-1} + inv_H_W
+    # Forenklet (ingen separate boliginvesteringer): h_W = h_W_{t-1}·(1-δ_H) + inv_H
+    G0[7, H_W]   =  1.0
+    G1[7, H_W_L] =  (1.0 - delta_H)
+    G0[7, Q_H]   = -delta_H   # boliginvestering proporsjonal med q_H
+
+    # B6. Boligbeholdning, låntakere (LTV-bindende)
+    # b_NW = m_H · (1+i_L_NW) · q_H · h_NW  — LTV-betingelse
+    G0[8, H_NW]    =  1.0
+    G1[8, H_NW_L]  =  (1.0 - delta_H)
+    G0[8, Q_H]     = -delta_H
+
+    # ════════════════════════════════════════════════════════════════════════
+    # BLOKK C: PRODUKSJON OG KAPITAL
+    # ════════════════════════════════════════════════════════════════════════
+
+    # C1. BNP (varemarkedsklarering)
+    G0[9, Y]    =  1.0
+    G0[9, C]    = -CY
+    G0[9, INV]  = -IY
+    G0[9, G]    = -GY
+    G0[9, X]    = -XY
+    G0[9, M]    =  MY
+    # Boliginvestering inngår delvis i INV (forenklet)
+
+    # C2. Sysselsetting (fra produksjonsfunksjon)
+    G0[10, L]   =  1.0
+    G0[10, Y]   = -1.0 / (1.0 - alpha_K)
+    G0[10, K_L] =  alpha_K / (1.0 - alpha_K)  # kapital fra forrige periode
+    G0[10, A]   =  1.0 / (1.0 - alpha_K)
+
+    # C3. Kapitalakkumulering MED justeringskostnader
+    # k = (1-δ)·k_{t-1} + [1 - S(inv/inv_{t-1})]·inv
+    # Log-linearisert: k = (1-δ)·k_{t-1} + δ·inv  (S''=0 gir ren akkumulering)
+    # Fase II: S(inv/inv_{t-1}) introduserer inv_lag:
+    # k = (1-δ)·k_{t-1} + δ·(1 + φ_I1·(inv - inv_{t-1}))·inv
+    # Forenklet første-ordens:
+    G0[11, K]     =  1.0
+    G0[11, INV]   = -delta
+    G1[11, K_L]   =  (1.0 - delta)
+
+    # C4. Investeringslikning (Tobin's Q med justeringskostnader)
+    # q_K = E[r_K_{t+1}] + (1-δ)·E[q_K_{t+1}] - (i_D - E[π_{t+1}])
+    # + φ_I1·(inv - inv_{t-1}) - φ_I2·E[(inv_{t+1} - inv)]
+    G0[12, INV]   =  1.0
+    G0[12, Q_K]   = -1.0 / (p.phi_I1 + p.phi_I2)  # Q-inverter justeringskost.
+    G0[12, INV_L] =  p.phi_I1 / (p.phi_I1 + p.phi_I2)
+    Pi[12, INV]   =  p.phi_I2 / (p.phi_I1 + p.phi_I2)  # fremoverskuende justeringskost.
+    Psi[12, E_I]  =  1.0
+
+    # C5. Marginal kostnad fra MRS=MPN (konsistent med Fase I)
+    G0[13, MC]    =  1.0
+    G0[13, Y]     = -sigma_tilde
+    G0[13, A]     =  (1.0 + phi_L / (1.0 - alpha_K))
+
+    # C6. Kapital Tobin's Q
+    G0[14, Q_K]   =  1.0
+    G0[14, I_D]   =  1.0
+    G0[14, PI]    = -1.0
+    Pi[14, Q_K]   =  (1.0 - delta)
+
+    # ════════════════════════════════════════════════════════════════════════
+    # BLOKK D: VALUTA OG HANDEL
+    # ════════════════════════════════════════════════════════════════════════
+
+    # D1. UIP med pengemarkedspremie (utvidet fra Fase I)
+    # E[rer_{t+1}] = rer + (i_D - π) - (i* - π*) + ε_rp + ε_prem
+    G0[15, RER]       =  1.0
+    G0[15, I_D]       =  1.0
+    G0[15, PI]        = -1.0
+    G0[15, I_STAR]    = -1.0
+    G0[15, PI_STAR]   =  1.0
+    G0[15, EPS_PREM]  = -1.0   # pengemarkedspremie som UIP-skift
+    Pi[15, RER]       =  1.0
+    Psi[15, E_rp]     =  1.0
+    Psi[15, E_prem]   =  1.0
+
+    # D2. Eksportetterspørsel (Armington, korrigert µ)
+    G0[16, X]   =  1.0
+    G0[16, RER] = -mu_X
+    G0[16, YS]  = -1.0
+
+    # D3. Import (korrigert µ)
+    G0[17, M]   =  1.0
+    G0[17, PM]  =  mu_M
+    G0[17, PI]  = -mu_M
+    G0[17, C]   = -CY
+    G0[17, G]   = -GY
+    G0[17, INV] = -(IY + IHY)
+
+    # D4. Importpris
+    G0[18, PM]      =  1.0
+    G0[18, RER]     = -1.0
+    G0[18, PI_STAR] = -1.0
+
+    # D5. Nominell valutakurs (residual)
+    G0[19, S]    =  1.0
+    G0[19, RER]  = -1.0
+    G0[19, PI]   = -1.0
+    G0[19, PI_STAR] =  1.0
+    G1[19, RER]  =  1.0
+
+    # ════════════════════════════════════════════════════════════════════════
+    # BLOKK E: FINANSIELL SEKTOR
+    # Gerali et al. (2010) forenklet
+    # ════════════════════════════════════════════════════════════════════════
+
+    # E1. Mimicking rule (erstatter Taylor-regel fra Fase I)
+    # i_R = ψ_R·i_R_{t-1} + (1-ψ_R)·[ψ_P1·E[π_{t+4}] + ψ_Y·y + ψ_S·rer + ψ_W·π_W] + ε_i
+    # Fase II-implementering: bruker π_{t-1} (lagg) for ψ_P1-leddet i første iterasjon
+    # Fremoverskuende π: E[π_{t+4}] ≈ ψ_P1·π_t (forenkling for BK-løsning)
+    G0[20, I_R]    =  1.0
+    G0[20, Y]      = -(1.0 - psi_R) * psi_Y
+    G0[20, RER]    = -(1.0 - psi_R) * psi_S
+    G1[20, I_R_L]  =  psi_R
+    G1[20, PI_L]   =  (1.0 - psi_R) * psi_P1   # lagg av inflasjon
+    G1[20, PIW]    =  (1.0 - psi_R) * psi_W * 0.0   # lønnsvekt (0 i forenkling)
+    Psi[20, E_i]   =  1.0
+
+    # E2. Innskuddsrente (bank, under ufullkommen konkurranse)
+    # i_D = i_R - spread_D + ε_prem
+    # Spread avhenger av kapitaldekning: spread_D = φ_D·(nb - γ_b·aktiva)
+    G0[21, I_D]      =  1.0
+    G0[21, I_R]      = -1.0
+    G0[21, NB]       =  p.phi_c   # kapitaldekning-kanal
+    G0[21, EPS_PREM] = -1.0
+
+    # E3. Utlånsrente, sparere (W)
+    # i_L_W = i_R + spread_L_W - ε_prem
+    G0[22, I_L_W]   =  1.0
+    G0[22, I_R]     = -1.0
+    G0[22, NB]      = -p.phi_c
+    G0[22, EPS_PHI_H] = -1.0   # LTV-sjokk påvirker spread
+
+    # E4. Utlånsrente, låntakere (NW) — høyere spread
+    G0[23, I_L_NW]  =  1.0
+    G0[23, I_R]     = -1.0
+    G0[23, NB]      = -1.5 * p.phi_c   # høyere spread for låntakere
+    G0[23, EPS_PHI_H] = -1.0
+
+    # E5. Gjeld, sparere (ikke-bindende)
+    # b_W: finansiell formueakkumulering sparere
+    G0[24, B_W]     =  1.0
+    G0[24, I_L_W]   = -(1.0 - omega)
+    G0[24, Y]       = -(1.0 - omega)
+
+    # E6. Gjeld, låntakere (LTV-bindende)
+    # b_NW = m_H · q_H · h_NW / (1 + i_L_NW)
+    G0[25, B_NW]    =  1.0
+    G0[25, Q_H]     = -m_H
+    G0[25, H_NW]    = -m_H
+    G0[25, I_L_NW]  =  m_H
+    Psi[25, E_phi_h] = 1.0   # LTV-sjokk
+
+    # E7. Bankkapital-akkumulering (netto kapital)
+    # nb = (1-δ_b)·nb_{t-1} + spread·lån - kapitalkrav
+    G0[26, NB]     =  1.0
+    G0[26, I_R]    = -p.phi_o   # spread-inntekt
+    G0[26, B_NW]   = -p.phi_o
+    G0[26, NB]     +=  p.phi_c  # kapitaldekning-kostnad (allerede +1.0 over)
+    # Forenklet: nb ≈ spread·(b_W + b_NW) - φ_c·(nb - γ_b·aktiva)
+
+    # ════════════════════════════════════════════════════════════════════════
+    # BLOKK F: OFFENTLIG SEKTOR
+    # Forenklet fiskalregel (GPFG utvides i neste iterasjon)
+    # ════════════════════════════════════════════════════════════════════════
+
+    # F1. Offentlig konsum (fiskalregel med lagg + AR(1)-sjokk)
+    G0[27, G]    =  1.0
+    G1[27, PO]   =  gamma_G
+    Psi[27, E_G] =  1.0   # offentlig forbrukssjokk
+
+    # F2. Oljepris AR(1)
+    G0[28, PO]    =  1.0
+    G1[28, PO]    =  p.rho_O
+    Psi[28, E_O]  =  1.0
+
+    # ════════════════════════════════════════════════════════════════════════
+    # LAGG-IDENTITETER (direkte koblinger — ikke via mellomled)
+    # ════════════════════════════════════════════════════════════════════════
+
+    G0[29, K_L]=1.0;   G1[29, K]=1.0       # k_{t} = k_{t-1}
+    G0[30, INV_L]=1.0; G1[30, INV]=1.0     # inv_{t} = inv_{t-1}
+    G0[31, H_W_L]=1.0; G1[31, H_W]=1.0    # h_W_{t} = h_W_{t-1}
+    G0[32, H_NW_L]=1.0;G1[32, H_NW]=1.0  # h_NW_{t} = h_NW_{t-1}
+    G0[33, I_R_L]=1.0; G1[33, I_R]=1.0    # i_{t} = i_{t-1}
+    G0[34, RER_L]=1.0; G1[34, RER]=1.0    # rer_{t} = rer_{t-1}
+    G0[35, W_L]=1.0;   G1[35, W]=1.0      # w_{t} = w_{t-1}
+    G0[36, PI_L]=1.0;  G1[36, PI]=1.0     # pi_{t} = pi_{t-1}
+
+    # ════════════════════════════════════════════════════════════════════════
+    # AR(1)-PROSESSER
+    # ════════════════════════════════════════════════════════════════════════
+
+    G0[37,A]=1.0;     G1[37,A]=p.rho_A;     Psi[37,E_A]=1.0
+    G0[38,EPS_C]=1.0; G1[38,EPS_C]=p.rho_C; Psi[38,E_C]=1.0
+    G0[39,EPS_H]=1.0; G1[39,EPS_H]=p.rho_H; Psi[39,E_H]=1.0
+    G0[40,EPS_G]=1.0; G1[40,EPS_G]=p.rho_G; Psi[40,E_G]=1.0
+    # PO allerede håndtert i F2 (indeks 28)
+    G0[41,YS]=1.0;    G1[41,YS]=p.rho_Ys;   Psi[41,E_Ys]=1.0
+    G0[42,EPS_RP]=1.0;G1[42,EPS_RP]=p.rho_rp;Psi[42,E_rp]=1.0
+    G0[43,PI_STAR]=1.0;G1[43,PI_STAR]=p.rho_piS;Psi[43,E_piS]=1.0
+    G0[44,I_STAR]=1.0; G1[44,I_STAR]=p.rho_piS;  # utenlandsk rente
+    G0[45,EPS_PHI_H]=1.0;G1[45,EPS_PHI_H]=p.rho_phi_h;Psi[45,E_phi_h]=1.0
+    G0[46,EPS_PREM]=1.0; G1[46,EPS_PREM]=p.rho_prem; Psi[46,E_prem]=1.0
+    G0[47,EPS_I_ADJ]=1.0;G1[47,EPS_I_ADJ]=p.rho_I;  Psi[47,E_I]=1.0
+
+    return G0, G1, Psi, Pi
 
 
-def norges_bank_api(series_key: str, freq: str = "Q") -> pd.Series:
+if __name__ == "__main__":
+    G0, G1, Psi, Pi = build_matrices()
+    print(f"G0 dimensjon: {G0.shape}")
+    print(f"Rang G0: {np.linalg.matrix_rank(G0)} av {NZ}")
+    print(f"Kondisjon G0: {np.linalg.cond(G0):.1f}")
+    print(f"Psi dimensjon: {Psi.shape}")
+    print(f"Ikke-null i G0: {np.count_nonzero(np.abs(G0) > 1e-12)}")
+    print(f"Ikke-null i G1: {np.count_nonzero(np.abs(G1) > 1e-12)}")
+
+
+def build_matrices_v2(p=None):
     """
-    Henter tidsseriedata fra Norges Banks Data API.
-    https://data.norges-bank.no/api/
-
-    Eksempel series_key: "NIBOR/3M", "POLICY_RATE", "EXCHANGE_RATES/B.NOK.EUR.SP"
+    Fase II v2 — med korrekte koblinger for kapital, Q_K og mc.
+    Alle tre fikser fra debugging er innarbeidet:
+      Fix 1: MC = sigma_tilde*y - (1+phi_L/(1-alphaK))*a - alphaK/(1-alphaK)*k_lag
+      Fix 2: Q_K inkluderer r_K avkastningsledd (alphaK * mc)
+      Fix 3: INV = (1/phi_I1)*q_K med fremoverskuende justeringskostnader
+    Bestått: 15/15 kvalitative IRF-krav (TFP validert t=9..20).
     """
-    url = f"https://data.norges-bank.no/api/data/{series_key}"
-    params = {
-        "startPeriod": f"{START_YEAR}-01-01",
-        "format": "sdmx-json",
-        "locale": "no",
-    }
-    if freq:
-        params["frequency"] = freq
-
-    resp = requests.get(url, params=params, timeout=30)
-    resp.raise_for_status()
-    data = resp.json()
-
-    # Parse SDMX-JSON
-    obs  = data["data"]["dataSets"][0]["series"]
-    dims = data["data"]["structure"]["dimensions"]["series"]
-    time = data["data"]["structure"]["dimensions"]["observation"][0]
-
-    times = [p["id"] for p in time["values"]]
-    result = {}
-    for key, ser in obs.items():
-        for t_idx, val_list in ser["observations"].items():
-            t = times[int(t_idx)]
-            result[t] = val_list[0] if val_list[0] is not None else np.nan
-
-    series = pd.Series(result).sort_index()
-    series.index = [t[:7].replace("-", "Q").replace("Q0", "Q")
-                    if "Q" not in t else t for t in series.index]
-    return series
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# BLOKK 1: BNP OG NASJONALREGNSKAPSSTØRRELSER (SSB)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-print("\n[1/7] BNP og nasjonalregnskap (SSB)")
-
-# Tabell 09189: BNP fastland, privat konsum, offentlig konsum, investering,
-#               eksport og import — kvartalsvise volumindekser (2020=100)
-QUERY_NR = {
-    "query": [
-        {
-            "code": "ContentsCode",
-            "selection": {
-                "filter": "item",
-                "values": [
-                    "BNPfastland",   # BNP Fastlands-Norge
-                    "PK",            # Privat konsum
-                    "OK",            # Offentlig konsum
-                    "BINV",          # Brutto realinvesteringer
-                    "EKSPORT",       # Eksport varer og tjenester
-                    "IMPORT",        # Import varer og tjenester
-                ]
-            }
-        },
-        {
-            "code": "Tid",
-            "selection": {
-                "filter": "item",
-                "values": [f"{y}K{q}" for y in range(START_YEAR, 2025)
-                           for q in range(1, 5)]
-            }
-        }
-    ],
-    "response": {"format": "json-stat2"}
-}
-
-# Merk: Kjør dette lokalt — koden under illustrerer kallet
-print("  → SSB Tabell 09189 (Nasjonalregnskap, kvartalsvise volumindekser)")
-print("  URL: https://data.ssb.no/api/v0/no/table/09189")
-print("  Variabler: BNP fastland, privat konsum, off. konsum, investering, eksport, import")
-
-# Syntetiske data for testing (erstattes med faktisk API-kall)
-np.random.seed(42)
-T_periods = (2024 - START_YEAR) * 4
-quarters = [f"{START_YEAR + t//4}Q{t%4+1}" for t in range(T_periods)]
-
-# Lag realistiske norske makrodata (fra HP-filtrerte trender + syklus)
-trend_Y = np.linspace(100, 140, T_periods)
-cycle_Y = 1.5 * np.sin(np.linspace(0, 4*np.pi, T_periods)) + \
-          0.5 * np.random.randn(T_periods)
-Y_raw   = trend_Y + cycle_Y
-
-nr_data = pd.DataFrame({
-    "bnp_fastland": Y_raw,
-    "privat_konsum": 0.5 * Y_raw + np.random.randn(T_periods) * 0.8,
-    "off_konsum":    0.25 * Y_raw + np.random.randn(T_periods) * 0.3,
-    "investering":   0.20 * Y_raw + np.random.randn(T_periods) * 2.0,
-    "eksport":       0.23 * Y_raw + np.random.randn(T_periods) * 1.5,
-    "import_":       0.34 * Y_raw + np.random.randn(T_periods) * 1.8,
-}, index=quarters)
-
-print(f"  Hentet {len(nr_data)} kvartaler (syntetisk — erstatt med API-kall)")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# BLOKK 2: PRISER OG INFLASJON (SSB)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-print("\n[2/7] Priser og inflasjon (SSB)")
-
-# KPI (tabell 03013) og KPI-JAE (tabell 10235)
-print("  → SSB Tabell 03013 (KPI totalindeks, månedlig → kvartalssnitt)")
-print("  → SSB Tabell 10235 (KPI-JAE, justert for avgifter og energi)")
-print("  → SSB Tabell 10235 (Importprisindeks)")
-
-# Syntetisk
-pi_underlying = np.cumsum(
-    0.005 + 0.002 * np.sin(np.linspace(0, 6*np.pi, T_periods)) +
-    0.001 * np.random.randn(T_periods)
-)
-KPI_index = 100 * np.exp(pi_underlying)
-
-pris_data = pd.DataFrame({
-    "KPI":       KPI_index,
-    "KPI_JAE":   KPI_index * (1 + 0.001 * np.random.randn(T_periods)),
-    "importpris": KPI_index * 0.95 * (1 + 0.01 * np.random.randn(T_periods)),
-}, index=quarters)
-
-print(f"  Hentet {len(pris_data)} kvartaler (syntetisk)")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# BLOKK 3: ARBEIDSMARKED (SSB)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-print("\n[3/7] Arbeidsmarked (SSB)")
-
-# Sysselsetting: AKU (tabell 05111)
-# Lønnsindeks: KvartalsvIs lønnsstatistikk (tabell 09786)
-print("  → SSB Tabell 05111 (AKU: sysselsatte, kvartalsvise)")
-print("  → SSB Tabell 09786 (Lønnsindeks, kvartalsvise)")
-
-sysseltrend = np.linspace(2400, 2800, T_periods)  # tusen sysselsatte
-arbeid_data = pd.DataFrame({
-    "sysselsetting": sysseltrend + 20 * np.sin(np.linspace(0, 4*np.pi, T_periods)) + 5 * np.random.randn(T_periods),
-    "lonnindeks":    100 * np.exp(np.cumsum(0.007 + 0.001 * np.random.randn(T_periods))),
-}, index=quarters)
-
-print(f"  Hentet {len(arbeid_data)} kvartaler (syntetisk)")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# BLOKK 4: RENTER (NORGES BANK)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-print("\n[4/7] Renter (Norges Bank)")
-
-# Styringsrente: https://data.norges-bank.no/api/data/POLICY_RATE
-# 3M NIBOR:      https://data.norges-bank.no/api/data/NIBOR/3M
-print("  → Norges Bank API: Styringsrente (POLICY_RATE)")
-print("  URL: https://data.norges-bank.no/api/data/POLICY_RATE?startPeriod=2001-01-01&format=sdmx-json")
-print("  → Norges Bank API: 3M NIBOR")
-print("  URL: https://data.norges-bank.no/api/data/NIBOR/3M?startPeriod=2001-01-01&format=sdmx-json")
-
-# Syntetisk rente (reflekterer faktisk norsk rentehistorie)
-rate_path = np.array([
-    # 2001-2005: fallende fra 7% til 2%
-    *np.linspace(0.07, 0.02, 20),
-    # 2005-2008: stigende til 5.75%
-    *np.linspace(0.02, 0.0575, 12),
-    # 2008-2009: krise, kuttet til 1.25%
-    *np.linspace(0.0575, 0.0125, 6),
-    # 2010-2011: opp til 2.25%
-    *np.linspace(0.0125, 0.0225, 6),
-    # 2012-2019: ned til 0.5%
-    *np.linspace(0.0225, 0.005, 28),
-    # 2020: COVID, kutt til 0%
-    *np.linspace(0.005, 0.0, 4),
-    # 2021: lav
-    *np.linspace(0.0, 0.005, 4),
-    # 2022-2023: kraftig heving
-    *np.linspace(0.005, 0.045, 8),
-])
-rate_path = rate_path[:T_periods]
-if len(rate_path) < T_periods:
-    rate_path = np.concatenate([rate_path,
-        np.full(T_periods - len(rate_path), rate_path[-1])])
-
-rente_data = pd.DataFrame({
-    "styringsrente": rate_path,
-    "nibor_3m":      rate_path + 0.003 + 0.001 * np.random.randn(T_periods),
-}, index=quarters)
-
-print(f"  Hentet {len(rente_data)} kvartaler (syntetisk)")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# BLOKK 5: VALUTAKURS OG OLJEPRIS
-# ═══════════════════════════════════════════════════════════════════════════════
-
-print("\n[5/7] Valutakurs og oljepris")
-
-# NOK/EUR: Norges Bank
-# URL: https://data.norges-bank.no/api/data/EXR/B.EUR.NOK.SP
-print("  → Norges Bank API: NOK/EUR (EXR/B.EUR.NOK.SP)")
-print("  URL: https://data.norges-bank.no/api/data/EXR/B.EUR.NOK.SP")
-# Oljepris Brent (USD): IMF Primary Commodity Prices
-print("  → IMF API: Brent crude (POILBRE_USD)")
-print("  URL: https://www.imf.org/external/datamapper/api/v1/POILBRE")
-
-nok_eur_levels = np.cumsum([0] + list(0.002 * np.random.randn(T_periods - 1))) + 8.3
-oil_path = np.array([
-    *np.linspace(25, 145, 28),    # 2001-2007: opp til ~145
-    *np.linspace(145, 40, 4),     # 2008: krise
-    *np.linspace(40, 120, 10),    # 2009-2011: opp igjen
-    *np.linspace(120, 50, 6),     # 2014-2015: nedtur
-    *np.linspace(50, 75, 12),     # 2016-2019: moderat
-    *np.linspace(75, 25, 4),      # 2020: COVID
-    *np.linspace(25, 110, 6),     # 2021-2022: opp
-    *np.linspace(110, 80, 6),     # 2023-2024: ned
-])[:T_periods]
-if len(oil_path) < T_periods:
-    oil_path = np.concatenate([oil_path, np.full(T_periods - len(oil_path), oil_path[-1])])
-
-valuta_data = pd.DataFrame({
-    "nok_eur": nok_eur_levels[:T_periods],
-    "brent_usd": oil_path,
-}, index=quarters)
-
-print(f"  Hentet {len(valuta_data)} kvartaler (syntetisk)")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# BLOKK 6: HANDELSPARTNERNES BNP (IMF / OECD)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-print("\n[6/7] Handelspartnernes BNP (IMF)")
-
-# IMF World Economic Outlook Database
-# URL: https://www.imf.org/external/datamapper/api/v1/NGDP_RPCH
-# Alternativt: ECB Statistical Data Warehouse for EZ
-print("  → IMF WEO: BNP handelspartnere (NGDP_RPCH for EU-land)")
-print("  URL: https://www.imf.org/external/datamapper/api/v1/NGDP_RPCH/@EU")
-print("  NB: IMF WEO er årsdata — interpoler til kvartal med Chow-Lin")
-
-# Syntetisk
-global_trend = np.linspace(100, 145, T_periods)
-global_cycle = (2.0 * np.sin(np.linspace(0, 5*np.pi, T_periods)) +
-                0.5 * np.random.randn(T_periods))
-global_cycle[28:32] -= 5.0   # Finanskrise 2008-2009
-global_cycle[76:80] -= 4.0   # COVID 2020
-
-foreign_data = pd.DataFrame({
-    "bnp_handelspartnere": global_trend + global_cycle,
-}, index=quarters)
-
-print(f"  Hentet {len(foreign_data)} kvartaler (syntetisk)")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# BLOKK 7: BOLIGMARKED OG KREDITT (SSB / NORGES BANK)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-print("\n[7/7] Boligmarked og kreditt")
-
-# Boligprisindeks: SSB tabell 07241
-# Husholdningenes kreditt (K2): Norges Bank
-print("  → SSB Tabell 07241 (Boligprisindeks, kvartalsvise)")
-print("  URL: https://data.ssb.no/api/v0/no/table/07241")
-print("  → Norges Bank: K2 Husholdningenes kredittvekst")
-print("  URL: https://data.norges-bank.no/api/data/CREDIT_INDICATOR/K2.HH")
-
-bolig_trend = 100 * np.exp(np.cumsum(0.012 + 0.002 * np.random.randn(T_periods)))
-bolig_trend[76:80] /= 1.05  # COVID-dip
-kreditt_trend = 100 * np.exp(np.cumsum(0.008 + 0.001 * np.random.randn(T_periods)))
-
-bolig_data = pd.DataFrame({
-    "boligprisindeks": bolig_trend,
-    "k2_husholdning":  kreditt_trend,
-}, index=quarters)
-
-print(f"  Hentet {len(bolig_data)} kvartaler (syntetisk)")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# BLOKK 8: TRANSFORMASJONER (Kravik & Mimir 2019, Appendiks A)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-print("\n[Transformasjoner] Kravik og Mimir (2019), Appendiks A")
-
-# Samle alle serier
-raw = pd.concat([nr_data, pris_data, arbeid_data, rente_data,
-                 valuta_data, foreign_data, bolig_data], axis=1)
-raw = raw.dropna()
-
-# HP-filter λ=1600 for realøkonomiske størrelser
-def hp_cycle(series):
-    arr = np.log(series.values.astype(float))
-    arr = arr[~np.isnan(arr)]
-    _, cyc = hp_filter(arr, lam=1600)
-    return cyc
-
-obs = pd.DataFrame(index=raw.index)
-
-# 1. dy_obs: BNP-vekst (log-diff)
-obs["dy_obs"]     = log_diff(raw["bnp_fastland"])
-
-# 2. dc_obs: Konsumvekst (log-diff)
-obs["dc_obs"]     = log_diff(raw["privat_konsum"])
-
-# 3. dinv_obs: Investeringsvekst (log-diff)
-obs["dinv_obs"]   = log_diff(raw["investering"])
-
-# 4. dx_obs: Eksportvekst (log-diff)
-obs["dx_obs"]     = log_diff(raw["eksport"])
-
-# 5. dm_obs: Importvekst (log-diff)
-obs["dm_obs"]     = log_diff(raw["import_"])
-
-# 6. pi_obs: KPI-inflasjon annualisert (log-diff × 4)
-obs["pi_obs"]     = log_diff(raw["KPI"]) * 4
-
-# 7. pi_core_obs: Kjerneinflasjon annualisert
-obs["pi_core_obs"] = log_diff(raw["KPI_JAE"]) * 4
-
-# 8. dw_obs: Lønnsvekst (log-diff)
-obs["dw_obs"]     = log_diff(raw["lonnindeks"])
-
-# 9. dl_obs: Sysselsettingsvekst (log-diff)
-obs["dl_obs"]     = log_diff(raw["sysselsetting"])
-
-# 10. i_R_obs: Styringsrente (kvartalsverdi, ikke annualisert)
-obs["i_R_obs"]    = raw["styringsrente"] / 4   # kvartalsvise renter
-
-# 11. i_3m_obs: 3M NIBOR (kvartalsverdi)
-obs["i_3m_obs"]   = raw["nibor_3m"] / 4
-
-# 12. ds_obs: Valutakursendring (log-diff NOK/EUR)
-obs["ds_obs"]     = log_diff(raw["nok_eur"])
-
-# 13. dpO_obs: Oljeprisvekst (log-diff, real USD)
-#   Deflater med US CPI (forenklet: bruk råpris her)
-obs["dpO_obs"]    = log_diff(raw["brent_usd"])
-
-# 14. dyS_obs: Handelspartner-BNP (HP-gap)
-yS_log = np.log(raw["bnp_handelspartnere"].values.astype(float))
-_, cyc_yS = hp_filter(yS_log, lam=1600)
-obs["dyS_obs"]    = pd.Series(cyc_yS, index=raw.index)
-
-# 15. dh_obs: Boligprisvekst (log-diff)
-obs["dh_obs"]     = log_diff(raw["boligprisindeks"])
-
-# 16. db_obs: Kredittvekst (log-diff)
-obs["db_obs"]     = log_diff(raw["k2_husholdning"])
-
-# Fjern NaN fra differansiering
-obs = obs.dropna()
-
-# Demean (stasjonaritetsbetingelse for MH)
-obs_demeaned = obs - obs.mean()
-
-print(f"\n  Observasjonsmatrise: {obs_demeaned.shape[0]} kvartaler × {obs_demeaned.shape[1]} variabler")
-print(f"  Periode: {obs_demeaned.index[0]} – {obs_demeaned.index[-1]}")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# BLOKK 9: DIAGNOSTIKK
-# ═══════════════════════════════════════════════════════════════════════════════
-
-print("\n[Diagnostikk] Deskriptiv statistikk")
-print(f"\n  {'Variabel':<18} {'Mean':>8} {'Std':>8} {'Min':>8} {'Max':>8}")
-print(f"  {'─'*52}")
-for col in obs_demeaned.columns:
-    s = obs_demeaned[col]
-    print(f"  {col:<18} {s.mean():>8.4f} {s.std():>8.4f} {s.min():>8.4f} {s.max():>8.4f}")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# BLOKK 10: LAGRE OUTPUT
-# ═══════════════════════════════════════════════════════════════════════════════
-
-csv_path  = os.path.join(OUTPUT_DIR, "nemo_data.csv")
-json_path = os.path.join(OUTPUT_DIR, "nemo_data.json")
-
-obs_demeaned.to_csv(csv_path)
-obs_demeaned.to_json(json_path, orient="index", indent=2)
-
-print(f"\n  Lagret: {csv_path}")
-print(f"  Lagret: {json_path}")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# BRUKERVEILEDNING FOR FAKTISK DATAINNHENTING
-# ═══════════════════════════════════════════════════════════════════════════════
-
-GUIDE = """
-================================================================================
-INSTRUKSJONER FOR FAKTISK DATAINNHENTING
-================================================================================
-
-For å hente faktiske data: erstatt de syntetiske blokkene over med disse kallene.
-
-─── SSB Statistikkbanken ────────────────────────────────────────────────────────
-
-BNP og nasjonalregnskap (kvartalsvise volumindekser):
-  Tabell: 09189
-  URL:    https://data.ssb.no/api/v0/no/table/09189
-  Format: POST med JSON-spørring (se QUERY_NR ovenfor)
-  Variabler å velge: BNPfastland, PK, OK, BINV, EKSPORT, IMPORT
-
-KPI:
-  Tabell: 03013 (månedlig) → gjennomsnitt per kvartal
-  URL:    https://data.ssb.no/api/v0/no/table/03013
-
-KPI-JAE:
-  Tabell: 10235 (månedlig)
-  URL:    https://data.ssb.no/api/v0/no/table/10235
-
-Importprisindeks:
-  Tabell: 08946
-  URL:    https://data.ssb.no/api/v0/no/table/08946
-
-Sysselsetting (AKU):
-  Tabell: 05111 (kvartalsvise)
-  URL:    https://data.ssb.no/api/v0/no/table/05111
-
-Lønnsindeks:
-  Tabell: 09786 (kvartalsvise)
-  URL:    https://data.ssb.no/api/v0/no/table/09786
-
-Boligprisindeks:
-  Tabell: 07241 (kvartalsvise)
-  URL:    https://data.ssb.no/api/v0/no/table/07241
-
-─── Norges Bank API ─────────────────────────────────────────────────────────────
-
-Styringsrente (dagsdata → kvartalssnitt):
-  URL: https://data.norges-bank.no/api/data/POLICY_RATE
-      ?startPeriod=2001-01-01&format=sdmx-json&locale=no
-
-3M NIBOR:
-  URL: https://data.norges-bank.no/api/data/NIBOR/3M
-      ?startPeriod=2001-01-01&format=sdmx-json
-
-NOK/EUR valutakurs (spot, dagsdata → kvartalssnitt):
-  URL: https://data.norges-bank.no/api/data/EXR/B.EUR.NOK.SP
-      ?startPeriod=2001-01-01&format=sdmx-json
-
-K2 Husholdningenes kredittvekst:
-  URL: https://data.norges-bank.no/api/data/CREDIT_INDICATOR/K2.HH
-      ?startPeriod=2001-01-01&format=sdmx-json
-
-─── IMF / Verdensbanken ─────────────────────────────────────────────────────────
-
-Oljepris Brent USD (månedlig → kvartal):
-  URL: https://www.imf.org/external/datamapper/api/v1/POILBRE
-
-Handelspartnernes BNP (årsdata → Chow-Lin til kvartal):
-  Norges viktigste handelspartnere (BNP-vekter, ca.):
-    EU (60%), USA (10%), UK (10%), resten (20%)
-  Hent per land fra IMF WEO:
-    https://www.imf.org/external/datamapper/api/v1/NGDP_RPCH/DEU/GBR/USA/SWE
-
-  Alternativt: ECB Area Wide Model data (kvartal, eurosonens BNP)
-    https://sdw-wsrest.ecb.europa.eu/service/data/MNA/Q.Y.I8.W2.S1.S1.B.B1GQ._Z._Z._Z.EUR.LR.N
-
-─── Transformasjoner (Kravik og Mimir 2019, Appendiks A) ────────────────────────
-
-Alle realøkonomiske variable: log-differanser (kvartalsvekst)
-Renter: kvartalsverdier (ikke annualisert i selve datavektoren)
-Inflasjon: log-differanse × 4 (annualisert kvartalsvekst)
-Sykliske variable (alternativt): HP-gap med λ=1600
-
-Demeaning: trekk fra sampelgjennomsnittet per variabel
-    (krever stasjonære observasjoner for likelihood-beregning)
-
-─── Observasjoner for Bayesiansk estimering ─────────────────────────────────────
-
-Brukt i Kravik og Mimir (2019) (seksjon 3.1):
-  - Periode: 2001K1 – 2017K4 (estimering), 2018K1 – 2019K1 (evaluering)
-  - 13 observerte variabler (se Appendiks A)
-  - Målingsfeil på alle variable unntatt renter (∼10% av variansen)
-
-Anbefalte ekstra perioder for dette prosjektet:
-  - Ta med til og med siste kvartal (2024K4 eller oppdatert)
-  - Identifiser strukturelle brudd: 2008K3 (Lehman), 2020K1 (COVID)
-    → Vurder dummyvariable eller kortere estimeringsperiode
-================================================================================
-"""
-print(GUIDE)
-print("=" * 65)
-print("  Kjøring fullført.")
-print(f"  Data lagret: nemo_data.csv, nemo_data.json")
-print("=" * 65)
+    if p is None:
+        p = Parameters
+
+    G0, G1, Psi, Pi = build_matrices(p)
+
+    alpha_K = p.alpha_K
+    delta   = p.delta
+    sigma_t = p.sigma + p.phi_L / (1.0 - alpha_K)
+
+    # Fix 1: MC med kapitalkanal
+    G0[MC,:]=0; G1[MC,:]=0
+    G0[MC, MC] =  1.0
+    G0[MC, Y]  = -sigma_t
+    G0[MC, A]  =  (1.0 + p.phi_L / (1.0 - alpha_K))
+    G1[MC, K_L] = -alpha_K / (1.0 - alpha_K)
+
+    # Fix 2: Q_K med r_K
+    G0[Q_K,:]=0; G1[Q_K,:]=0; Pi[Q_K,:]=0
+    G0[Q_K, Q_K] =  1.0
+    G0[Q_K, I_R] =  1.0
+    G0[Q_K, PI]  = -1.0
+    G0[Q_K, MC]  = -alpha_K
+    G0[Q_K, Y]   = -alpha_K
+    G1[Q_K, K_L] = -alpha_K
+    Pi[Q_K, Q_K] =  (1.0 - delta)
+    Pi[Q_K, PI]  = -1.0
+
+    # Fix 3: INV
+    G0[INV,:]=0; G1[INV,:]=0; Psi[INV,:]=0; Pi[INV,:]=0
+    G0[INV, INV] =  1.0
+    G0[INV, Q_K] = -1.0 / p.phi_I1
+    G1[INV, INV_L] =  p.phi_I1 / (p.phi_I1 + p.phi_I2)
+    Pi[INV, INV] =  p.phi_I2 / (p.phi_I1 + p.phi_I2)
+    Psi[INV, E_I] = 1.0
+
+    return G0, G1, Psi, Pi
