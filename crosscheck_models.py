@@ -254,8 +254,13 @@ class BVARMinnesota:
         data       : DataFrame med self.variables som kolonner
         covid_mask : bool-array (T,), True = ekskluder fra estimering
         """
-        Y_full = data[self.variables].values.astype(float)
+        _sub = data[self.variables]
+        _valid = _sub.notna().all(axis=1)
+        Y_full = _sub[_valid].values.astype(float)
         T_full = len(Y_full)
+        # Justerer covid_mask til gyldige rader (trailing NaN dropper siste kvartal)
+        if covid_mask is not None:
+            covid_mask = covid_mask[_valid.values]
 
         # Velg lagorden via BIC hvis ikke angitt eksplisitt (p=4 er default)
         X_full, Y_dep_full = _lag_matrix(Y_full, self.p)
