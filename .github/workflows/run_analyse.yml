@@ -1,0 +1,51 @@
+name: Kjør NEMO analyse
+
+on:
+  workflow_dispatch:
+    inputs:
+      posterior_file:
+        description: 'Posterior JSON-fil'
+        required: false
+        default: 'chain_v3_v2_posterior.json'
+      data_file:
+        description: 'Observasjonsdata CSV-fil'
+        required: false
+        default: 'nemo_data_faktisk_v2.csv'
+
+jobs:
+  analyse:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Hent kode
+        uses: actions/checkout@v4
+
+      - name: Sett opp Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Installer avhengigheter
+        run: pip install numpy scipy pandas statsmodels
+
+      - name: Kjør NEMO analyse
+        run: |
+          python nemo_analyse.py \
+            --posterior ${{ github.event.inputs.posterior_file }} \
+            --data ${{ github.event.inputs.data_file }} \
+            --output analyse_resultater.json
+
+      - name: Last opp resultat som artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: analyse_resultater
+          path: analyse_resultater.json
+          retention-days: 7
+
+      - name: Commit analyse_resultater.json til repoet
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add analyse_resultater.json
+          git diff --cached --quiet || git commit -m "Oppdater analyse_resultater.json [automatisk]"
+          git push
