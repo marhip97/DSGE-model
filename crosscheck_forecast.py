@@ -1,7 +1,7 @@
 """
 ================================================================================
 NEMO FASE III — FORECAST-AGGREGERING OG ENSEMBLE
-Milepål 4 (forecast og usikkerhet) og Milepål 5 (ensemble)
+Milepel 4 (forecast og usikkerhet) og Milepel 5 (ensemble)
 
 Tar output fra crosscheck_models.py og produserer:
   - Ensemble-prognose per variabel (vektet kombinasjon av modeller)
@@ -16,9 +16,9 @@ Ensemble-metodikk:
   Litteratur: Timmermann (2006), Genre et al. (2013).
 
 Bruk:
-    python crosscheck_forecast.py \\
-        --results crosscheck_results.json \\
-        --data    crosscheck_data.csv \\
+    python crosscheck_forecast.py \
+        --results crosscheck_results.json \
+        --data    crosscheck_data.csv \
         --output  crosscheck_ensemble.json
 
     Eller fra Python:
@@ -48,24 +48,26 @@ logging.basicConfig(
 )
 log = logging.getLogger("crosscheck_forecast")
 
-# ── Variabelkart ─────────────────────────────────────────────────────────────────────────────
+# ── Variabelkart ──────────────────────────────────────────────────────────────
+# Hvilke modeller som dekker hvilke variabler
 VAR_TO_MODELS = {
     "dy_obs":   ["bvar1"],
     "dc_obs":   ["bvar1"],
     "dinv_obs": ["bvar1"],
     "dx_obs":   ["bvar1"],
     "dm_obs":   ["bvar1"],
-    "pi_obs":   ["bvar2"],
+    "pi_obs":   ["bvar2"],          # + nowcast-justering
     "dw_obs":   ["bvar2"],
     "dpO_obs":  ["bvar2", "ar_olje"],
     "dyS_obs":  ["bvar2", "ar_partner"],
-    "i_R_obs":  ["bvar3"],
+    "i_R_obs":  ["bvar3"],          # + nowcast-justering
     "i_3m_obs": ["bvar3"],
     "ds_obs":   ["bvar3"],
     "dh_obs":   ["bvar3"],
     "db_obs":   ["bvar3"],
 }
 
+# Lesbare navn for output
 VAR_LABELS = {
     "dy_obs":   "BNP fastland",
     "dc_obs":   "Privat konsum",
@@ -83,6 +85,7 @@ VAR_LABELS = {
     "db_obs":   "Kredittvekst",
 }
 
+# Enheter for output
 VAR_UNITS = {
     "dy_obs":   "pst. kv.vekst",
     "dc_obs":   "pst. kv.vekst",
@@ -105,12 +108,13 @@ COVID_END   = "2021Q4"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-HJELPEFUNKSJONER
-═══════════════════════════════════════════════════════════════════════════════
+# HJELPEFUNKSJONER
+# ═══════════════════════════════════════════════════════════════════════════════
 
 def _normal_quantile(mean: np.ndarray,
                      std: np.ndarray,
                      q: float) -> np.ndarray:
+    """Normalfordelt kvantil: mean + Φ^{-1}(q) * std."""
     from scipy.stats import norm
     return mean + norm.ppf(q) * std
 
@@ -128,7 +132,8 @@ def _combine_forecast_moments(means: List[np.ndarray],
                = Σ_m w_m * σ_m²  +  Σ_m w_m * (μ_m - E[y])²
 
     Andre ledd er modell-uenighets-variansen (mellom-modell spredning).
-    Dette gir bredere intervaller når modellene er uenige.
+    Dette gir bredere intervaller når modellene er uenige — en viktig
+    egenskap for en kryssjekk-ensemble.
     """
     w = weights / weights.sum()
     combined_mean = sum(w[i] * means[i] for i in range(len(means)))
@@ -146,6 +151,10 @@ def _extract_model_forecast(results: Dict,
                               variable: str,
                               h: int
                               ) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+    """
+    Hent (mean, variance) fra en modells prognose for en variabel.
+    Returnerer None hvis modellen ikke har prognose for variabelen.
+    """
     model_fc = results.get(model_key, {})
     var_fc   = model_fc.get(variable)
     if var_fc is None:
@@ -154,6 +163,7 @@ def _extract_model_forecast(results: Dict,
     mean = np.array(var_fc["mean"][:h], dtype=float)
     bands = var_fc.get("bands", {})
 
+    # Estimer std fra 5/95-prosentiler (≈ 1.645 * std for normalfordeling)
     if "5" in bands and "95" in bands:
         lo = np.array(bands["5"][:h], dtype=float)
         hi = np.array(bands["95"][:h], dtype=float)
@@ -163,7 +173,7 @@ def _extract_model_forecast(results: Dict,
         hi = np.array(bands["75"][:h], dtype=float)
         std = (hi - lo) / (2 * 0.6745)
     else:
-        std = np.ones(h) * 0.5
+        std = np.ones(h) * 0.5  # fallback
 
     variance = np.maximum(std ** 2, 1e-10)
     return mean, variance
@@ -178,6 +188,9 @@ def _rmse_weights(fitted: Dict,
                   ) -> Dict[str, np.ndarray]:
     """
     Beregn RMSE-invers vekter for ensemble per variabel.
+
+    Vekt_m ∝ 1 / RMSE_m,  normalisert til sum = 1.
+
     Fallback til lik vekting hvis fitted values mangler eller
     RMSE-differansen er liten (< 5 % relativ forskjell).
     """
@@ -213,6 +226,7 @@ def _rmse_weights(fitted: Dict,
         if np.any(np.isinf(rmse_arr)) or rmse_arr.min() < 1e-12:
             weights[var] = np.ones(len(available))
         else:
+            # Sjekk om relativ RMSE-forskjell er stor nok til å rettferdiggjøre ulik vekting
             rel_diff = (rmse_arr.max() - rmse_arr.min()) / rmse_arr.mean()
             if rel_diff < 0.05:
                 weights[var] = np.ones(len(available))
@@ -224,8 +238,8 @@ def _rmse_weights(fitted: Dict,
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-NOWCAST-JUSTERING
-═══════════════════════════════════════════════════════════════════════════════
+# NOWCAST-JUSTERING
+# ═══════════════════════════════════════════════════════════════════════════════
 
 def apply_nowcast(ensemble_mean: np.ndarray,
                   ensemble_var: np.ndarray,
@@ -234,7 +248,13 @@ def apply_nowcast(ensemble_mean: np.ndarray,
                   h: int) -> Tuple[np.ndarray, np.ndarray]:
     """
     Juster første horisont (h=1) med nowcast-estimat.
-    Blander BVAR-prognose og nowcast med vekt alpha = months_observed / 3.
+
+    Logikk: Nowcast gir et bedre estimat for inneværende kvartal
+    enn BVAR-prognosen (som bare bruker kvartalsvise data).
+    Vi blander med vekt alpha = months_observed / 3:
+        - 1 måned observert: alpha = 1/3  (nowcast bidrar lite)
+        - 2 måneder observert: alpha = 2/3
+        - 3 måneder observert: alpha = 1  (fullstendig nowcast)
     """
     ncast_info = nowcast.get(variable, {})
     if not ncast_info or "nowcast" not in ncast_info:
@@ -244,11 +264,13 @@ def apply_nowcast(ensemble_mean: np.ndarray,
     alpha = months_obs / 3.0
     ncast_val = float(ncast_info["nowcast"])
 
+    # Varians fra nowcast-konfidensintervall
     ci_lo = ncast_info.get("ci_90_lo", ncast_val - 0.5)
     ci_hi = ncast_info.get("ci_90_hi", ncast_val + 0.5)
     ncast_std = max((ci_hi - ci_lo) / (2 * 1.6449), 1e-4)
     ncast_var  = ncast_std ** 2
 
+    # Kombiner: blanding av BVAR-prognose og nowcast for h=1
     adj_mean = ensemble_mean.copy()
     adj_var  = ensemble_var.copy()
     adj_mean[0] = (1 - alpha) * ensemble_mean[0] + alpha * ncast_val
@@ -258,8 +280,8 @@ def apply_nowcast(ensemble_mean: np.ndarray,
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-HISTORISK TILPASNING
-═══════════════════════════════════════════════════════════════════════════════
+# HISTORISK TILPASNING
+# ═══════════════════════════════════════════════════════════════════════════════
 
 def build_historical_fit(fitted: Dict,
                           data: pd.DataFrame,
@@ -268,7 +290,9 @@ def build_historical_fit(fitted: Dict,
                           p: int = 4) -> Dict:
     """
     Bygg historisk tilpasning per variabel.
+
     For variabler med flere modeller: vektet snitt av fitted values.
+    Returnerer dict med observert, tilpasset og residual per variabel.
     """
     out = {}
     for var in variables:
@@ -277,6 +301,7 @@ def build_historical_fit(fitted: Dict,
         if obs is None:
             continue
 
+        # Samle fitted values fra tilgjengelige modeller
         fv_list = []
         for m_key in model_list:
             fv = fitted.get(m_key, {}).get(var)
@@ -286,17 +311,20 @@ def build_historical_fit(fitted: Dict,
         if not fv_list:
             continue
 
+        # Lik vekting av fitted values (for historisk tilpasning)
         fv_mean = np.mean(fv_list, axis=0)
         n_fit   = len(fv_mean)
 
         # Aligner fra slutten for konsistens med variabel lagorden
-        obs_aligned   = obs[-n_fit:]
+        obs_aligned = obs[-n_fit:]
         covid_aligned = covid_mask[-n_fit:]
 
+        # Residual (ekskl. COVID)
         resid = obs_aligned - fv_mean
         resid_no_covid = resid.copy()
         resid_no_covid[covid_aligned] = np.nan
 
+        # RMSE (ekskl. COVID og NaN)
         valid = ~covid_aligned & ~np.isnan(obs_aligned) & ~np.isnan(fv_mean)
         rmse  = float(np.sqrt(np.mean(resid[valid] ** 2))) if valid.sum() > 0 else np.nan
 
@@ -315,8 +343,8 @@ def build_historical_fit(fitted: Dict,
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-ENSEMBLE FORECASTER
-═══════════════════════════════════════════════════════════════════════════════
+# ENSEMBLE FORECASTER
+# ═══════════════════════════════════════════════════════════════════════════════
 
 class EnsembleForecaster:
     """
@@ -337,6 +365,14 @@ class EnsembleForecaster:
                  data_path: str,
                  weighting: str = "rmse",
                  p: int = 4):
+        """
+        Parameters
+        ----------
+        results_path : sti til crosscheck_results.json (fra crosscheck_models.py)
+        data_path    : sti til crosscheck_data.csv
+        weighting    : 'equal' eller 'rmse' (RMSE-invers vekting)
+        p            : lagorden som ble brukt i modellene (for indeks-justering)
+        """
         self.weighting = weighting
         self.p         = p
 
@@ -350,6 +386,7 @@ class EnsembleForecaster:
         except Exception:
             pass
 
+        # COVID-maske
         if "covid_flag" in self.data.columns:
             self.covid_mask = self.data["covid_flag"].fillna(0).astype(bool).values
         else:
@@ -359,12 +396,13 @@ class EnsembleForecaster:
                 [(p >= start and p <= end) for p in self.data.index], dtype=bool
             )
 
-        self.variables  = list(VAR_TO_MODELS.keys())
-        self.h_meta     = int(self.results.get("meta", {}).get("h", 12))
+        self.variables = list(VAR_TO_MODELS.keys())
+        self.h_meta    = int(self.results.get("meta", {}).get("h", 12))
         self.end_period = self.results.get("meta", {}).get("end_period", "")
         log.info(f"  Slutt-periode: {self.end_period}, h={self.h_meta}")
 
     def _get_forecast_periods(self, h: int) -> List[str]:
+        """Generer liste med fremtidige kvartalsbetegnelser."""
         if not self.end_period:
             return [f"h+{i+1}" for i in range(h)]
         try:
@@ -393,6 +431,7 @@ class EnsembleForecaster:
         nowcast_raw = self.results.get("nowcast", {})
         periods     = self._get_forecast_periods(h)
 
+        # ── Beregn vekter ─────────────────────────────────────────────────────
         all_model_keys = ["bvar1", "bvar2", "bvar3", "ar_olje", "ar_partner"]
         available_keys = [k for k in all_model_keys if k in self.results]
 
@@ -408,7 +447,8 @@ class EnsembleForecaster:
                 for var in self.variables
             }
 
-        forecasts   = {}
+        # ── Aggreger per variabel ─────────────────────────────────────────────
+        forecasts = {}
         weights_out = {}
 
         for var in self.variables:
@@ -418,6 +458,7 @@ class EnsembleForecaster:
                 log.warning(f"  {var}: ingen tilgjengelige modeller")
                 continue
 
+            # Hent forecast fra hver modell
             moments = []
             for m_key in model_list:
                 res = _extract_model_forecast(self.results, m_key, var, h)
@@ -428,17 +469,20 @@ class EnsembleForecaster:
                 log.warning(f"  {var}: ingen forecast-data funnet")
                 continue
 
+            # Vekter
             w_arr = weights_by_var.get(var, np.ones(len(moments)))
-            w_arr = w_arr[:len(moments)]
+            w_arr = w_arr[:len(moments)]   # Juster til tilgjengelige
             w_arr = w_arr / w_arr.sum()
 
             means_list = [m[0] for m in moments]
             vars_list  = [m[1] for m in moments]
 
+            # Kombiner momenter
             ens_mean, ens_var = _combine_forecast_moments(
                 means_list, vars_list, w_arr
             )
 
+            # Nowcast-justering for KPI og styringsrente
             if var in ("pi_obs", "i_R_obs"):
                 ens_mean, ens_var = apply_nowcast(
                     ens_mean, ens_var, nowcast_raw, var, h
@@ -446,6 +490,7 @@ class EnsembleForecaster:
 
             ens_std = np.sqrt(np.maximum(ens_var, 1e-10))
 
+            # Konfidensintervaller
             ci_50_lo = _normal_quantile(ens_mean, ens_std, 0.25)
             ci_50_hi = _normal_quantile(ens_mean, ens_std, 0.75)
             ci_90_lo = _normal_quantile(ens_mean, ens_std, 0.05)
@@ -462,6 +507,7 @@ class EnsembleForecaster:
                 "models_used": model_list,
             }
 
+            # Individuelle modellprognoser (for diagnostikk)
             model_detail = {}
             for i, m_key in enumerate(model_list):
                 if i < len(moments):
@@ -475,23 +521,26 @@ class EnsembleForecaster:
 
         log.info(f"  Aggregert {len(forecasts)}/{len(self.variables)} variabler.")
 
+        # ── Historisk tilpasning ──────────────────────────────────────────────
         log.info("  Bygger historisk tilpasning...")
         historical = build_historical_fit(
             fitted_raw, self.data, self.variables,
             self.covid_mask, self.p
         )
 
+        # ── Evalueringsoppsummering ───────────────────────────────────────────
         eval_summary = self._evaluation_summary(historical)
 
+        # ── Output-struktur ───────────────────────────────────────────────────
         output = {
             "meta": {
-                "end_period":       self.end_period,
-                "h":                h,
+                "end_period":     self.end_period,
+                "h":              h,
                 "forecast_periods": periods,
-                "weighting":        self.weighting,
-                "variables":        self.variables,
-                "n_variables":      len(forecasts),
-                "nowcast_applied":  list(nowcast_raw.keys()),
+                "weighting":      self.weighting,
+                "variables":      self.variables,
+                "n_variables":    len(forecasts),
+                "nowcast_applied": list(nowcast_raw.keys()),
             },
             "forecasts":  forecasts,
             "historical": historical,
@@ -504,6 +553,7 @@ class EnsembleForecaster:
         return output
 
     def _evaluation_summary(self, historical: Dict) -> Dict:
+        """Oppsummering av modellpasning: RMSE og MAE per variabel."""
         summary = {}
         for var, hdata in historical.items():
             obs   = np.array([x for x in hdata["observed"] if x is not None],
@@ -517,9 +567,10 @@ class EnsembleForecaster:
             valid = ~covid & ~np.isnan(obs) & ~np.isnan(fv)
             if valid.sum() < 4:
                 continue
-            resid  = obs[valid] - fv[valid]
-            rmse   = float(np.sqrt(np.mean(resid ** 2)))
-            mae    = float(np.mean(np.abs(resid)))
+            resid = obs[valid] - fv[valid]
+            rmse  = float(np.sqrt(np.mean(resid ** 2)))
+            mae   = float(np.mean(np.abs(resid)))
+            # R² (ekskl. COVID)
             ss_tot = float(np.sum((obs[valid] - obs[valid].mean()) ** 2))
             ss_res = float(np.sum(resid ** 2))
             r2 = 1.0 - ss_res / ss_tot if ss_tot > 1e-12 else np.nan
@@ -534,6 +585,7 @@ class EnsembleForecaster:
         return summary
 
     def save(self, output: Dict, path: str) -> None:
+        """Lagre ensemble-output til JSON."""
         def _serialize(obj):
             if isinstance(obj, (np.floating, np.integer)):
                 return float(obj)
@@ -549,6 +601,7 @@ class EnsembleForecaster:
         log.info(f"  Lagret: {path}")
 
     def print_summary(self, output: Dict) -> None:
+        """Skriv lesbar oppsummering til terminal."""
         print("\n" + "=" * 65)
         print("  ENSEMBLE FORECAST — OPPSUMMERING")
         print("=" * 65)
@@ -558,7 +611,7 @@ class EnsembleForecaster:
         print(f"  Variabler      : {output['meta']['n_variables']}")
 
         print("\n  PASNING (RMSE, ex. COVID):")
-        print(f"  {'Variabel':<22} {'RMSE':>8}  {'MAE':>8}  {'R\u00b2':>7}  {'N':>5}")
+        print(f"  {'Variabel':<22} {'RMSE':>8}  {'MAE':>8}  {'R²':>7}  {'N':>5}")
         print("  " + "─" * 55)
         for var, ev in sorted(output["evaluation"].items(),
                                key=lambda x: x[1].get("rmse", 99)):
@@ -584,20 +637,24 @@ class EnsembleForecaster:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-KJØRING
-═══════════════════════════════════════════════════════════════════════════════
+# KJØRING
+# ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="NEMO Fase III — Ensemble forecast-aggregering"
     )
-    parser.add_argument("--results",   default="crosscheck_results.json")
-    parser.add_argument("--data",      default="crosscheck_data.csv")
+    parser.add_argument("--results",   default="crosscheck_results.json",
+                        help="Output fra crosscheck_models.py")
+    parser.add_argument("--data",      default="crosscheck_data.csv",
+                        help="Output fra crosscheck_data.py")
     parser.add_argument("--output",    default="crosscheck_ensemble.json")
     parser.add_argument("--horizon",   type=int, default=12)
     parser.add_argument("--weighting", default="rmse",
-                        choices=["equal", "rmse"])
-    parser.add_argument("--lag",       type=int, default=4)
+                        choices=["equal", "rmse"],
+                        help="Ensemble-vektingsmetode")
+    parser.add_argument("--lag",       type=int, default=4,
+                        help="Lagorden brukt i modellene")
     args = parser.parse_args()
 
     ens = EnsembleForecaster(
