@@ -1,6 +1,10 @@
 name: Kjør Fase III — Kryssjekkmodeller og ensemble
 
 on:
+  schedule:
+    # 20. i mars, juni, september, desember kl 08:00 UTC
+    # (etter kvartalsvis publisering av nasjonalregnskap fra SSB)
+    - cron: '0 8 20 3,6,9,12 *'
   workflow_dispatch:
     inputs:
       draws:
@@ -21,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
       - name: Hent kode
@@ -33,14 +37,34 @@ jobs:
           python-version: '3.11'
 
       - name: Installer avhengigheter
-        run: pip install numpy scipy pandas statsmodels
+        run: pip install numpy scipy pandas statsmodels requests urllib3
+
+      - name: Hent ferske makrodata (SSB, Norges Bank, FRED)
+        run: |
+          python crosscheck_data.py \
+            --output-dir . \
+            --fallback nemo_data_faktisk_v2.csv
+
+      - name: Bekreft at datafil er klar
+        run: |
+          python -c "
+          import pandas as pd
+          df = pd.read_csv('crosscheck_data.csv', index_col=0)
+          obs = [c for c in df.columns if not c.endswith('_level') and c != 'covid_flag']
+          print(f'crosscheck_data.csv: {len(df)} rader x {len(df.columns)} kolonner')
+          print(f'Periode: {df.index[0]} - {df.index[-1]}')
+          print(f'Obs-serier: {len(obs)}')
+          missing = [c for c in obs if df[c].isna().mean() > 0.5]
+          if missing:
+              print(f'ADVARSEL: h\u00f8y NaN-andel i {missing}')
+          "
 
       - name: Kjør kryssjekkmodeller (BVAR + AR)
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: |
           python crosscheck_models.py \
-            --data nemo_data_faktisk_v2.csv \
+            --data crosscheck_data.csv \
             --output crosscheck_results.json \
             --horizon ${{ github.event.inputs.horizon }} \
             --draws ${{ github.event.inputs.draws }} \
@@ -53,7 +77,7 @@ jobs:
         run: |
           python crosscheck_forecast.py \
             --results crosscheck_results.json \
-            --data nemo_data_faktisk_v2.csv \
+            --data crosscheck_data.csv \
             --output crosscheck_ensemble.json \
             --horizon ${{ github.event.inputs.horizon }} \
             --weighting rmse
@@ -74,6 +98,8 @@ jobs:
         with:
           name: fase3_resultater
           path: |
+            crosscheck_data.csv
+            crosscheck_meta.json
             crosscheck_results.json
             crosscheck_ensemble.json
             nemo_dashboard_built.html
@@ -84,6 +110,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add crosscheck_results.json crosscheck_ensemble.json nemo_dashboard_built.html nemo_dashboard_data.json
-          git diff --cached --quiet || git commit -m "Fase III: oppdater kryssjekkresultater og dashboard [automatisk]"
+          git add crosscheck_data.csv crosscheck_meta.json crosscheck_results.json crosscheck_ensemble.json nemo_dashboard_built.html nemo_dashboard_data.json
+          git diff --cached --quiet || git commit -m "Fase III: oppdater data og prognoser [automatisk]"
           git push

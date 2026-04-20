@@ -35,6 +35,9 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 import requests
+from io import StringIO
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -47,8 +50,30 @@ log = logging.getLogger("crosscheck_data")
 # ── Konfigurasjon ─────────────────────────────────────────────────────────────
 START_YEAR    = 2001
 START_QUARTER = 1
-TIMEOUT       = 30       # sekunder per HTTP-kall
+TIMEOUT       = 45       # sekunder per HTTP-kall
 COVID_EXCL    = ("2020Q1", "2021Q4")   # inkluderes i rådata, flagges i meta
+
+
+def _make_session() -> requests.Session:
+    """Opprett requests-session med retry-logikk og User-Agent (fikser FRED 403)."""
+    session = requests.Session()
+    retry = Retry(
+        total=4,
+        backoff_factor=2,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET", "POST"],
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (compatible; NEMO-Forecast/3.0; research)",
+        "Accept": "application/json, text/csv, */*",
+    })
+    return session
+
+
+SESSION = _make_session()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -117,7 +142,7 @@ def ssb_post(table_id: str, query: dict) -> pd.Series:
     """
     url = f"https://data.ssb.no/api/v0/no/table/{table_id}"
     try:
-        resp = requests.post(url, json=query, timeout=TIMEOUT)
+        resp = SESSION.post(url, json=query, timeout=TIMEOUT)
         resp.raise_for_status()
         data = resp.json()
     except Exception as e:
@@ -311,7 +336,7 @@ def nb_api(series_key: str, label: str) -> pd.Series:
         "locale": "no",
     }
     try:
-        resp = requests.get(url, params=params, timeout=TIMEOUT)
+        resp = SESSION.get(url, params=params, timeout=TIMEOUT)
         resp.raise_for_status()
         data = resp.json()
     except Exception as e:
@@ -364,7 +389,9 @@ def fred_csv(series_id: str, label: str) -> pd.Series:
     """Hent serie fra FRED via CSV-endepunkt."""
     url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
     try:
-        df = pd.read_csv(url, parse_dates=["DATE"], index_col="DATE")
+        resp = SESSION.get(url, timeout=TIMEOUT)
+        resp.raise_for_status()
+        df = pd.read_csv(StringIO(resp.text), parse_dates=["DATE"], index_col="DATE")
         s = df.iloc[:, 0].dropna()
         s.index = pd.DatetimeIndex(s.index)
         # Resampler til kvartal avhengig av frekvens
@@ -427,6 +454,42 @@ def fetch_handelspartner_bnp() -> pd.Series:
     combined = combined / tot_w  # Renormaliser til tilgjengelige serier
     log.info(f"  {'Handelspartner-BNP:':<20} {len(combined)} kvartaler (FRED, {len(partner_series)} land)")
     return combined
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# FALLBACK — bruk eksisterende datafil ved API-feil
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def merge_with_fallback(df: pd.DataFrame, fallback_path: str) -> pd.DataFrame:
+    """
+    Fyll manglende obs-kolonner fra fallback-CSV (f.eks. nemo_data_faktisk_v2.csv)
+    ved API-feil eller tomme serier. Sikrer at modellene alltid har data å kjøre på.
+    """
+    if not fallback_path or not os.path.exists(fallback_path):
+        log.info("  Ingen fallback-fil angitt eller funnet.")
+        return df
+    try:
+        fb = pd.read_csv(fallback_path, index_col=0)
+        try:
+            fb.index = pd.PeriodIndex(fb.index, freq="Q")
+        except Exception:
+            fb.index = pd.PeriodIndex(pd.to_datetime(fb.index), freq="Q")
+    except Exception as e:
+        log.warning(f"  Kunne ikke lese fallback '{fallback_path}': {e}")
+        return df
+
+    obs_cols = [c for c in fb.columns
+                if not c.endswith("_level") and c != "covid_flag"]
+    filled = []
+    for col in obs_cols:
+        if col not in df.columns or len(df[col].dropna()) < 10:
+            df[col] = fb[col].reindex(df.index)
+            filled.append(col)
+    if filled:
+        log.warning(f"  FALLBACK brukt for {len(filled)} serier: {', '.join(filled)}")
+    else:
+        log.info("  Alle serier hentet live — ingen fallback nødvendig.")
+    return df
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -591,7 +654,7 @@ def demean(df: pd.DataFrame,
 # HOVED-PIPELINE
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def run_pipeline(output_dir: str = ".") -> tuple:
+def run_pipeline(output_dir: str = ".", fallback_path: str = None) -> tuple:
     """
     Kjør komplett datapipeline.
 
@@ -654,6 +717,11 @@ def run_pipeline(output_dir: str = ".") -> tuple:
     covid_col = flag_covid(df_demeaned)
     df_demeaned["covid_flag"] = covid_col.astype(int)
     df_aligned["covid_flag"]  = covid_col.astype(int)
+
+    # ── Steg 3b: Fyll inn fra fallback ved API-feil ─────────────────────────
+    if fallback_path:
+        log.info(f"\n[3b/4] Sjekker fallback mot: {fallback_path}")
+        df_demeaned = merge_with_fallback(df_demeaned, fallback_path)
 
     # ── Steg 4: Lagre ───────────────────────────────────────────────────────
     log.info("\n[4/4] Lagrer output...")
@@ -745,10 +813,17 @@ if __name__ == "__main__":
         "--start-year", type=int, default=START_YEAR,
         help=f"Start-år for dataserie (default: {START_YEAR})"
     )
+    parser.add_argument(
+        "--fallback", default=None,
+        help="Sti til fallback-CSV (f.eks. nemo_data_faktisk_v2.csv) ved API-feil"
+    )
     args = parser.parse_args()
     START_YEAR = args.start_year
 
-    _, df_out, meta = run_pipeline(output_dir=args.output_dir)
+    _, df_out, meta = run_pipeline(
+        output_dir=args.output_dir,
+        fallback_path=args.fallback,
+    )
 
     # Kort oppsummering i terminal
     print("\n" + "=" * 55)
