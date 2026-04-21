@@ -478,10 +478,16 @@ def nb_api(series_key: str, label: str) -> pd.Series:
         result = {times[int(k)]: v[0] for k, v in ser_data.items()
                   if v[0] is not None}
         s = pd.Series(result, dtype=float).sort_index()
-        # Dagsdata → kvartalsgjennomsnitt
+        # Dagsdata → kvartalsgjennomsnitt; forkast partielle kvartaler
+        # (mindre enn ~60 handelsdager) for å unngå at et pågående kvartal
+        # gir utslag i log-differanser nedstrøms.
         if len(s) > 200:
             s.index = pd.to_datetime(s.index)
-            s = s.resample("QE").mean().to_period("Q")
+            grp = s.resample("QE")
+            quarterly = grp.mean()
+            counts = grp.count()
+            quarterly = quarterly[counts >= 60]
+            s = quarterly.to_period("Q")
         else:
             s = to_period_index(s)
         log.info(f"  {label:<20} {len(s)} kvartaler (Norges Bank)")
@@ -644,8 +650,14 @@ def fred_csv(series_id: str, label: str) -> pd.Series:
             s = _fred_fetch_csv(series_id)
             source = "FRED-CSV"
         if len(s) > 300:
-            s = s.resample("QE").mean().to_period("Q")
+            # Daglig serie: forkast partielle kvartaler (<60 handelsdager)
+            grp = s.resample("QE")
+            quarterly = grp.mean()
+            counts = grp.count()
+            quarterly = quarterly[counts >= 60]
+            s = quarterly.to_period("Q")
         else:
+            # Kvartallig/månedlig serie: bruk siste verdi
             s = s.resample("QE").last().to_period("Q")
         log.info(f"  {label:<20} {len(s)} kvartaler ({source})")
         return s
