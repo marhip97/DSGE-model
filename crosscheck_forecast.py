@@ -137,7 +137,7 @@ def _extract_model_forecast(results: Dict,
     else:
         model_fc = results.get(model_key, {})
         var_fc   = model_fc.get(variable)
-    if var_fc is None:
+    if not var_fc or "mean" not in var_fc:
         return None
 
     mean = np.array(var_fc["mean"][:h], dtype=float)
