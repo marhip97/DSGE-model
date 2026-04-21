@@ -452,45 +452,81 @@ def fetch_kpi_jae() -> pd.Series:
         s = _ssb_smart_query(table_id, contents_kw, sector_kw)
         if not s.empty:
             s = _period_series_to_quarterly(s)
+            # KPI-JAE finnes kun fra ~1999; serier > 150 kvartaler er sannsynligvis
+            # vanlig CPI-nivåindeks med lang historikk
+            if len(s) > 150:
+                log.warning(f"  SSB {table_id}: {len(s)} kvartaler — "
+                            f"for lang historikk, sannsynligvis ikke KPI-JAE")
+                continue
             log.info(f"  KPI-JAE:         {len(s)} kvartaler (SSB {table_id})")
             return s
 
-    # Norges Bank publiserer KPI-JAE via SDMX API — søk i aktuelle dataflows
+    # Norges Bank SDMX — søk i prisrelaterte dataflows
     for df_name in ["CONSUMER_PRICES", "PRICES", "PRISER", "INFLATION", "CPI"]:
         key = _nb_discover_key(df_name, ["KPI", "JAE"])
         if key:
             s = nb_api(key, "KPI-JAE (NB):")
             if not s.empty:
                 s = _period_series_to_quarterly(s)
-                log.info(f"  KPI-JAE:         {len(s)} kvartaler ({key})")
-                return s
+                if len(s) <= 150:
+                    log.info(f"  KPI-JAE:         {len(s)} kvartaler ({key})")
+                    return s
 
     log.warning("  KPI-JAE:         0 kvartaler (alle tabeller feilet)")
     return pd.Series(dtype=float)
 
 
 def fetch_aku_ledighet() -> pd.Series:
-    """AKU-ledighet, sesongjustert, prosent av arbeidsstyrken — SSB 12046/05111."""
-    # Prøv flere tabeller og ContentsCodes
-    candidates = [
-        ("12046", ["Ledige", "AKUledige", "ledighet", "arbeidsledig"],
+    """AKU-ledighet, sesongjustert, prosent av arbeidsstyrken."""
+    def _validate(s: pd.Series, source: str) -> pd.Series:
+        """Returner serien hvis medianverdien er rimelig for ledighetsrate (0.5–20%)."""
+        if s.empty:
+            return pd.Series(dtype=float)
+        med = s.dropna().median()
+        if 0.5 < med < 20:
+            log.info(f"  AKU-ledighet:    {len(s)} kvartaler ({source}), median={med:.1f}%")
+            return s
+        log.warning(f"  {source}: urimelige verdier (median={med:.2f}), prøver neste")
+        return pd.Series(dtype=float)
+
+    # SSB-kandidater: tabeller med direkte prosent-ContentCode
+    ssb_candidates = [
+        # 12046: dedikert AKU-prosent-tabell
+        ("12046", ["Ledige", "AKUledige", "ledighet", "arbeidsledig", "prosent"],
                   ["prosent", "pst", "rate", "andel", "I alt", "i alt", "begge", "15-74"]),
-        # 05111 har Kjonn-dim ('Begge kjønn'→'begge') og Alder-dim ('15-74 år'→'15-74')
-        ("05111", ["AKULedigPst", "AKUledige", "ledighet", "ledige", "prosent"],
+        # 08517: AKU-ledige i prosent av arbeidsstyrken (kvartalsvis)
+        ("08517", ["AKULedigPst", "ledighet", "ledige", "prosent", "pst"],
+                  ["prosent", "pst", "I alt", "i alt", "total", "begge", "15-74"]),
+        # 07819: AKU-rate, sesongjustert
+        ("07819", ["AKULedigPst", "ledighet", "ledige", "prosent", "pst"],
+                  ["prosent", "pst", "I alt", "i alt", "total", "begge", "15-74"]),
+        # 05111: stor AKU-tabell med Kjonn- og Alder-dimensjoner
+        # Kjonn='0'='Begge kjønn' og Alder='15-74' må matche via sector_kw
+        ("05111", ["AKULedigPst", "ledighet", "Ledighetsprosent", "prosent", "pst"],
                   ["prosent", "pst", "I alt", "i alt", "total", "begge", "Begge kjønn", "15-74"]),
     ]
-    for table_id, contents_kw, sector_kw in candidates:
+    for table_id, contents_kw, sector_kw in ssb_candidates:
         s = _ssb_smart_query(table_id, contents_kw, sector_kw)
         if not s.empty:
-            # Konverter til kvartal (kan allerede være kvartal)
             s = _period_series_to_quarterly(s)
-            # Sjekk at verdiene er rimelige for ledighetsprosent (1-15%)
-            med = s.dropna().median()
-            if 0.5 < med < 20:
-                log.info(f"  AKU-ledighet:    {len(s)} kvartaler (SSB {table_id}), median={med:.1f}%")
-                return s
-            log.warning(f"  SSB {table_id}: urimelige verdier (median={med:.2f}), prøver neste")
-    log.warning("  AKU-ledighet:    0 kvartaler (alle tabeller feilet)")
+            result = _validate(s, f"SSB {table_id}")
+            if not result.empty:
+                return result
+
+    # FRED: OECD-basert AKU-rate for Norge, kvartalsvis (ingen API-nøkkel nødvendig)
+    # LRUNTTTTNOQ156S: Unemployment Rate: Aged 15-74: All Persons for Norway
+    for fred_id, label in [
+        ("LRUNTTTTNOQ156S", "FRED/OECD AKU-rate 15-74"),
+        ("NOURN", "FRED NOURN"),
+    ]:
+        s = fred_csv(fred_id, label)
+        if not s.empty:
+            s = _period_series_to_quarterly(s)
+            result = _validate(s, fred_id)
+            if not result.empty:
+                return result
+
+    log.warning("  AKU-ledighet:    0 kvartaler (alle SSB-tabeller og FRED feilet)")
     return pd.Series(dtype=float)
 
 

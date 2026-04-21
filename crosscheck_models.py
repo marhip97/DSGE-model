@@ -1059,8 +1059,10 @@ class ModelLibrary:
                                       if self.bvar_kjerne.fitted else {})
 
         # AR-prognoser (benchmark, én per målvariabel)
+        # ARModel.forecast() returnerer {variable: {mean, bands}} — vi pakker ut
+        # det indre dict-laget så results["ar"][v] = {"mean": [...], "bands": {...}}
         results["ar"] = {
-            v: ar.forecast(h=h) if ar.fitted else {}
+            v: ar.forecast(h=h).get(v, {}) if ar.fitted else {}
             for v, ar in self.ar_models.items()
         }
 
