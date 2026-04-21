@@ -238,6 +238,52 @@ def _add_irf_est(dsge: Dict) -> None:
     log.info(f"  IRF transformert: {len(irf_est)} sjokk → irf_est")
 
 
+def _add_posterior(dsge: Dict, chain_path: str = "chain_v3_v2_posterior.json") -> None:
+    """Les MCMC-kjedesammendrag og legg til posterior-array for Estimering-tabellen."""
+    if not os.path.exists(chain_path):
+        log.warning(f"  chain-fil ikke funnet: {chain_path}")
+        return
+    with open(chain_path) as f:
+        chain = json.load(f)
+    summ = chain.get("summary", {})
+    posterior = [
+        {
+            "name":  name,
+            "km":    vals.get("km"),
+            "mean":  vals.get("mean"),
+            "std":   vals.get("std"),
+            "p5":    vals.get("p5"),
+            "p95":   vals.get("p95"),
+            "psrf":  vals.get("psrf"),
+            "ess":   vals.get("ess"),
+            "fixed": False,
+        }
+        for name, vals in summ.items()
+    ]
+    dsge["posterior"] = posterior
+    meta = dsge.setdefault("meta", {})
+    psrf_vals = [p["psrf"] for p in posterior if p["psrf"] is not None]
+    ess_vals  = [p["ess"]  for p in posterior if p["ess"]  is not None]
+    if psrf_vals:
+        meta["psrf_max"] = round(max(psrf_vals), 4)
+    if ess_vals:
+        meta["ess_min"] = round(min(ess_vals), 1)
+    log.info(f"  Posterior: {len(posterior)} parametere (psrf_max={meta.get('psrf_max')}, "
+             f"ess_min={meta.get('ess_min')})")
+
+
+def _add_last_level(ck_data: Dict) -> None:
+    """Sett last_level i forecasts fra siste historiske obs — tetter gap i Kryssjekk-grafene."""
+    historical = ck_data.get("historical", {})
+    for vname, fc in ck_data.get("forecasts", {}).items():
+        if fc.get("last_level") is not None:
+            continue
+        hist = historical.get(vname, {})
+        obs = [v for v in hist.get("observed", []) if v is not None]
+        if obs:
+            fc["last_level"] = obs[-1]
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # SAMMENSLÅING
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -265,6 +311,7 @@ def merge(dsge_path: str, ck_path: str) -> Dict:
     dsge_ok   = dsge_data is not None
     if dsge_ok:
         _add_irf_est(dsge_data)
+        _add_posterior(dsge_data)
 
     # ── Last Fase III ─────────────────────────────────────────────────────
     ck_data = None
@@ -273,6 +320,7 @@ def merge(dsge_path: str, ck_path: str) -> Dict:
         with open(ck_path, encoding="utf-8") as f:
             ck_data = json.load(f)
         ck_ok = True
+        _add_last_level(ck_data)
         log.info(f"  Fase III lastet: {ck_path}")
     else:
         log.warning(f"  Fase III-fil ikke funnet: {ck_path}")
