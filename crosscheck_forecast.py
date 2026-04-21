@@ -264,6 +264,13 @@ def apply_nowcast(ensemble_mean: np.ndarray,
     alpha = months_obs / 3.0
     ncast_val = float(ncast_info["nowcast"])
 
+    # Hopp over nowcast-override hvis verdien er ugyldig — unngår at
+    # h=1-prognosen blir NaN hvis nowcast-konverteringen feilet.
+    if not np.isfinite(ncast_val):
+        log.warning(f"  nowcast {variable}: verdi ikke endelig ({ncast_val}), "
+                    f"hopper over h=1-override")
+        return ensemble_mean, ensemble_var
+
     # Varians fra nowcast-konfidensintervall
     ci_lo = ncast_info.get("ci_90_lo", ncast_val - 0.5)
     ci_hi = ncast_info.get("ci_90_hi", ncast_val + 0.5)
