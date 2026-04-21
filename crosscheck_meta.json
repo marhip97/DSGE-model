@@ -1,6 +1,6 @@
 {
   "pipeline_version": "fase3_v1",
-  "run_timestamp": "2026-04-21T07:15:20",
+  "run_timestamp": "2026-04-21T07:25:10",
   "start_period": "2001Q1",
   "end_period": "2026Q2",
   "n_quarters": 102,
@@ -76,7 +76,7 @@
     "i_R_obs": 0.680001761553099,
     "ds_obs": 0.3384495189172465,
     "dpO_obs": 1.2692281782995165,
-    "dyS_obs": 0.13178877275621506
+    "dyS_obs": 0.13178877275709622
   },
   "covid_exclusion": [
     "2020Q1",
