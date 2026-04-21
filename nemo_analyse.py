@@ -376,7 +376,7 @@ if __name__ == "__main__":
         sigma = sigma_vals[sidx]
         irf = compute_irf(T, R, sidx, sigma, args.n_irf)
         irf_results[sname] = {
-            vname: [round(float(irf[t, vidx]), 6) for t in range(args.n_irf)]
+            vname: [round(float(irf[t, vidx] * 100), 4) for t in range(args.n_irf)]
             for vidx, vname in VAR_NAMES.items()
         }
     print(f"  Beregnet {len(irf_results)} IRF-er, {args.n_irf} perioder.")
@@ -413,7 +413,93 @@ if __name__ == "__main__":
         std = sigma_vals[sidx]
         print(f"    {sname:<15}: {eps/std:+.2f}σ")
 
-    # Lagre
+    # ── Obs-rom-indekser ──────────────────────────────────────────────────────
+    _DY = OBS_NAMES.index('dy_obs')   # 0
+    _PI = OBS_NAMES.index('pi_obs')   # 5
+    _IR = OBS_NAMES.index('i_R_obs')  # 7
+    _DS = OBS_NAMES.index('ds_obs')   # 9
+    _DH = OBS_NAMES.index('dh_obs')   # 12
+    _OBS_KEYS = {_DY: 'y', _PI: 'pi', _IR: 'i', _DS: 'rer', _DH: 'bolig'}
+
+    # ── Les demean-verdier for å konvertere tilbake til faktiske nivåer ───────
+    _meta_path = args.data.replace('crosscheck_data.csv', 'crosscheck_meta.json')
+    _dmeans = {}
+    if os.path.exists(_meta_path):
+        with open(_meta_path) as _f:
+            _dmeans = json.load(_f).get('demean_values', {})
+    _dm = {
+        _DY: _dmeans.get('dy_obs',   0.0),
+        _PI: _dmeans.get('pi_obs',   0.0),
+        _IR: _dmeans.get('i_R_obs',  0.0),
+        _DS: _dmeans.get('ds_obs',   0.0),
+        _DH: _dmeans.get('dh_obs',   0.0),
+    }
+    # Rente skaleres: kvartalsnivå i pst. × 4 = % p.a.
+    _IR_SCALE = 4.0
+
+    # ── RTS-smoother → glattede tilstander ───────────────────────────────────
+    print("\nKjører RTS-smoother...")
+    z_smooth = rts_smoother(T, R, Q_mat, Y_comb, H, Sv)
+    print(f"  RTS-smoother kjørt: {len(z_smooth)} perioder.")
+
+    # ── hist_level: observerte verdier + demean-korreksjon ───────────────────
+    def _safe(v, dm=0.0, scale=1.0):
+        return round((float(v) + dm) * scale, 4) if not np.isnan(v) else None
+
+    date_strs = [str(d.date()) if hasattr(d, 'date') else str(d) for d in dates]
+    hist_level = {
+        'dates': date_strs,
+        'y':     [_safe(v, _dm[_DY])              for v in Y_comb[:, _DY]],
+        'pi':    [_safe(v, _dm[_PI])              for v in Y_comb[:, _PI]],
+        'i':     [_safe(v, _dm[_IR], _IR_SCALE)   for v in Y_comb[:, _IR]],
+        'rer':   [_safe(v, _dm[_DS])              for v in Y_comb[:, _DS]],
+        'bolig': [_safe(v, _dm[_DH])              for v in Y_comb[:, _DH]],
+    }
+
+    # ── forecast_level: tilstandsrom → obs-rom + demean-korreksjon ───────────
+    _fcst_obs  = fcst['baseline']    @ H.T  # (n_fcst, 14)
+    _fcst_cond = fcst['conditional'] @ H.T  # (n_fcst, 14)
+
+    last_date = pd.Timestamp(dates[-1])
+    fcst_dates = [
+        str((last_date + pd.DateOffset(months=3 * (k + 1))).to_period('Q').to_timestamp().date())
+        for k in range(args.n_fcst)
+    ]
+
+    def _fser(arr, col, dm=0.0, scale=1.0):
+        return [round((float(v) + dm) * scale, 4) for v in arr[:, col]]
+
+    forecast_level = {
+        'dates': fcst_dates,
+        'y':     _fser(_fcst_obs,  _DY, _dm[_DY]),
+        'pi':    _fser(_fcst_obs,  _PI, _dm[_PI]),
+        'i':     _fser(_fcst_obs,  _IR, _dm[_IR], _IR_SCALE),
+        'rer':   _fser(_fcst_obs,  _DS, _dm[_DS]),
+        'bolig': _fser(_fcst_obs,  _DH, _dm[_DH]),
+        'y_bl':  _fser(_fcst_cond, _DY, _dm[_DY]),
+        'pi_bl': _fser(_fcst_cond, _PI, _dm[_PI]),
+        'i_bl':  _fser(_fcst_cond, _IR, _dm[_IR], _IR_SCALE),
+    }
+
+    # ── hist_decomp: sjokk-bidrag per periode via smoothede tilstander ────────
+    print("Beregner historisk dekomposisjon...")
+    T_hist = len(z_smooth)
+    hist_decomp: dict = {}
+    for obs_idx, vkey in _OBS_KEYS.items():
+        h_row = H[obs_idx, :]
+        shocks: dict = {}
+        for sidx, sname in SHOCK_NAMES.items():
+            r_col = R[:, sidx]
+            contrib = []
+            for t in range(1, T_hist):
+                eps_t = z_smooth[t] - T @ z_smooth[t - 1]
+                obs_c = float(h_row @ (r_col * eps_t[sidx]))
+                contrib.append(round(obs_c, 6))
+            shocks[sname] = contrib
+        hist_decomp[vkey] = shocks
+    print(f"  Historisk dekomposisjon: {T_hist - 1} perioder, {len(SHOCK_NAMES)} sjokk.")
+
+    # ── Lagre ─────────────────────────────────────────────────────────────────
     results = {
         'irf':  irf_results,
         'fevd': fevd_pct,
@@ -422,14 +508,18 @@ if __name__ == "__main__":
             'baseline':    fcst['baseline'].tolist(),
             'std_P':       fcst['std_P'],
         },
+        'forecast_level': forecast_level,
+        'hist_level':     hist_level,
+        'hist_decomp':    hist_decomp,
         'active_shocks': {
             SHOCK_NAMES[k]: round(float(v/sigma_vals[k]), 3)
             for k, v in fcst['eps_T'].items()
         },
         'meta': {
-            'eig_max': round(float(np.abs(np.linalg.eigvals(T)).max()), 6),
-            'n_states': NZ,
-            'n_shocks': NE,
+            'eig_max':       round(float(np.abs(np.linalg.eigvals(T)).max()), 6),
+            'n_states':      NZ,
+            'n_shocks':      NE,
+            'last_obs_date': date_strs[-1] if date_strs else None,
         }
     }
     with open(args.output, 'w') as f:
