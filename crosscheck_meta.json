@@ -1,10 +1,10 @@
 {
   "pipeline_version": "fase3_v1",
-  "run_timestamp": "2026-04-21T12:43:05",
+  "run_timestamp": "2026-04-21T15:46:06",
   "start_period": "2001Q1",
   "end_period": "2026Q2",
   "n_quarters": 102,
-  "n_variables": 29,
+  "n_variables": 30,
   "columns": [
     "dy_obs",
     "dy_obs_level",
@@ -30,6 +30,7 @@
     "ds_obs_level",
     "dpO_obs",
     "dpO_obs_level",
+    "u_obs",
     "dyS_obs",
     "dyS_obs_level",
     "db_obs",
@@ -49,6 +50,7 @@
     "i_3m_obs",
     "ds_obs",
     "dpO_obs",
+    "u_obs",
     "dyS_obs",
     "db_obs"
   ],
@@ -81,7 +83,8 @@
     "i_3m_obs": 0.47611095489419447,
     "ds_obs": 0.4466681072898107,
     "dpO_obs": 0.8201887413276914,
-    "dyS_obs": 0.1420500992085834,
+    "u_obs": 3.6455911208791205,
+    "dyS_obs": 0.13178877275621506,
     "db_obs": 7.717028985507248
   },
   "covid_exclusion": [
@@ -113,6 +116,15 @@
       "ok": true,
       "n": 188
     },
+    "kpi_jae": {
+      "ok": false,
+      "n": 0,
+      "reason": "tom serie"
+    },
+    "aku": {
+      "ok": true,
+      "n": 103
+    },
     "lonn": {
       "ok": true,
       "n": 52
@@ -143,12 +155,14 @@
     },
     "handelspartner": {
       "ok": true,
-      "n": 204
+      "n": 316
     }
   },
   "sources": {
     "bnp_konsum_inv_eks_imp": "SSB Statistikkbanken, tabell 09190",
     "kpi": "SSB Statistikkbanken, tabell 03013 (månedlig → kvartal)",
+    "kpi_jae": "SSB Statistikkbanken, tabell 08981 (KPI-JAE, månedlig → kvartal)",
+    "aku": "SSB Statistikkbanken, tabell 12046/05111 (AKU-ledighet, sesongjustert, %)",
     "lonn": "SSB Statistikkbanken, tabell 09786",
     "bolig": "SSB Statistikkbanken, tabell 07241",
     "renter": "Norges Bank API (SDMX-JSON)",
@@ -160,6 +174,8 @@
   "transformations": {
     "dy,dc,dinv,dx,dm": "Δlog(X) × 100 (kvartalsvekst pst.)",
     "pi_obs": "Δlog(KPI) × 4 × 100 (annualisert)",
+    "pi_jae_obs": "Δlog(KPI-JAE) × 4 × 100 (annualisert)",
+    "u_obs": "AKU-ledighet i % av arbeidsstyrken (nivå, sesongjustert)",
     "dw_obs": "Δlog(lønn) × 4 × 100 (annualisert)",
     "dh_obs": "Δlog(boligpris) × 100 (kvartalsvekst)",
     "i_R_obs, i_3m_obs": "rente / 4 (kvartalsnivå, pst.)",
