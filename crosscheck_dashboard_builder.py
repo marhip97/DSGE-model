@@ -196,6 +196,49 @@ def extract_dsge_meta(dsge: Dict) -> Dict:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# IRF-TRANSFORMASJON  (norske nøkler → korte JS-nøkler)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_SHOCK_TO_ID: Dict[str, str] = {
+    "Pengepol.":    "monetary",
+    "Risikopremie": "risk",
+    "Prismarkup":   "cost",
+    "TFP":          "tech",
+    "Oljepris":     "oil",
+    "Ettersp.":     "demand",
+    "Bolig":        "housing",
+    "Konsum":       "consumption",
+}
+_VAR_TO_ID: Dict[str, str] = {
+    "BNP-gap":       "y",
+    "KPI-inflasjon": "pi",
+    "Styringsrente": "i",
+    "RER-gap":       "rer",
+    "Boligpris-gap": "q_H",
+    "Konsum-gap":    "c_NW",
+}
+
+
+def _add_irf_est(dsge: Dict) -> None:
+    """Legg til irf_est/irf_cal/irf_ci med korte nøkler som dashboardet forventer."""
+    raw = dsge.get("irf", {})
+    irf_est: Dict[str, Any] = {}
+    for shock_label, vars_dict in raw.items():
+        sid = _SHOCK_TO_ID.get(shock_label)
+        if sid is None:
+            continue
+        irf_est[sid] = {
+            _VAR_TO_ID[v]: vals
+            for v, vals in vars_dict.items()
+            if v in _VAR_TO_ID
+        }
+    dsge["irf_est"] = irf_est
+    dsge.setdefault("irf_cal", {})
+    dsge.setdefault("irf_ci",  {})
+    log.info(f"  IRF transformert: {len(irf_est)} sjokk → irf_est")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # SAMMENSLÅING
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -220,6 +263,8 @@ def merge(dsge_path: str, ck_path: str) -> Dict:
     # ── Last Fase II ──────────────────────────────────────────────────────
     dsge_data = load_dsge(dsge_path) if dsge_path else None
     dsge_ok   = dsge_data is not None
+    if dsge_ok:
+        _add_irf_est(dsge_data)
 
     # ── Last Fase III ─────────────────────────────────────────────────────
     ck_data = None
