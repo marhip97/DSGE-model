@@ -199,49 +199,50 @@ class BVARMinnesota:
 
     def _build_prior_moments(self,
                               sigma_ols: np.ndarray
-                              ) -> Tuple[np.ndarray, np.ndarray]:
+                              ) -> Tuple[np.ndarray, List]:
         """
         Bygg Minnesota prior-gjennomsnitt og presisjon for vec(B).
 
         Prior-gjennomsnitt:
-            - Egne lag-1: 1 (random walk prior for ikke-stasjonære)
-              men vi bruker stasjonære differanser → sett til 0
-            - Alle andre koeffisienter: 0
+            - Alle koeffisienter: 0 (stasjonære differanser)
 
-        Prior-presisjon (diagonal):
-            Var(B_{ij,l}) = (lambda1 * lambda2)^2 / l^lambda3
-                            × sigma_i / sigma_j   for i ≠ j
-            Var(B_{ii,l}) = lambda1^2 / l^lambda3  for eget lag
+        Prior-presisjon (diagonal, per ligning):
+            Var(B_{ii,l}) = lambda1^2 / l^lambda3          for eget lag
+            Var(B_{ij,l}) = (lambda1*lambda2)^2 / l^lambda3
+                            × sigma_i / sigma_j             for i ≠ j
             Var(konstant) : stor (diffus)
+
+        Returnerer B_prior_mean og liste med Omega_0_inv per ligning.
         """
         pr  = self.prior
         n, p = self.n, self.p
-        k   = n * p + 1   # antall regressorer per ligning
+        k   = n * p + 1
 
-        # Antall koeffisienter totalt
         B_prior_mean = np.zeros((k, n))
-        # Alle serier er stasjonære differanser → prior mean = 0
 
-        # Bygger diagonal presisjon Omega_0^{-1}
-        # (varianser for hver koeffisient)
-        variances = np.zeros(k)
-        # Konstant: diffus
-        variances[0] = 1e6
+        Omega_0_inv_list = []
+        for eq in range(n):
+            variances = np.zeros(k)
+            variances[0] = 1e6  # diffus konstant
+            sig_i = max(float(sigma_ols[eq, eq]), 1e-8)
 
-        for l in range(1, p + 1):
-            for j in range(n):
-                idx = 1 + (l - 1) * n + j
-                if idx < k:
-                    # Eget lag
-                    var_ii = (pr.lambda1 ** 2) / (l ** pr.lambda3)
-                    # Kryssvar — bruker sigma-ratio for skalering
-                    var_ij = ((pr.lambda1 * pr.lambda2) ** 2 / (l ** pr.lambda3)
-                              * sigma_ols[j, j])
-                    variances[idx] = var_ij   # lagres per regressor (j)
+            for l in range(1, p + 1):
+                for j in range(n):
+                    idx = 1 + (l - 1) * n + j
+                    if idx < k:
+                        if j == eq:
+                            # Eget lag: sterk prior (ingen lambda2-demping)
+                            var = (pr.lambda1 ** 2) / (l ** pr.lambda3)
+                        else:
+                            # Kryssvar: svakere prior, sigma_i/sigma_j-skalering
+                            sig_j = max(float(sigma_ols[j, j]), 1e-8)
+                            var = ((pr.lambda1 * pr.lambda2) ** 2
+                                   / (l ** pr.lambda3) * sig_i / sig_j)
+                        variances[idx] = var
 
-        # Presisjonmatrise (diagonal)
-        Omega_0_inv = np.diag(1.0 / np.maximum(variances, 1e-12))
-        return B_prior_mean, Omega_0_inv
+            Omega_0_inv_list.append(np.diag(1.0 / np.maximum(variances, 1e-12)))
+
+        return B_prior_mean, Omega_0_inv_list
 
     def fit(self,
             data: pd.DataFrame,
@@ -282,8 +283,8 @@ class BVARMinnesota:
         # OLS som startpunkt og for prior-kalibrering
         B_ols, Sigma_ols = _ols_var(X, Y_d)
 
-        # Prior-momenter
-        B_prior, Omega_0_inv = self._build_prior_moments(Sigma_ols)
+        # Prior-momenter (eq-spesifikk for korrekt Minnesota-prior)
+        B_prior, Omega_0_inv_list = self._build_prior_moments(Sigma_ols)
 
         # ── Gibbs-sampler ─────────────────────────────────────────────────────
         # Initialisering
@@ -299,11 +300,10 @@ class BVARMinnesota:
         for draw in range(total):
             # ── Steg 1: Sample B | Sigma ───────────────────────────────────
             Sigma_inv = np.linalg.inv(Sigma + np.eye(self.n) * 1e-8)
-            # Posterior presisjon: Omega_n^{-1} = Omega_0^{-1} + X'(Sigma^{-1} ⊗ I)X
-            # For diagonal Omega_0^{-1} og full Sigma: kolonne-vis
             B_post_cols = []
             for eq in range(self.n):
-                s_ii = float(Sigma_inv[eq, eq])
+                s_ii        = float(Sigma_inv[eq, eq])
+                Omega_0_inv = Omega_0_inv_list[eq]   # ligning-spesifikk prior
                 Omega_n_inv = Omega_0_inv + s_ii * (X.T @ X)
                 Omega_n     = np.linalg.inv(Omega_n_inv + np.eye(k) * 1e-10)
                 b_prior_eq  = B_prior[:, eq]

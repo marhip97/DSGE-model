@@ -563,13 +563,14 @@ class EnsembleForecaster:
         """Oppsummering av modellpasning: RMSE og MAE per variabel."""
         summary = {}
         for var, hdata in historical.items():
-            obs   = np.array([x for x in hdata["observed"] if x is not None],
-                             dtype=float)
-            fv    = np.array([x for x in hdata["fitted"]   if x is not None],
-                             dtype=float)
             covid = np.array(hdata["covid_periods"])
-            n     = min(len(obs), len(fv), len(covid))
-            obs, fv, covid = obs[:n], fv[:n], covid[:n]
+            n     = min(len(hdata["observed"]), len(hdata["fitted"]), len(covid))
+            # Keep None as NaN (not filtered out) to preserve time-alignment
+            obs   = np.array([x if x is not None else np.nan
+                              for x in hdata["observed"][:n]], dtype=float)
+            fv    = np.array([x if x is not None else np.nan
+                              for x in hdata["fitted"][:n]], dtype=float)
+            covid = covid[:n]
 
             valid = ~covid & ~np.isnan(obs) & ~np.isnan(fv)
             if valid.sum() < 4:
