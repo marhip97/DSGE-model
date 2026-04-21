@@ -307,7 +307,7 @@ select{font-size:11px;padding:4px 8px;border-radius:var(--rad);border:.5px solid
   <div class="warn-box">
     <strong>Hva betyr «tilpasset kurve»?</strong> Den stiplede kurven viser hva BVAR-modellen ville ha gjettet for hvert kvartal i ettertid — ikke en ekte fremskrivning, men en rekonstruksjon der modellen allerede kjenner alle data. Kurven er bevisst glattere enn den observerte serien fordi Minnesota-prioren trekker koeffisientene mot null for å unngå at modellen «pugger» historiske svingninger. Modellen ofrer noe presisjon i fortiden for å gi mer robuste prognoser fremover.
     <br><br>
-    <strong>Hva forteller R² oss?</strong> R² måler hvor stor andel av svingningene modellen klarer å forklare — 0,4 betyr 40%. For kvartalsvise endringstall er 0,3–0,6 normalt og godt. Disse seriene inneholder mer tilfeldig støy enn nivåserier, og selv profesjonelle prognosemiljøer oppnår typisk R² i dette området for norske makrovariable.
+    <strong>Hva forteller R² oss?</strong> R² måler hvor stor andel av svingningene modellen klarer å forklare — 0,4 betyr 40 %. For kvartalsvise endringstall er 0,3–0,6 normalt og godt. <em>Negativ R²</em> betyr at modellen predikerer dårligere enn å bruke historisk gjennomsnitt; det er mer vanlig for korte dataserier (under 30 observasjoner) der Minnesota-prioren dominerer og trekker koeffisientene mot null. RMSE er da et mer pålitelig mål på relativ modellkvalitet.
     <br><br>
     <strong>COVID-perioden (2020K1–2021K4)</strong> holdes utenfor pasningsberegningen — nedstengningene skapte bevegelser ingen strukturell makromodell er ment å fange opp.
   </div>
@@ -385,7 +385,7 @@ select{font-size:11px;padding:4px 8px;border-radius:var(--rad);border:.5px solid
 <div id="ck-eval" style="display:none">
   <div class="sec-bar ck">Kryssjekkmodeller — Evaluering og modellvekter</div>
   <div class="info-box">
-    <strong>Modellvekter og pasningsstatistikk.</strong> Søylediagrammet viser hvor stor andel av ensemble-prognosen som kommer fra hver modell per variabel. Høyere vekt til modeller med lavere RMSE i treningsperioden (ekskl. COVID). Dersom to modeller treffer omtrent like godt (under 5% relativ RMSE-forskjell), brukes lik vekting fordi datamaterialet ikke gir grunnlag for å skille dem. R²-verdier på 0,3–0,6 er normalt for kvartalsvise vekstrater — se forklaring på tilpasningsfanen.
+    <strong>Modellvekter og pasningsstatistikk.</strong> Søylediagrammet viser hvor stor andel av ensemble-prognosen som kommer fra hver modell per variabel. Høyere vekt til modeller med lavere RMSE i treningsperioden (ekskl. COVID). Dersom to modeller treffer omtrent like godt (under 5 % relativ RMSE-forskjell), brukes lik vekting fordi datamaterialet ikke gir grunnlag for å skille dem. R²-verdier over 0,3 er normalt for kvartalsvise vekstrater; negativ R² indikerer at modellen predikerer dårligere enn historisk gjennomsnitt — se tilpasningsfanen for fullstendig forklaring.
   </div>
   <div class="sl">Ensemble-vekter per variabel</div>
   <div class="cw" style="margin-bottom:1.25rem">
@@ -1281,7 +1281,7 @@ function renderCKHist() {
 function buildCKEvalTable() {
   const tbody=document.getElementById('ckEvalTbl'); if(!tbody||tbody.children.length||!CK)return;
   Object.entries(CK.evaluation||{}).sort((a,b)=>(b[1].r2??0)-(a[1].r2??0)).forEach(([v,ev])=>{
-    const r2c=ev.r2!=null?(ev.r2>.5?'var(--teal)':ev.r2>.25?'var(--text2)':'var(--coral)'):'var(--text3)';
+    const r2c=ev.r2!=null?(ev.r2>.5?'var(--teal)':ev.r2>.25?'var(--text2)':ev.r2>=0?'var(--amber)':'var(--coral)'):'var(--text3)';
     const tr=document.createElement('tr');
     tr.innerHTML=`<td>${ev.label}</td><td class="mono">${ev.rmse}</td><td class="mono">${ev.mae}</td>
       <td class="mono" style="color:${r2c}">${ev.r2!=null?ev.r2.toFixed(3):'–'}</td><td class="mono">${ev.n_obs}</td>`;
@@ -1398,7 +1398,7 @@ function buildCKEval() {
   }
   const tbody=document.getElementById('ckEvalFullTbl'); if(!tbody||tbody.children.length)return;
   Object.entries(CK.evaluation||{}).sort((a,b)=>(b[1].r2??0)-(a[1].r2??0)).forEach(([v,ev])=>{
-    const r2c=ev.r2!=null?(ev.r2>.5?'var(--teal)':ev.r2>.25?'var(--text2)':'var(--coral)'):'var(--text3)';
+    const r2c=ev.r2!=null?(ev.r2>.5?'var(--teal)':ev.r2>.25?'var(--text2)':ev.r2>=0?'var(--amber)':'var(--coral)'):'var(--text3)';
     const models=CK.forecasts?.[v]?.models_used?.join(', ')||'–';
     const tr=document.createElement('tr');
     tr.innerHTML=`<td>${ev.label}</td><td class="mono">${ev.rmse}</td><td class="mono">${ev.mae}</td>
