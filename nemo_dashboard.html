@@ -1096,22 +1096,30 @@ function buildVal() {
 // KRYSSJEKK — FELLES HJELP
 // ═══════════════════════════════════════════════════════════════════════════
 
-function makeCKChartData(v) {
+function makeCKChartData(v, useLevel) {
   if (!CK) return null;
   const fc=CK.forecasts?.[v]; const hd=CK.historical?.[v];
   if (!fc||!hd) return null;
   const allLabels=[...hd.periods,...fc.periods];
-  const histMap={};hd.observed.forEach((y,i)=>{histMap[hd.periods[i]]=y;});
-  const fitMap={};hd.fitted.forEach((y,i)=>{fitMap[hd.periods[i]]=y;});
-  const fcMap={};fc.mean.forEach((y,i)=>{fcMap[fc.periods[i]]=y;});
-  const c90LoM={};fc.ci_90.lo.forEach((y,i)=>{c90LoM[fc.periods[i]]=y;});
-  const c90HiM={};fc.ci_90.hi.forEach((y,i)=>{c90HiM[fc.periods[i]]=y;});
-  const c50LoM={};fc.ci_50.lo.forEach((y,i)=>{c50LoM[fc.periods[i]]=y;});
-  const c50HiM={};fc.ci_50.hi.forEach((y,i)=>{c50HiM[fc.periods[i]]=y;});
+  // Velg nivå- eller vekstrate-arrays
+  const useL = useLevel && (hd.observed_level || fc.level_mean);
+  const obsArr  = useL && hd.observed_level  ? hd.observed_level  : hd.observed;
+  const fcArr   = useL && fc.level_mean      ? fc.level_mean      : fc.mean;
+  const lo90    = useL && fc.level_ci_90?.lo ? fc.level_ci_90.lo  : (fc.ci_90?.lo ?? []);
+  const hi90    = useL && fc.level_ci_90?.hi ? fc.level_ci_90.hi  : (fc.ci_90?.hi ?? []);
+  const lo50    = useL && fc.level_ci_50?.lo ? fc.level_ci_50.lo  : (fc.ci_50?.lo ?? []);
+  const hi50    = useL && fc.level_ci_50?.hi ? fc.level_ci_50.hi  : (fc.ci_50?.hi ?? []);
+  const histMap={};obsArr.forEach((y,i)=>{histMap[hd.periods[i]]=y;});
+  const fitMap={};(hd.fitted||[]).forEach((y,i)=>{fitMap[hd.periods[i]]=y;});
+  const fcMap={};fcArr.forEach((y,i)=>{fcMap[fc.periods[i]]=y;});
+  const c90LoM={};lo90.forEach((y,i)=>{c90LoM[fc.periods[i]]=y;});
+  const c90HiM={};hi90.forEach((y,i)=>{c90HiM[fc.periods[i]]=y;});
+  const c50LoM={};lo50.forEach((y,i)=>{c50LoM[fc.periods[i]]=y;});
+  const c50HiM={};hi50.forEach((y,i)=>{c50HiM[fc.periods[i]]=y;});
   const sl=m=>allLabels.map(p=>m[p]??null);
   // Bro-punkt
   const bridgeIdx=allLabels.indexOf(fc.periods[0]);
-  const lastHist=hd.observed[hd.observed.length-1];
+  const lastHist=obsArr[obsArr.length-1];
   const meanData=sl(fcMap);
   if(bridgeIdx>=0&&lastHist!=null&&meanData[bridgeIdx]==null)meanData[bridgeIdx]=lastHist;
   return{allLabels,histData:sl(histMap),fitData:sl(fitMap),meanData,
@@ -1169,7 +1177,9 @@ function buildCKFcstGrid() {
 }
 
 function renderCKMini(v,color) {
-  const d=makeCKChartData(v); if(!d)return;
+  // Renter og inflasjon vises som faktisk nivå i nøkkelvariabler-kortene
+  const useL=['i_R_obs','i_3m_obs','pi_obs'].includes(v);
+  const d=makeCKChartData(v,useL); if(!d)return;
   const ctx=document.getElementById('ckMini_'+v); if(!ctx)return;
   const hLen=CK.historical?.[v]?.periods.length??0;
   const startIdx=Math.max(0,hLen-16);
@@ -1188,21 +1198,15 @@ function renderCKMini(v,color) {
 
 function renderCKFcstMain() {
   if(!CK)return;
-  const v=selectedCKVar; const cfg=VAR_CFG[v]; const d=makeCKChartData(v); if(!d)return;
+  const v=selectedCKVar; const cfg=VAR_CFG[v];
+  const useL=showLevel&&cfg.hasLevel;
+  const d=makeCKChartData(v, useL); if(!d)return;
   const wrap=document.getElementById('levelToggleWrap');
   if(wrap)wrap.style.display=cfg.hasLevel?'flex':'none';
   document.getElementById('ckFcstTitle').textContent=cfg.label;
-  document.getElementById('ckFcstUnit').textContent=showLevel&&cfg.hasLevel?(cfg.levelUnit||cfg.unit):cfg.unit;
+  document.getElementById('ckFcstUnit').textContent=useL?(cfg.levelUnit||cfg.unit):cfg.unit;
 
   let{histData,meanData,ci90Lo,ci90Hi,ci50Lo,ci50Hi}=d;
-  if(showLevel&&cfg.hasLevel){
-    const last=CK.forecasts?.[v]?.last_level??CK.historical?.[v]?.last_level??null;
-    if(last!=null){
-      const acc=arr=>arr.map(x=>x==null?null:(v==='i_R_obs'?x+last:last*Math.exp(x/100)));
-      histData=acc(histData);meanData=acc(meanData);
-      ci90Lo=acc(ci90Lo);ci90Hi=acc(ci90Hi);ci50Lo=acc(ci50Lo);ci50Hi=acc(ci50Hi);
-    }
-  }
 
   if(charts['ckFcstMain'])charts['ckFcstMain'].destroy();
   charts['ckFcstMain']=new Chart(document.getElementById('ckFcstMain'),{type:'line',
@@ -1294,15 +1298,18 @@ function renderCompare() {
   const v=document.getElementById('cmpVar')?.value||'pi_obs';
   const cfg=VAR_CFG[v];
   document.getElementById('cmpTitle').textContent=cfg.label+' — DSGE vs kryssjekk';
-  const d=makeCKChartData(v); if(!d)return;
+  // Renter og inflasjon vises som faktisk nivå i sammenligningsgrafen
+  const useL=cfg.hasLevel&&['i_R_obs','i_3m_obs','pi_obs'].includes(v);
+  const d=makeCKChartData(v,useL); if(!d)return;
   const hLen=CK.historical?.[v]?.periods.length??0;
   const startIdx=Math.max(0,hLen-12);
   const labels=d.allLabels.slice(startIdx);
   const sl=arr=>arr.slice(startIdx);
+  const unitLabel=useL?(cfg.levelUnit||cfg.unit):cfg.unit;
   const datasets=[
     {data:sl(d.ci90Lo),borderWidth:0,pointRadius:0,fill:false,label:''},
     {data:sl(d.ci90Hi),borderWidth:0,pointRadius:0,fill:'-1',backgroundColor:hexToRgba('#1a9870',.13),label:'90% PI (ensemble)'},
-    {data:sl(d.histData),borderColor:'#7a7870',borderWidth:1.5,pointRadius:0,tension:.3,fill:false,label:'Historisk',spanGaps:false},
+    {data:sl(d.histData),borderColor:'#7a7870',borderWidth:1.5,pointRadius:0,tension:.3,fill:false,label:'Historisk',spanGaps:true},
     {data:sl(d.meanData),borderColor:'#1a9870',borderWidth:2.5,pointRadius:0,tension:.3,fill:false,label:'Kryssjekk ensemble',spanGaps:false},
   ];
   const sig=document.getElementById('cmpSignal');
@@ -1312,13 +1319,14 @@ function renderCompare() {
     const dsgeMap={};(dsgeFC.periods||[]).forEach((p,i)=>{dsgeMap[p]=dsgeFC.mean[i];});
     const dsgeData=d.allLabels.slice(startIdx).map(p=>dsgeMap[p]??null);
     datasets.push({data:dsgeData,borderColor:'#1a5fa8',borderWidth:2,borderDash:[7,4],pointRadius:0,tension:.3,fill:false,label:'DSGE Fase II',spanGaps:false});
-    const div1=fc?Math.abs((dsgeFC.mean[0]??0)-(fc.mean[0]??0))/(fc.std[0]||1):null;
-    if(div1!=null){
-      sig.textContent=div1>1?`Divergens h=1: ${div1.toFixed(2)} std`:`Enighet h=1: ${div1.toFixed(2)} std`;
-      sig.style.cssText=div1>1
-        ?'font-size:11.5px;padding:5px 10px;border-radius:var(--rad);background:rgba(208,82,42,.08);border:.5px solid rgba(208,82,42,.25);color:var(--coral)'
-        :'font-size:11.5px;padding:5px 10px;border-radius:var(--rad);background:rgba(26,152,112,.08);border:.5px solid rgba(26,152,112,.25);color:var(--teal)';
-    }
+    // Divergens-mål: bruk nivå-prognose for sammenlignbare enheter
+    const ckMean0 = useL ? (fc?.level_mean?.[0]??fc?.mean?.[0]??0) : (fc?.mean?.[0]??0);
+    const ckStd0  = fc?.std?.[0]||1;
+    const div1 = Math.abs((dsgeFC.mean[0]??0)-ckMean0)/ckStd0;
+    sig.textContent=div1>1?`Divergens h=1: ${div1.toFixed(2)} std`:`Enighet h=1: ${div1.toFixed(2)} std`;
+    sig.style.cssText=div1>1
+      ?'font-size:11.5px;padding:5px 10px;border-radius:var(--rad);background:rgba(208,82,42,.08);border:.5px solid rgba(208,82,42,.25);color:var(--coral)'
+      :'font-size:11.5px;padding:5px 10px;border-radius:var(--rad);background:rgba(26,152,112,.08);border:.5px solid rgba(26,152,112,.25);color:var(--teal)';
   }else{
     sig.textContent='DSGE-data ikke lastet';
     sig.style.cssText='font-size:11.5px;padding:5px 10px;border-radius:var(--rad);background:var(--bg2);border:.5px solid var(--border2);color:var(--text3)';
@@ -1328,10 +1336,10 @@ function renderCompare() {
     data:{labels,datasets},
     options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},
       plugins:{legend:{display:true,position:'bottom',labels:{font:{size:9},boxWidth:14,padding:10,filter:i=>i.text!==''}},
-        tooltip:{mode:'index',intersect:false,callbacks:{label:c=>c.dataset.label?(c.dataset.label+': '+(c.parsed.y!=null?c.parsed.y.toFixed(3):'–')):null}}},
+        tooltip:{mode:'index',intersect:false,callbacks:{label:c=>c.dataset.label?(c.dataset.label+': '+(c.parsed.y!=null?c.parsed.y.toFixed(2):'–')):null}}},
       scales:{x:{type:'category',ticks:{font:{size:9},maxTicksLimit:12,maxRotation:0},grid:{display:false}},
               y:{ticks:{font:{size:9}},grid:{color:'rgba(100,98,90,.08)'},
-                 title:{display:true,text:cfg.unit,font:{size:9},color:'#8a8880'}}}}});
+                 title:{display:true,text:unitLabel,font:{size:9},color:'#8a8880'}}}}});
 }
 
 function buildCmpTable() {
@@ -1361,11 +1369,16 @@ function buildCKEval() {
   if(!CK)return;
   const wData={},wVars=[];
   const mColors={bvar1:'#1a5fa8',bvar2:'#d0522a',bvar3:'#1a9870',bvar:'#7a6fa8',ar:'#b07010'};
+  // Finn alle modellgrupper på tvers av variabler
+  const allGrps=new Set();
+  Object.values(CK.weights||{}).forEach(mw=>Object.keys(mw).forEach(m=>allGrps.add(m.startsWith('ar')?'ar':m)));
   Object.entries(CK.weights||{}).forEach(([v,mw])=>{
     wVars.push(v);
-    Object.entries(mw).forEach(([m,w])=>{
-      const grp=m.startsWith('ar')?'ar':m;
+    allGrps.forEach(grp=>{
       if(!wData[grp])wData[grp]=[];
+      // Summer bidrag fra alle modeller med dette grp-prefikset
+      let w=0;
+      Object.entries(mw).forEach(([m,wt])=>{if((m.startsWith('ar')?'ar':m)===grp)w+=wt;});
       wData[grp].push(w);
     });
   });

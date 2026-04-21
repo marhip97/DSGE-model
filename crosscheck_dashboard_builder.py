@@ -78,9 +78,38 @@ def extract_dsge_forecast(dsge: Dict) -> Dict:
     """
     Trekk ut DSGE-fremskrivning i format som dashboardet forventer.
 
+    Bruker forecast_level (nivåverdier med demean-korreksjon) hvis tilgjengelig,
+    ellers fallback til råverdier fra tilstandsrommet.
+
     Returnerer dict på formen:
         {obs_navn: {mean: [...], std: [...], periods: [...]}}
     """
+    # ── Forsøk å bruke forecast_level (korrekte nivåverdier) ─────────────────
+    fl = dsge.get("forecast_level", {})
+    if fl and fl.get("dates"):
+        LEVEL_MAP = {
+            "i":     "i_R_obs",
+            "pi":    "pi_obs",
+            "y":     "dy_obs",
+            "rer":   "ds_obs",
+            "bolig": "dh_obs",
+        }
+        result: Dict = {}
+        for dsge_key, obs_name in LEVEL_MAP.items():
+            vals = fl.get(dsge_key, [])
+            if not vals:
+                continue
+            result[obs_name] = {
+                "mean":    [float(v) for v in vals],
+                "std":     [0.3] * len(vals),
+                "periods": fl.get("dates", [])[:len(vals)],
+                "source":  "dsge_fase2_forecast_level",
+            }
+        if result:
+            log.info(f"  DSGE-fremskrivning fra forecast_level: {len(result)} variabler")
+            return result
+
+    # ── Fallback: råverdier fra tilstandsrommet ───────────────────────────────
     fc_raw = dsge.get("forecast", {})
     meta   = dsge.get("meta", {})
 
@@ -284,6 +313,133 @@ def _add_last_level(ck_data: Dict) -> None:
             fc["last_level"] = obs[-1]
 
 
+# Kvartalsrenter annualiseres (×4), andre variabler beholder sin skala
+_RATE_SCALE: Dict[str, float] = {"i_R_obs": 4.0, "i_3m_obs": 4.0}
+
+
+def _add_level_series(
+    ck_data: Dict,
+    meta_path: str = "crosscheck_meta.json",
+    csv_path: str = "crosscheck_data.csv",
+) -> None:
+    """
+    Legg til nivå-korrigerte serier i Kryssjekk-data.
+
+    For hver variabel i historical: legger til observed_level (demean + skala).
+    For hver variabel i forecasts:  legger til level_mean, level_ci_90, level_ci_50.
+    For renter (i_R_obs, i_3m_obs):  multipliserer med 4 (kvartals→årsrate).
+    For ds_obs (NOK/EUR):            konverterer log-nivå til faktisk kurs via exp().
+    """
+    import math
+
+    # 1. Last demean-verdier
+    demean: Dict[str, float] = {}
+    if os.path.exists(meta_path):
+        try:
+            with open(meta_path) as f:
+                demean = json.load(f).get("demean_values", {})
+        except Exception as exc:
+            log.warning(f"  crosscheck_meta.json lese-feil: {exc}")
+
+    # 2. Last _level-kolonner fra CSV — kun for variabler der nivå er meningsfullt
+    # i_R_obs_level / i_3m_obs_level = faktisk % p.a.
+    # ds_obs_level = ln(NOK/EUR) → konverteres via exp()
+    # Andre _level-kolonner er log-pris-/volumindekser (ikke tolkbare som nivå for grafer)
+    period_to_level: Dict[str, Dict[str, Optional[float]]] = {}
+    _LEVEL_COLS = {"i_R_obs", "i_3m_obs", "ds_obs"}
+    if os.path.exists(csv_path):
+        try:
+            import pandas as pd
+            df = pd.read_csv(csv_path, index_col=0, parse_dates=True)
+            for var_base in _LEVEL_COLS:
+                col = var_base + "_level"
+                if col not in df.columns:
+                    continue
+                period_to_level[var_base] = {}
+                for idx, val in df[col].items():
+                    try:
+                        ts = pd.Timestamp(idx)
+                        q = (ts.month - 1) // 3 + 1
+                        p = f"{ts.year}Q{q}"
+                        period_to_level[var_base][p] = (
+                            None if pd.isna(val) else float(val)
+                        )
+                    except Exception:
+                        pass
+            log.info(
+                f"  Level-kolonner fra {csv_path}: {list(period_to_level.keys())}"
+            )
+        except Exception as exc:
+            log.warning(f"  crosscheck_data.csv lese-feil: {exc}")
+
+    historical = ck_data.get("historical", {})
+    forecasts  = ck_data.get("forecasts", {})
+
+    # 3. Legg til observed_level i historical
+    for var, hd in historical.items():
+        dm    = demean.get(var, 0.0)
+        scale = _RATE_SCALE.get(var, 1.0)
+        periods = hd.get("periods", [])
+
+        if var in period_to_level:
+            # Bruk faktiske nivåverdier fra CSV
+            obs_level: list = []
+            for p in periods:
+                val = period_to_level[var].get(p)
+                if val is not None and var == "ds_obs":
+                    # ds_obs_level = ln(NOK/EUR) → konverter til faktisk kurs
+                    val = round(math.exp(val), 4)
+                elif val is not None:
+                    val = round(val, 4)
+                obs_level.append(val)
+        else:
+            # Beregn fra demeanede observasjoner
+            obs_level = [
+                round((v + dm) * scale, 4) if v is not None else None
+                for v in hd.get("observed", [])
+            ]
+
+        hd["observed_level"] = obs_level
+        non_null = [v for v in obs_level if v is not None]
+        if non_null:
+            hd["last_level"] = non_null[-1]
+
+    # 4. Legg til nivå-prognoser i forecasts
+    def to_level(arr: list, dm: float, scale: float) -> list:
+        return [
+            round((x + dm) * scale, 4) if x is not None else None
+            for x in arr
+        ]
+
+    for var, fc in forecasts.items():
+        dm    = demean.get(var, 0.0)
+        scale = _RATE_SCALE.get(var, 1.0)
+
+        fc["level_mean"] = to_level(fc.get("mean", []), dm, scale)
+
+        ci90 = fc.get("ci_90", {})
+        fc["level_ci_90"] = {
+            "lo": to_level(ci90.get("lo", []), dm, scale),
+            "hi": to_level(ci90.get("hi", []), dm, scale),
+        }
+        ci50 = fc.get("ci_50", {})
+        fc["level_ci_50"] = {
+            "lo": to_level(ci50.get("lo", []), dm, scale),
+            "hi": to_level(ci50.get("hi", []), dm, scale),
+        }
+
+        # Oppdater last_level fra historical nivåverdier
+        hist = historical.get(var, {})
+        non_null_hist = [v for v in hist.get("observed_level", []) if v is not None]
+        if non_null_hist:
+            fc["last_level"] = non_null_hist[-1]
+
+    log.info(
+        f"  Level-serier lagt til: {len(historical)} historiske, "
+        f"{len(forecasts)} prognoser"
+    )
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # SAMMENSLÅING
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -321,6 +477,7 @@ def merge(dsge_path: str, ck_path: str) -> Dict:
             ck_data = json.load(f)
         ck_ok = True
         _add_last_level(ck_data)
+        _add_level_series(ck_data)
         log.info(f"  Fase III lastet: {ck_path}")
     else:
         log.warning(f"  Fase III-fil ikke funnet: {ck_path}")
