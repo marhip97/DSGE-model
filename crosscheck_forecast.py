@@ -304,6 +304,10 @@ def build_historical_fit(fitted: Dict,
         if not fv_list:
             continue
 
+        # Trim alle til korteste lengde — ulike modeller har ulik lagorden p
+        min_len = min(len(fv) for fv in fv_list)
+        fv_list = [fv[-min_len:] for fv in fv_list]
+
         # Lik vekting av fitted values (for historisk tilpasning)
         fv_mean = np.mean(fv_list, axis=0)
         n_fit   = len(fv_mean)
