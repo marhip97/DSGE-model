@@ -58,7 +58,7 @@ COVID_END   = "2021Q4"
 
 # Variabelgrupper
 BVAR1_VARS  = ["dy_obs", "dc_obs", "dinv_obs", "dx_obs", "dm_obs"]
-BVAR2_VARS  = ["pi_obs", "dw_obs", "dpO_obs", "dyS_obs"]
+BVAR2_VARS  = ["pi_obs", "dpO_obs", "dyS_obs"]   # dw_obs fjernet: data kun til 2021Q1
 BVAR3_VARS  = ["i_R_obs", "i_3m_obs", "ds_obs", "dh_obs", "db_obs"]
 AR_VARS     = ["dpO_obs", "dyS_obs"]
 ALL_OBS     = BVAR1_VARS + BVAR2_VARS + BVAR3_VARS

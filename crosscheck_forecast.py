@@ -57,7 +57,6 @@ VAR_TO_MODELS = {
     "dx_obs":   ["bvar1"],
     "dm_obs":   ["bvar1"],
     "pi_obs":   ["bvar2"],          # + nowcast-justering
-    "dw_obs":   ["bvar2"],
     "dpO_obs":  ["bvar2", "ar_olje"],
     "dyS_obs":  ["bvar2", "ar_partner"],
     "i_R_obs":  ["bvar3"],          # + nowcast-justering
