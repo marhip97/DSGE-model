@@ -525,23 +525,52 @@ def _nb_try_paths(candidates: List[str], label: str) -> pd.Series:
     return pd.Series(dtype=float)
 
 
+def _nb_discover_key(dataflow: str, match_terms: List[str]) -> Optional[str]:
+    """
+    Query et NB-dataflow for å finne en series-key som matcher match_terms
+    (søk i dimensjonsverdier og labels). Returnerer full SDMX-sti.
+    """
+    try:
+        url = f"https://data.norges-bank.no/api/data/{dataflow}"
+        r = SESSION.get(url,
+                        params={"format": "sdmx-json", "lastNObservations": 1},
+                        timeout=TIMEOUT)
+        r.raise_for_status()
+        d = r.json()
+        dims = d["data"]["structure"]["dimensions"]["series"]
+        series = d["data"]["dataSets"][0]["series"]
+        best = None
+        for key_indices in series.keys():
+            parts = [int(x) for x in key_indices.split(":")]
+            vid_parts, labels = [], []
+            for dim, i in zip(dims, parts):
+                val = dim["values"][i]
+                vid_parts.append(val["id"])
+                labels.append(val.get("name", ""))
+            combined = (" ".join(vid_parts) + " " + " ".join(labels)).upper()
+            if all(t.upper() in combined for t in match_terms):
+                key_str = f"{dataflow}/{'.'.join(vid_parts)}"
+                log.info(f"  NB {dataflow} oppdaget {match_terms}: {key_str}")
+                return key_str
+        log.info(f"  NB {dataflow}: fant ingen match for {match_terms} "
+                 f"blant {len(series)} serier")
+    except Exception as e:
+        log.warning(f"NB discover {dataflow} {match_terms}: {e}")
+    return None
+
+
 def fetch_nibor_3m() -> pd.Series:
-    """Kortsiktig pengemarkedsrente — prøv MONEY_MARKET, IR og NIBOR-varianter."""
-    return _nb_try_paths(
-        [
-            # MONEY_MARKET er listet i dataflow-katalogen — NOWA bor her
-            "MONEY_MARKET/B.NOWA.ON.R",
-            "MONEY_MARKET/D.NOWA.ON.R",
-            "MONEY_MARKET/B.NOWA.SD.R",
-            "MONEY_MARKET/D.NOWA.SD.R",
-            "MONEY_MARKET/B.NOK.ON.R",
-            # IR-dataflow (prøvde allerede, men ta med som backup)
-            "IR/B.NOWA.SD.R",
-            "IR/B.NIBOR3M.SD.R",
-            "IR/B.NIBOR.3M.SD.R",
-        ],
-        "NOWA (proxy 3M):",
-    )
+    """Kortsiktig pengemarkedsrente — discover NOWA-key i MONEY_MARKET."""
+    discovered = _nb_discover_key("MONEY_MARKET", ["NOWA"])
+    candidates = [
+        # Statiske kandidater først (rask path om de virker)
+        "MONEY_MARKET/B.NOWA.ON.R",
+        "MONEY_MARKET/D.NOWA.ON.R",
+        "IR/B.NOWA.SD.R",
+    ]
+    if discovered:
+        candidates.insert(0, discovered)
+    return _nb_try_paths(candidates, "NOWA (proxy 3M):")
 
 
 def fetch_nok_eur() -> pd.Series:
@@ -549,21 +578,24 @@ def fetch_nok_eur() -> pd.Series:
 
 
 def fetch_kredittvekst() -> pd.Series:
-    """K2 husholdninger — prøv FINANCIAL_INDICATORS og andre Norges Bank-flows."""
-    return _nb_try_paths(
-        [
-            # FINANCIAL_INDICATORS er listet i dataflow-katalogen
-            "FINANCIAL_INDICATORS/M.K2.HH.A.CA",
-            "FINANCIAL_INDICATORS/M.K2.HH.SA.G",
-            "FINANCIAL_INDICATORS/M.K2.HH",
-            "FINANCIAL_INDICATORS/M.K2.TP.A.G",
-            # MONEY_MARKET
-            "MONEY_MARKET/M.K2.HH.A.G",
-            # Gamle stier
-            "K2/M.A.B.A1.A.CA.Z5.A",
-        ],
-        "K2 husholdninger:",
-    )
+    """K2 husholdninger — publiseres av SSB (ikke Norges Bank)."""
+    # SSB 10649: "Kredittindikator K2, månedlig. Beløp og endring i prosent"
+    candidates = [
+        ("10649", ["Tolvmndsvekst", "endring", "vekst", "12"],
+                  ["HHold", "husholdninger", "private husholdninger"]),
+        ("11184", ["Tolvmndsvekst", "endring", "vekst"],
+                  ["HHold", "husholdninger"]),
+        ("08587", ["Tolvmndsvekst", "endring"],
+                  ["HHold", "husholdninger"]),
+    ]
+    for table_id, contents_kw, sector_kw in candidates:
+        s = _ssb_smart_query(table_id, contents_kw, sector_kw)
+        if not s.empty:
+            s = _period_series_to_quarterly(s)
+            log.info(f"  K2 husholdninger: {len(s)} kvartaler (SSB {table_id})")
+            return s
+    log.warning("  K2 husholdninger: 0 kvartaler (alle tabeller feilet)")
+    return pd.Series(dtype=float)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
