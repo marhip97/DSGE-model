@@ -290,7 +290,15 @@ def _ssb_smart_query(table_id: str,
                 "selection": {"filter": "item", "values": [code]},
             })
         elif sector_keywords:
+            # Prøv sektor-nøkkelord først (f.eks. 'husholdninger'), deretter
+            # generiske aggregater for dimensjoner som ikke er sektor
+            # (f.eks. Valuta = 'I alt', Region = 'Hele landet').
             code = _ssb_find_value(vals, lbls, sector_keywords)
+            if not code:
+                code = _ssb_find_value(
+                    vals, lbls,
+                    ["i alt", "alle", "total", "totalt", "hele", "00", "0000"],
+                )
             if code:
                 label = dict(zip(vals, lbls)).get(code, "")
                 log.info(f"  SSB {table_id}/{vc}: valgte {code!r} ({label!r})")
@@ -300,8 +308,9 @@ def _ssb_smart_query(table_id: str,
                 })
             else:
                 log.warning(
-                    f"SSB {table_id}/{vc}: ingen match for {sector_keywords}; "
-                    f"tilgjengelig: {list(zip(vals[:8], lbls[:8]))}"
+                    f"SSB {table_id}/{vc}: ingen match for {sector_keywords} "
+                    f"eller aggregat; tilgjengelig: "
+                    f"{list(zip(vals[:8], lbls[:8]))}"
                 )
                 return pd.Series(dtype=float)
         else:
