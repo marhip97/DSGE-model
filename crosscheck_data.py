@@ -473,10 +473,11 @@ def fetch_kpi_jae() -> pd.Series:
             return r
 
     # ── FRED: OECD-basert kjerneinflasjon for Norge (proxy for KPI-JAE) ─────
-    # NOCPICORMINMEI: CPI eks. mat+energi, indeks 2015=100, månedlig
+    # Prøv både ISO-2 (NO) og ISO-3 (NOR) som landkode — FRED er inkonsistent
     for fred_id, label in [
-        ("NOCPICORMINMEI", "FRED/OECD CPI eks. mat+energi"),
-        ("CPGRLE01NOM086NEST", "FRED/OECD CPI eks. energi"),
+        ("NOCPICORMINMEI",    "FRED/OECD CPI eks. mat+energi (NO)"),
+        ("CPGRLE01NOR086NEST", "FRED/OECD CPI eks. energi (NOR)"),
+        ("CPGRLE01NOM086NEST", "FRED/OECD CPI eks. energi (NOM)"),
     ]:
         s = fred_csv(fred_id, label)
         if not s.empty:
@@ -784,14 +785,16 @@ def fred_csv(series_id: str, label: str) -> pd.Series:
             s = _fred_fetch_csv(series_id)
             source = "FRED-CSV"
         if len(s) > 300:
-            # Daglig serie: forkast partielle kvartaler (<60 handelsdager)
             grp = s.resample("QE")
             quarterly = grp.mean()
-            counts = grp.count()
-            quarterly = quarterly[counts >= 60]
-            s = quarterly.to_period("Q")
+            counts    = grp.count()
+            if counts.median() > 30:
+                # Dagsdata: forkast partielle kvartaler (<60 handelsdager)
+                quarterly = quarterly[counts >= 60]
+            # Månedlige serier (median ~3 obs/kv): beholder alle kvartaler med ≥1 obs
+            s = quarterly[counts >= 1].to_period("Q")
         else:
-            # Kvartallig/månedlig serie: bruk siste verdi
+            # Kvartallig serie: bruk siste verdi per kvartal
             s = s.resample("QE").last().to_period("Q")
         log.info(f"  {label:<20} {len(s)} kvartaler ({source})")
         return s
