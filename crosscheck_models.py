@@ -995,10 +995,13 @@ class ModelLibrary:
         ]
         for step, label, model, var_list in bvars:
             log.info(f"\n[{step}] {label}...")
-            cols = [c for c in var_list if c in self.data.columns]
-            if len(cols) >= 2:
+            missing = [v for v in var_list if v not in self.data.columns]
+            if missing:
+                log.warning(f"  {label}: hopper over — mangler variabler {missing}")
+                continue
+            if len(var_list) >= 2:
                 p_opt = _select_lag_bic(
-                    self.data[cols].values,
+                    self.data[var_list].values,
                     p_max=self.p, exclude_mask=self.covid_mask,
                 )
                 log.info(f"  Lagorden BIC: p={p_opt}")
@@ -1007,6 +1010,9 @@ class ModelLibrary:
 
         log.info("\n[4/5] AR-benchmark (univariat per målvariabel)...")
         for v, ar in self.ar_models.items():
+            if v not in self.data.columns:
+                log.warning(f"  AR {v}: hopper over — variabel mangler")
+                continue
             ar.fit(self.data, covid_mask=self.covid_mask)
 
         log.info("\n[5/5] Månedlige ARIMA-modeller (nowcast KPI / KPI-JAE)...")

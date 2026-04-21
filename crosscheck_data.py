@@ -297,7 +297,7 @@ def _ssb_smart_query(table_id: str,
             if not code:
                 code = _ssb_find_value(
                     vals, lbls,
-                    ["i alt", "alle", "total", "totalt", "hele", "00", "0000"],
+                    ["i alt", "alle", "total", "totalt", "hele", "begge", "00", "0000"],
                 )
             if code:
                 label = dict(zip(vals, lbls)).get(code, "")
@@ -428,12 +428,17 @@ def fetch_kpi() -> pd.Series:
 
 
 def fetch_kpi_jae() -> pd.Series:
-    """KPI justert for avgiftsendringer og uten energivarer (KPI-JAE), månedlig — SSB 08981."""
+    """KPI justert for avgiftsendringer og uten energivarer (KPI-JAE), månedlig — SSB 03013."""
     candidates = [
-        ("08981", ["KPIJAEAlt", "KPIJAEalt", "kpijae", "jae", "justert", "kjerne"],
-                  ["TOTAL", "total", "alle", "0"]),
-        ("10235", ["KPIJAEAlt", "kpijae", "justert"],
+        # Struktur A: KPI-JAE har eget ContentCode i 03013 (f.eks. KpiJae/KpiJAE)
+        ("03013", ["KpiJae", "KpiJAE", "KpiJaeMnd", "KpiJaeInd", "jae", "justert", "avgift"],
                   ["TOTAL", "total", "alle"]),
+        # Struktur B: ContentCode er KpiIndMnd, men Konsumgrp-dim inneholder JAE-verdi
+        ("03013", ["KpiIndMnd", "kpi", "indeks"],
+                  ["jae", "justert", "avgift", "uten energi", "uten"]),
+        # Fallback: 08981 med breiere søk
+        ("08981", ["KpiIndMnd", "KPIJAEAlt", "kpijae", "jae", "justert", "indeks"],
+                  ["JAE", "jae", "justert", "TOTAL", "total"]),
     ]
     for table_id, contents_kw, sector_kw in candidates:
         s = _ssb_smart_query(table_id, contents_kw, sector_kw)
@@ -450,11 +455,10 @@ def fetch_aku_ledighet() -> pd.Series:
     # Prøv flere tabeller og ContentsCodes
     candidates = [
         ("12046", ["Ledige", "AKUledige", "ledighet", "arbeidsledig"],
-                  ["prosent", "pst", "rate", "andel", "I alt", "i alt"]),
+                  ["prosent", "pst", "rate", "andel", "I alt", "i alt", "begge"]),
         ("05111", ["AKULedigPst", "AKUledige", "ledighet", "ledige", "prosent"],
-                  ["prosent", "pst", "I alt", "i alt", "total"]),
-        ("12043", ["Ledige", "ledighet", "arbeidsledig"],
-                  ["prosent", "pst", "I alt"]),
+                  ["prosent", "pst", "I alt", "i alt", "total", "begge", "Begge kjønn"]),
+        # 12043 fjernet (trafikkulykker — feil tabell)
     ]
     for table_id, contents_kw, sector_kw in candidates:
         s = _ssb_smart_query(table_id, contents_kw, sector_kw)
