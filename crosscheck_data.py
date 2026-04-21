@@ -571,16 +571,18 @@ def _nb_discover_key(dataflow: str, match_terms: List[str]) -> Optional[str]:
 
 
 def fetch_nibor_3m() -> pd.Series:
-    """Kortsiktig pengemarkedsrente — discover NOWA-key i MONEY_MARKET."""
-    discovered = _nb_discover_key("MONEY_MARKET", ["NOWA"])
-    candidates = [
-        # Statiske kandidater først (rask path om de virker)
-        "MONEY_MARKET/B.NOWA.ON.R",
-        "MONEY_MARKET/D.NOWA.ON.R",
-        "IR/B.NOWA.SD.R",
-    ]
-    if discovered:
-        candidates.insert(0, discovered)
+    """
+    Kortsiktig pengemarkedsrente — NOWA (Norwegian Overnight Weighted Average).
+    NOWA ble flyttet fra IR- til SHORT_RATES-dataflowen (NB dokumentasjon).
+    """
+    # Kjent offisiell nøkkel (verifisert i NBs dokumentasjon).
+    candidates = ["SHORT_RATES/B.NOWA.ON.R"]
+    # Dynamisk discovery som fallback — søk i flere dataflows hvis direkte
+    # nøkkel skulle endre seg igjen.
+    for df_name in ["SHORT_RATES", "IR", "MONEY_MARKET", "FINANCIAL_INDICATORS"]:
+        key = _nb_discover_key(df_name, ["NOWA"])
+        if key and key not in candidates:
+            candidates.append(key)
     return _nb_try_paths(candidates, "NOWA (proxy 3M):")
 
 
@@ -589,15 +591,17 @@ def fetch_nok_eur() -> pd.Series:
 
 
 def fetch_kredittvekst() -> pd.Series:
-    """K2 husholdninger — publiseres av SSB (ikke Norges Bank)."""
-    # SSB 10649: "Kredittindikator K2, månedlig. Beløp og endring i prosent"
+    """
+    K2 kredittindikator, husholdninger — publiseres av SSB.
+    Primærtabell 11599: "Innenlandsk lånegjeld … etter måned, valuta og
+    låntakersektor". ContentsCode = 'Tolvmånedersvekst. Prosent',
+    sektor-dimensjon 'låntakersektor', verdi 'Husholdninger mv.'.
+    """
     candidates = [
-        ("10649", ["Tolvmndsvekst", "endring", "vekst", "12"],
-                  ["HHold", "husholdninger", "private husholdninger"]),
-        ("11184", ["Tolvmndsvekst", "endring", "vekst"],
-                  ["HHold", "husholdninger"]),
-        ("08587", ["Tolvmndsvekst", "endring"],
-                  ["HHold", "husholdninger"]),
+        ("11599",
+         ["Tolvmånedersvekst", "tolvmnedersvekst", "tolvmndsvekst",
+          "12-månedersvekst", "12 mnd", "årsvekst", "vekst"],
+         ["husholdninger mv", "husholdninger", "hushold", "hhold"]),
     ]
     for table_id, contents_kw, sector_kw in candidates:
         s = _ssb_smart_query(table_id, contents_kw, sector_kw)
