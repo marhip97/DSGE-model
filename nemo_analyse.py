@@ -422,11 +422,14 @@ if __name__ == "__main__":
     _OBS_KEYS = {_DY: 'y', _PI: 'pi', _IR: 'i', _DS: 'rer', _DH: 'bolig'}
 
     # ── Les demean-verdier for å konvertere tilbake til faktiske nivåer ───────
-    _meta_path = args.data.replace('crosscheck_data.csv', 'crosscheck_meta.json')
+    _meta_path = os.path.join(os.path.dirname(os.path.abspath(args.data)), 'crosscheck_meta.json')
     _dmeans = {}
     if os.path.exists(_meta_path):
-        with open(_meta_path) as _f:
-            _dmeans = json.load(_f).get('demean_values', {})
+        try:
+            with open(_meta_path) as _f:
+                _dmeans = json.load(_f).get('demean_values', {})
+        except Exception:
+            pass
     _dm = {
         _DY: _dmeans.get('dy_obs',   0.0),
         _PI: _dmeans.get('pi_obs',   0.0),
@@ -447,12 +450,33 @@ if __name__ == "__main__":
         return round((float(v) + dm) * scale, 4) if not np.isnan(v) else None
 
     date_strs = [str(d.date()) if hasattr(d, 'date') else str(d) for d in dates]
+
+    # ── Last NOK/EUR-nivå fra crosscheck_data.csv (ds_obs_level = ln(NOK/EUR)) ─
+    _rer_levels = None
+    _ck_csv = os.path.join(os.path.dirname(os.path.abspath(args.data)), 'crosscheck_data.csv')
+    if not os.path.exists(_ck_csv):
+        _ck_csv = 'crosscheck_data.csv'
+    if os.path.exists(_ck_csv):
+        try:
+            _ck_df = pd.read_csv(_ck_csv, index_col=0, parse_dates=True)
+            if 'ds_obs_level' in _ck_df.columns:
+                _ck_pre  = _ck_df[_ck_df.index <= '2019-12-31']['ds_obs_level'].values
+                _ck_post = _ck_df[_ck_df.index >= '2022-01-01']['ds_obs_level'].values
+                _ck_rer  = np.concatenate([_ck_pre, _ck_post])
+                _rer_levels = [
+                    round(float(np.exp(v)), 4) if not np.isnan(v) else None
+                    for v in _ck_rer
+                ]
+        except Exception:
+            pass
+
     hist_level = {
         'dates': date_strs,
         'y':     [_safe(v, _dm[_DY])              for v in Y_comb[:, _DY]],
         'pi':    [_safe(v, _dm[_PI])              for v in Y_comb[:, _PI]],
         'i':     [_safe(v, _dm[_IR], _IR_SCALE)   for v in Y_comb[:, _IR]],
-        'rer':   [_safe(v, _dm[_DS])              for v in Y_comb[:, _DS]],
+        'rer':   _rer_levels if _rer_levels is not None
+                 else [_safe(v, _dm[_DS])          for v in Y_comb[:, _DS]],
         'bolig': [_safe(v, _dm[_DH])              for v in Y_comb[:, _DH]],
     }
 
