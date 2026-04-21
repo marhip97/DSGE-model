@@ -31,7 +31,8 @@ import os
 import sys
 import warnings
 from datetime import datetime, date
-from typing import Optional
+from functools import lru_cache
+from typing import Optional, List
 
 import numpy as np
 import pandas as pd
@@ -194,154 +195,220 @@ def _parse_ssb_jsonstat(data: dict) -> pd.Series:
     if not valid:
         return pd.Series(dtype=float)
     idx, clean = zip(*valid)
-    # Behold frekvens fra perioden (kvartal eller måned)
     return pd.Series(list(clean), index=pd.PeriodIndex(idx),
                      dtype=float).sort_index()
 
 
-def ssb_v2_get(table_id: str, value_codes: dict) -> pd.Series:
-    """
-    Hent tidsserie fra SSB PxWebApi v2 (GET).
-    value_codes = {"ContentsCode": ["BNPB"], "Tid": ["*"], ...}
-    """
-    url = f"https://data.ssb.no/api/pxwebapi/v2/tables/{table_id}/data"
-    params = [("format", "json-stat2"), ("lang", "no")]
-    for var, vals in value_codes.items():
-        params.append((f"valueCodes[{var}]", ",".join(vals)))
+def _period_series_to_quarterly(s: pd.Series) -> pd.Series:
+    """Konverter en PeriodIndex-serie (M eller Q) til kvartallig DatetimeIndex-kompatibel."""
+    if isinstance(s.index, pd.PeriodIndex):
+        freq = s.index.freqstr.upper()
+        if "M" in freq:
+            # Månedlig → kvartal via DatetimeIndex
+            s_dt = s.copy()
+            s_dt.index = s.index.to_timestamp()
+            return s_dt.resample("QE").mean().to_period("Q")
+        # Allerede kvartallig
+        s.index = s.index.asfreq("Q")
+        return s
+    return s
+
+
+@lru_cache(maxsize=16)
+def _ssb_meta(table_id: str) -> list:
+    """Hent SSB v0 tabellmetadata (bufret). Returnerer liste av {code, text, values, valueTexts}."""
+    url = f"https://data.ssb.no/api/v0/no/table/{table_id}"
     try:
-        resp = SESSION.get(url, params=params, timeout=TIMEOUT)
-        resp.raise_for_status()
-        return _parse_ssb_jsonstat(resp.json())
+        r = SESSION.get(url, timeout=TIMEOUT)
+        r.raise_for_status()
+        d = r.json()
+        result = []
+        for var in d.get("variables", []):
+            result.append({
+                "code":       var.get("code", ""),
+                "text":       var.get("text", ""),
+                "values":     var.get("values", []),
+                "valueTexts": var.get("valueTexts", var.get("values", [])),
+            })
+        log.debug(f"SSB {table_id} meta: {[v['code'] for v in result]}")
+        return result
     except Exception as e:
-        log.warning(f"SSB v2 {table_id}: {e}")
+        log.warning(f"SSB meta {table_id}: {e}")
+        return []
+
+
+def _ssb_find_value(options: List[str], labels: List[str],
+                    keywords: List[str]) -> Optional[str]:
+    """Finn første verdikode som matcher et nøkkelord (case-insensitiv) i kode eller label."""
+    for kw in keywords:
+        kl = kw.lower()
+        for code, label in zip(options, labels):
+            if kl == code.lower() or kl in code.lower() or kl in label.lower():
+                return code
+    return None
+
+
+def _ssb_smart_query(table_id: str,
+                     contents_keywords: List[str],
+                     sector_keywords: Optional[List[str]] = None) -> pd.Series:
+    """
+    Bygg SSB v0-spørring basert på tabellmetadata.
+    Velger ContentsCode via innholds-nøkkelord og evt. sektordimensjon via sektor-nøkkelord.
+    For ukjente dimensjoner brukes første gyldige verdi.
+    """
+    meta = _ssb_meta(table_id)
+    if not meta:
         return pd.Series(dtype=float)
 
+    query_parts = []
+    for var in meta:
+        vc   = var["code"]
+        vt   = var["text"].lower()
+        vals = var["values"]
+        lbls = var["valueTexts"]
+        if not vals:
+            continue
 
-def ssb_post(table_id: str, query: dict) -> pd.Series:
-    """
-    Hent en enkelt tidsserie fra SSB JSON-stat API v0 (POST, fallback).
-    """
+        if "tid" in vc.lower() or "tid" in vt or "quarter" in vt:
+            query_parts.append({
+                "code": vc,
+                "selection": {"filter": "all", "values": ["*"]},
+            })
+        elif "contents" in vc.lower() or vc.lower() == "contentsCode".lower():
+            code = _ssb_find_value(vals, lbls, contents_keywords)
+            if code is None:
+                log.warning(f"SSB {table_id}: ingen ContentsCode for {contents_keywords}; "
+                            f"tilgjengelig: {list(zip(vals[:6], lbls[:6]))}")
+                return pd.Series(dtype=float)
+            query_parts.append({
+                "code": vc,
+                "selection": {"filter": "item", "values": [code]},
+            })
+        elif sector_keywords:
+            code = _ssb_find_value(vals, lbls, sector_keywords)
+            if code:
+                query_parts.append({
+                    "code": vc,
+                    "selection": {"filter": "item", "values": [code]},
+                })
+            else:
+                log.debug(f"SSB {table_id}/{vc}: ingen match for {sector_keywords}, "
+                          f"bruker første verdi '{vals[0]}'")
+                query_parts.append({
+                    "code": vc,
+                    "selection": {"filter": "item", "values": [vals[0]]},
+                })
+        else:
+            query_parts.append({
+                "code": vc,
+                "selection": {"filter": "item", "values": [vals[0]]},
+            })
+
+    if not query_parts:
+        return pd.Series(dtype=float)
+
+    query = {"query": query_parts, "response": {"format": "json-stat2"}}
     url = f"https://data.ssb.no/api/v0/no/table/{table_id}"
     try:
         resp = SESSION.post(url, json=query, timeout=TIMEOUT)
         resp.raise_for_status()
         return _parse_ssb_jsonstat(resp.json())
     except Exception as e:
-        log.warning(f"SSB v0 {table_id}: {e}")
+        log.warning(f"SSB {table_id}: {e}")
         return pd.Series(dtype=float)
-
-
-def ssb_fetch(table_id: str, value_codes: dict,
-              v0_fallback_codes: Optional[dict] = None) -> pd.Series:
-    """
-    Fetch SSB serie: prøv PxWebApi v2 (GET) først, så v0 (POST) som fallback.
-    value_codes: {"ContentsCode": ["BNPB"], "Tid": ["*"], ...}
-    """
-    s = ssb_v2_get(table_id, value_codes)
-    if not s.empty:
-        return s
-    codes_for_v0 = v0_fallback_codes or value_codes
-    v0_query = {
-        "query": [
-            {"code": var,
-             "selection": {
-                 "filter": "all" if vals == ["*"] else "item",
-                 "values": vals,
-             }}
-            for var, vals in codes_for_v0.items()
-        ],
-        "response": {"format": "json-stat2"},
-    }
-    return ssb_post(table_id, v0_query)
-
-
-def _ssb_09190(content_code: str, label: str) -> pd.Series:
-    """Hent én makroøkonomisk størrelse fra SSB 09190 (nasjonalregnskap)."""
-    s = ssb_fetch(
-        "09190",
-        {
-            "Makrost": ["nr23_9fn"],
-            "ContentsCode": [content_code],
-            "Tid": ["*"],
-        },
-    )
-    log.info(f"  {label:<16} {len(s)} kvartaler (SSB 09190)")
-    return s
 
 
 def fetch_bnp_fastland() -> pd.Series:
     """BNP Fastlands-Norge, volumindeks — SSB 09190."""
-    return _ssb_09190("BNPB", "BNP fastland:")
+    s = _ssb_smart_query(
+        "09190",
+        contents_keywords=["BNPB", "BNP", "bnp fastland", "fastland"],
+        sector_keywords=["fastland", "fn", "nr23_9fn", "9fn"],
+    )
+    s = _period_series_to_quarterly(s)
+    log.info(f"  BNP fastland:    {len(s)} kvartaler (SSB 09190)")
+    return s
 
 
 def fetch_privat_konsum() -> pd.Series:
     """Privat konsum, volumindeks — SSB 09190."""
-    return _ssb_09190("PK", "Privat konsum:")
+    s = _ssb_smart_query(
+        "09190",
+        contents_keywords=["PK", "konsum", "privat konsum"],
+        sector_keywords=["fastland", "fn", "nr23_9fn", "9fn"],
+    )
+    s = _period_series_to_quarterly(s)
+    log.info(f"  Privat konsum:   {len(s)} kvartaler (SSB 09190)")
+    return s
 
 
 def fetch_investering() -> pd.Series:
     """Bruttoinvestering fastland, volumindeks — SSB 09190."""
-    return _ssb_09190("BINV", "Investering:")
+    s = _ssb_smart_query(
+        "09190",
+        contents_keywords=["BINV", "investering", "bruttoinvestering"],
+        sector_keywords=["fastland", "fn", "nr23_9fn", "9fn"],
+    )
+    s = _period_series_to_quarterly(s)
+    log.info(f"  Investering:     {len(s)} kvartaler (SSB 09190)")
+    return s
 
 
 def fetch_eksport() -> pd.Series:
     """Eksport — SSB 09190."""
-    return _ssb_09190("EKSPORT", "Eksport:")
+    s = _ssb_smart_query(
+        "09190",
+        contents_keywords=["EKSPORT", "eksport", "export"],
+        sector_keywords=["fastland", "fn", "nr23_9fn", "9fn"],
+    )
+    s = _period_series_to_quarterly(s)
+    log.info(f"  Eksport:         {len(s)} kvartaler (SSB 09190)")
+    return s
 
 
 def fetch_import() -> pd.Series:
     """Import — SSB 09190."""
-    return _ssb_09190("IMPORT", "Import:")
+    s = _ssb_smart_query(
+        "09190",
+        contents_keywords=["IMPORT", "import"],
+        sector_keywords=["fastland", "fn", "nr23_9fn", "9fn"],
+    )
+    s = _period_series_to_quarterly(s)
+    log.info(f"  Import:          {len(s)} kvartaler (SSB 09190)")
+    return s
 
 
 def fetch_kpi() -> pd.Series:
     """KPI alle varer, månedlig → kvartalsgjennomsnitt — SSB 03013."""
-    s = ssb_fetch(
+    s = _ssb_smart_query(
         "03013",
-        {
-            "Konsumgrp": ["TOTAL"],
-            "ContentsCode": ["KpiIndMnd"],
-            "Tid": ["*"],
-        },
+        contents_keywords=["KpiIndMnd", "indeks", "kpi", "totalindeks"],
+        sector_keywords=["TOTAL", "total", "alle"],
     )
-    if not s.empty:
-        # Månedlig → kvartal
-        if isinstance(s.index, pd.PeriodIndex) and s.index.freq == "M":
-            s = s.resample("QE").mean()
-        else:
-            s_monthly = pd.Series(
-                s.values,
-                index=pd.period_range(s.index[0], periods=len(s), freq="M"),
-                dtype=float,
-            )
-            s = s_monthly.resample("QE").mean()
+    s = _period_series_to_quarterly(s)
     log.info(f"  KPI:             {len(s)} kvartaler (SSB 03013)")
     return s
 
 
 def fetch_lonnsindeks() -> pd.Series:
-    """Lønn per normalårsverk (kvartalsvise lønnsstatistikk) — SSB 09786."""
-    s = ssb_fetch(
+    """Lønn per normalårsverk — SSB 09786."""
+    s = _ssb_smart_query(
         "09786",
-        {
-            "ContentsCode": ["Fortjeneste"],
-            "Tid": ["*"],
-        },
+        contents_keywords=["Fortjeneste", "lønn", "lonn", "wage", "earnings"],
     )
+    s = _period_series_to_quarterly(s)
     log.info(f"  Lønnsindeks:     {len(s)} kvartaler (SSB 09786)")
     return s
 
 
 def fetch_boligpris() -> pd.Series:
     """Boligprisindeks, kvartalsvis — SSB 07241."""
-    s = ssb_fetch(
+    s = _ssb_smart_query(
         "07241",
-        {
-            "Boligtype": ["00"],
-            "ContentsCode": ["BoligprIS"],
-            "Tid": ["*"],
-        },
+        contents_keywords=["BoligprIS", "boligpris", "prisindeks", "house price"],
+        sector_keywords=["00", "alle", "total", "i alt"],
     )
+    s = _period_series_to_quarterly(s)
     log.info(f"  Boligpris:       {len(s)} kvartaler (SSB 07241)")
     return s
 

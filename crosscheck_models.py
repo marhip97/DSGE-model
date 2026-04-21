@@ -447,15 +447,21 @@ class ARModel:
     def fit(self,
             data: pd.DataFrame,
             covid_mask: Optional[np.ndarray] = None) -> "ARModel":
+        valid  = data[self.variable].notna().values
         y_full = data[self.variable].dropna().values.astype(float)
+
+        # Trim covid_mask to match y_full (removes rows dropped by dropna)
+        if covid_mask is not None and len(covid_mask) == len(valid):
+            cm = covid_mask[valid]
+        else:
+            cm = covid_mask
 
         # BIC-lagvalg
         best_p, best_bic = 1, np.inf
         for p in range(1, self.p_max + 1):
             X, Y_d = _lag_matrix(y_full.reshape(-1, 1), p)
-            T = len(Y_d)
-            if covid_mask is not None:
-                m = covid_mask[p:]
+            if cm is not None:
+                m = cm[p:]
                 X_f = X[~m]; Y_f = Y_d[~m]
             else:
                 X_f, Y_f = X, Y_d
@@ -472,8 +478,8 @@ class ARModel:
 
         self.p = best_p
         X, Y_d = _lag_matrix(y_full.reshape(-1, 1), self.p)
-        if covid_mask is not None:
-            m = covid_mask[self.p:]
+        if cm is not None:
+            m = cm[self.p:]
             X_f = X[~m]; Y_f = Y_d[~m]
         else:
             X_f, Y_f = X, Y_d
