@@ -1,15 +1,27 @@
 {
   "pipeline_version": "fase3_v1",
-  "run_timestamp": "2026-04-21T06:57:01",
+  "run_timestamp": "2026-04-21T07:10:10",
   "start_period": "2001Q1",
   "end_period": "2026Q2",
   "n_quarters": 102,
-  "n_variables": 21,
+  "n_variables": 27,
   "columns": [
+    "dy_obs",
+    "dy_obs_level",
+    "dc_obs",
+    "dc_obs_level",
+    "dinv_obs",
+    "dinv_obs_level",
+    "dx_obs",
+    "dx_obs_level",
+    "dm_obs",
+    "dm_obs_level",
     "pi_obs",
     "pi_obs_level",
     "dw_obs",
     "dw_obs_level",
+    "dh_obs",
+    "dh_obs_level",
     "i_R_obs",
     "i_R_obs_level",
     "ds_obs",
@@ -19,46 +31,52 @@
     "dyS_obs",
     "dyS_obs_level",
     "covid_flag",
+    "i_3m_obs",
+    "db_obs"
+  ],
+  "obs_series": [
     "dy_obs",
     "dc_obs",
     "dinv_obs",
     "dx_obs",
     "dm_obs",
-    "i_3m_obs",
-    "dh_obs",
-    "db_obs"
-  ],
-  "obs_series": [
     "pi_obs",
     "dw_obs",
+    "dh_obs",
     "i_R_obs",
     "ds_obs",
     "dpO_obs",
     "dyS_obs",
-    "dy_obs",
-    "dc_obs",
-    "dinv_obs",
-    "dx_obs",
-    "dm_obs",
     "i_3m_obs",
-    "dh_obs",
     "db_obs"
   ],
   "level_series": [
+    "dy_obs_level",
+    "dc_obs_level",
+    "dinv_obs_level",
+    "dx_obs_level",
+    "dm_obs_level",
     "pi_obs_level",
     "dw_obs_level",
+    "dh_obs_level",
     "i_R_obs_level",
     "ds_obs_level",
     "dpO_obs_level",
     "dyS_obs_level"
   ],
   "demean_values": {
+    "dy_obs": 0.6229836726882516,
+    "dc_obs": 0.629504418062504,
+    "dinv_obs": 0.8263314635527358,
+    "dx_obs": 0.34237357322823075,
+    "dm_obs": 0.8918167148072716,
     "pi_obs": 2.355797079183622,
     "dw_obs": 15.272647519870773,
+    "dh_obs": 1.4792701272678033,
     "i_R_obs": 0.680001761553099,
     "ds_obs": 0.3384495189172465,
     "dpO_obs": 1.2692281782995165,
-    "dyS_obs": 0.12389535130249564
+    "dyS_obs": 0.13178877275621506
   },
   "covid_exclusion": [
     "2020Q1",
@@ -66,29 +84,24 @@
   ],
   "fetch_status": {
     "bnp": {
-      "ok": false,
-      "n": 0,
-      "reason": "tom serie"
+      "ok": true,
+      "n": 192
     },
     "konsum": {
-      "ok": false,
-      "n": 0,
-      "reason": "tom serie"
+      "ok": true,
+      "n": 192
     },
     "investering": {
-      "ok": false,
-      "n": 0,
-      "reason": "tom serie"
+      "ok": true,
+      "n": 192
     },
     "eksport": {
-      "ok": false,
-      "n": 0,
-      "reason": "tom serie"
+      "ok": true,
+      "n": 192
     },
     "import": {
-      "ok": false,
-      "n": 0,
-      "reason": "tom serie"
+      "ok": true,
+      "n": 192
     },
     "kpi": {
       "ok": true,
@@ -121,9 +134,8 @@
       "n": 157
     },
     "boligpris": {
-      "ok": false,
-      "n": 0,
-      "reason": "tom serie"
+      "ok": true,
+      "n": 137
     },
     "handelspartner": {
       "ok": true,
