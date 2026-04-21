@@ -504,7 +504,8 @@ class ARModel:
         n = len(self.y_full)
         fv = []
         for t in range(p, n):
-            x_t = np.concatenate([[1.0], self.y_full[t - 1:t - p - 1:-1]])
+            lags = self.y_full[t - p:t][::-1]   # [y_{t-1}, ..., y_{t-p}]
+            x_t  = np.concatenate([[1.0], lags])
             fv.append(float(self.coef @ x_t))
         return fv
 

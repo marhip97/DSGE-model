@@ -297,7 +297,8 @@ def _ssb_smart_query(table_id: str,
             if not code:
                 code = _ssb_find_value(
                     vals, lbls,
-                    ["i alt", "alle", "total", "totalt", "hele", "begge", "00", "0000"],
+                    ["i alt", "alle", "total", "totalt", "hele", "begge",
+                     "15-74", "00", "0000"],
                 )
             if code:
                 label = dict(zip(vals, lbls)).get(code, "")
@@ -428,17 +429,24 @@ def fetch_kpi() -> pd.Series:
 
 
 def fetch_kpi_jae() -> pd.Series:
-    """KPI justert for avgiftsendringer og uten energivarer (KPI-JAE), månedlig — SSB 03013."""
+    """KPI justert for avgiftsendringer og uten energivarer (KPI-JAE), månedlig.
+
+    SSB 03013 inneholder kun konsumgrupper (COICOP), ikke metodejustert KPI-JAE.
+    Prøver ContentCode-spesifikke søk i 03013, deretter 08183/08184 og 08981.
+    """
     candidates = [
-        # Struktur A: KPI-JAE har eget ContentCode i 03013 (f.eks. KpiJae/KpiJAE)
-        ("03013", ["KpiJae", "KpiJAE", "KpiJaeMnd", "KpiJaeInd", "jae", "justert", "avgift"],
+        # 03013: JAE-spesifikt ContentCode (hvis SSB legger det til i fremtiden)
+        ("03013", ["KpiJae", "KpiJAE", "KpiJaeMnd", "KpiJaeInd", "KpiJaeAlt",
+                   "jae", "justert", "avgift"],
                   ["TOTAL", "total", "alle"]),
-        # Struktur B: ContentCode er KpiIndMnd, men Konsumgrp-dim inneholder JAE-verdi
-        ("03013", ["KpiIndMnd", "kpi", "indeks"],
-                  ["jae", "justert", "avgift", "uten energi", "uten"]),
-        # Fallback: 08981 med breiere søk
-        ("08981", ["KpiIndMnd", "KPIJAEAlt", "kpijae", "jae", "justert", "indeks"],
-                  ["JAE", "jae", "justert", "TOTAL", "total"]),
+        # 08183/08184: mulige dedikerte KPI-undergruppe-tabeller
+        ("08183", ["KpiIndMnd", "KpiJae", "jae", "justert", "indeks"],
+                  ["TOTAL", "total", "alle", "JAE", "jae"]),
+        ("08184", ["KpiIndMnd", "KpiJae", "jae", "justert", "indeks"],
+                  ["TOTAL", "total", "alle", "JAE", "jae"]),
+        # 08981: månedlig KPI-tabell (sannsynligvis kun vanlig KPI, men prøver)
+        ("08981", ["KpiJae", "KpiJAE", "KpiJaeInd", "jae", "justert"],
+                  ["TOTAL", "total", "alle", "JAE", "jae"]),
     ]
     for table_id, contents_kw, sector_kw in candidates:
         s = _ssb_smart_query(table_id, contents_kw, sector_kw)
@@ -446,6 +454,17 @@ def fetch_kpi_jae() -> pd.Series:
             s = _period_series_to_quarterly(s)
             log.info(f"  KPI-JAE:         {len(s)} kvartaler (SSB {table_id})")
             return s
+
+    # Norges Bank publiserer KPI-JAE via SDMX API — søk i aktuelle dataflows
+    for df_name in ["CONSUMER_PRICES", "PRICES", "PRISER", "INFLATION", "CPI"]:
+        key = _nb_discover_key(df_name, ["KPI", "JAE"])
+        if key:
+            s = nb_api(key, "KPI-JAE (NB):")
+            if not s.empty:
+                s = _period_series_to_quarterly(s)
+                log.info(f"  KPI-JAE:         {len(s)} kvartaler ({key})")
+                return s
+
     log.warning("  KPI-JAE:         0 kvartaler (alle tabeller feilet)")
     return pd.Series(dtype=float)
 
@@ -455,10 +474,10 @@ def fetch_aku_ledighet() -> pd.Series:
     # Prøv flere tabeller og ContentsCodes
     candidates = [
         ("12046", ["Ledige", "AKUledige", "ledighet", "arbeidsledig"],
-                  ["prosent", "pst", "rate", "andel", "I alt", "i alt", "begge"]),
+                  ["prosent", "pst", "rate", "andel", "I alt", "i alt", "begge", "15-74"]),
+        # 05111 har Kjonn-dim ('Begge kjønn'→'begge') og Alder-dim ('15-74 år'→'15-74')
         ("05111", ["AKULedigPst", "AKUledige", "ledighet", "ledige", "prosent"],
-                  ["prosent", "pst", "I alt", "i alt", "total", "begge", "Begge kjønn"]),
-        # 12043 fjernet (trafikkulykker — feil tabell)
+                  ["prosent", "pst", "I alt", "i alt", "total", "begge", "Begge kjønn", "15-74"]),
     ]
     for table_id, contents_kw, sector_kw in candidates:
         s = _ssb_smart_query(table_id, contents_kw, sector_kw)
