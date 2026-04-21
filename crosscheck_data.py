@@ -429,50 +429,68 @@ def fetch_kpi() -> pd.Series:
 
 
 def fetch_kpi_jae() -> pd.Series:
-    """KPI justert for avgiftsendringer og uten energivarer (KPI-JAE), månedlig.
+    """KPI justert for avgiftsendringer og uten energivarer (KPI-JAE).
 
-    SSB 03013 inneholder kun konsumgrupper (COICOP), ikke metodejustert KPI-JAE.
-    Prøver ContentCode-spesifikke søk i 03013, deretter 08183/08184 og 08981.
+    KPI-JAE finnes kun fra ~1999Q4; serier > 110 kvartaler er vanlig CPI-indeks.
+    Prøver først JAE-spesifikke ContentCodes (Strategi A), deretter
+    ContentCode=KpiIndMnd + JAE-spesifikk Konsumgrp (Strategi B).
+    FRED OECD-kjerneinflasjon (ekskl. mat+energi) er siste fallback.
     """
-    candidates = [
-        # 03013: JAE-spesifikt ContentCode (hvis SSB legger det til i fremtiden)
-        ("03013", ["KpiJae", "KpiJAE", "KpiJaeMnd", "KpiJaeInd", "KpiJaeAlt",
-                   "jae", "justert", "avgift"],
-                  ["TOTAL", "total", "alle"]),
-        # 08183/08184: mulige dedikerte KPI-undergruppe-tabeller
-        ("08183", ["KpiIndMnd", "KpiJae", "jae", "justert", "indeks"],
-                  ["TOTAL", "total", "alle", "JAE", "jae"]),
-        ("08184", ["KpiIndMnd", "KpiJae", "jae", "justert", "indeks"],
-                  ["TOTAL", "total", "alle", "JAE", "jae"]),
-        # 08981: månedlig KPI-tabell (sannsynligvis kun vanlig KPI, men prøver)
-        ("08981", ["KpiJae", "KpiJAE", "KpiJaeInd", "jae", "justert"],
-                  ["TOTAL", "total", "alle", "JAE", "jae"]),
-    ]
-    for table_id, contents_kw, sector_kw in candidates:
-        s = _ssb_smart_query(table_id, contents_kw, sector_kw)
+    def _validate(s: pd.Series, source: str) -> pd.Series:
+        if s.empty:
+            return pd.Series(dtype=float)
+        if len(s) > 110:
+            log.warning(f"  {source}: {len(s)} kv. — for lang historikk, hopper over")
+            return pd.Series(dtype=float)
+        log.info(f"  KPI-JAE:         {len(s)} kvartaler ({source})")
+        return s
+
+    # ── Strategi A: tabell med eksplisitt JAE-ContentCode ────────────────────
+    jae_cc = ["KpiJae", "KpiJAE", "KpiJaeMnd", "KpiJaeInd", "KpiJaeAlt",
+              "jae", "justert", "avgift"]
+    for table_id, sec in [
+        ("03013", ["TOTAL", "total"]),
+        # 08184 har spesial-aggregater, men kun JAE-specifik ContentCode er nyttig
+        ("08184", ["TOTAL", "total", "JAE", "jae"]),
+        ("08183", ["TOTAL", "total", "JAE", "jae"]),
+        ("08981", ["TOTAL", "total", "JAE", "jae"]),
+    ]:
+        s = _ssb_smart_query(table_id, jae_cc, sec)
+        r = _validate(_period_series_to_quarterly(s), f"SSB {table_id} (A)")
+        if not r.empty:
+            return r
+
+    # ── Strategi B: ContentCode=KpiIndMnd + Konsumgrp=JAE-aggregat ──────────
+    # SSB 03013 har Konsumgrp-dim med COICOP-grupper OG spesial-aggregater.
+    # "uten energi" er substring av "uten energivarer" (korrekt JAE-label),
+    # men IKKE av "utenom institusjon" (som ga feil match tidligere).
+    jae_grp = ["JAE", "jae", "uten energi", "justert for avgift", "kjerne"]
+    for table_id in ["03013", "08184"]:
+        s = _ssb_smart_query(table_id, ["KpiIndMnd", "kpi"], jae_grp)
+        # Lengdesjekk avviser TOTAL-fallback (188 kv.) og andre feil
+        r = _validate(_period_series_to_quarterly(s), f"SSB {table_id} (B)")
+        if not r.empty:
+            return r
+
+    # ── FRED: OECD-basert kjerneinflasjon for Norge (proxy for KPI-JAE) ─────
+    # NOCPICORMINMEI: CPI eks. mat+energi, indeks 2015=100, månedlig
+    for fred_id, label in [
+        ("NOCPICORMINMEI", "FRED/OECD CPI eks. mat+energi"),
+        ("CPGRLE01NOM086NEST", "FRED/OECD CPI eks. energi"),
+    ]:
+        s = fred_csv(fred_id, label)
         if not s.empty:
             s = _period_series_to_quarterly(s)
-            # KPI-JAE finnes kun fra ~1999; serier > 150 kvartaler er sannsynligvis
-            # vanlig CPI-nivåindeks med lang historikk
-            if len(s) > 150:
-                log.warning(f"  SSB {table_id}: {len(s)} kvartaler — "
-                            f"for lang historikk, sannsynligvis ikke KPI-JAE")
-                continue
-            log.info(f"  KPI-JAE:         {len(s)} kvartaler (SSB {table_id})")
-            return s
+            # Skjær til 1999 for å holde < 110 kv.
+            try:
+                s = s.loc[pd.Period("1999Q4"):]
+            except Exception:
+                pass
+            r = _validate(s, fred_id)
+            if not r.empty:
+                return r
 
-    # Norges Bank SDMX — søk i prisrelaterte dataflows
-    for df_name in ["CONSUMER_PRICES", "PRICES", "PRISER", "INFLATION", "CPI"]:
-        key = _nb_discover_key(df_name, ["KPI", "JAE"])
-        if key:
-            s = nb_api(key, "KPI-JAE (NB):")
-            if not s.empty:
-                s = _period_series_to_quarterly(s)
-                if len(s) <= 150:
-                    log.info(f"  KPI-JAE:         {len(s)} kvartaler ({key})")
-                    return s
-
-    log.warning("  KPI-JAE:         0 kvartaler (alle tabeller feilet)")
+    log.warning("  KPI-JAE:         0 kvartaler (alle tabeller og FRED feilet)")
     return pd.Series(dtype=float)
 
 

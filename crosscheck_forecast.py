@@ -451,20 +451,26 @@ class EnsembleForecaster:
                 log.warning(f"  {var}: ingen tilgjengelige modeller")
                 continue
 
-            # Hent forecast fra hver modell
+            # Hent forecast fra hver modell — bygg active_models parallelt med moments
             moments = []
+            active_models = []
             for m_key in model_list:
                 res = _extract_model_forecast(self.results, m_key, var, h)
                 if res is not None:
                     moments.append(res)
+                    active_models.append(m_key)
 
             if not moments:
                 log.warning(f"  {var}: ingen forecast-data funnet")
                 continue
 
-            # Vekter
-            w_arr = weights_by_var.get(var, np.ones(len(moments)))
-            w_arr = w_arr[:len(moments)]   # Juster til tilgjengelige
+            # Vekter — indekser kun over modeller som faktisk produserte forecasts
+            full_w = weights_by_var.get(var, np.ones(len(model_list)))
+            active_idx = [model_list.index(m) for m in active_models]
+            if active_idx and max(active_idx) < len(full_w):
+                w_arr = full_w[np.array(active_idx)]
+            else:
+                w_arr = np.ones(len(active_models))
             w_arr = w_arr / w_arr.sum()
 
             means_list = [m[0] for m in moments]
@@ -497,20 +503,20 @@ class EnsembleForecaster:
                 "ci_50":   {"lo": ci_50_lo.tolist(), "hi": ci_50_hi.tolist()},
                 "ci_90":   {"lo": ci_90_lo.tolist(), "hi": ci_90_hi.tolist()},
                 "std":     ens_std.tolist(),
-                "models_used": model_list,
+                "models_used": active_models,
             }
 
             # Individuelle modellprognoser (for diagnostikk)
-            model_detail = {}
-            for i, m_key in enumerate(model_list):
-                if i < len(moments):
-                    model_detail[m_key] = {
-                        "mean":   moments[i][0].tolist(),
-                        "weight": float(w_arr[i]),
-                    }
+            model_detail = {
+                m_key: {
+                    "mean":   moments[i][0].tolist(),
+                    "weight": float(w_arr[i]),
+                }
+                for i, m_key in enumerate(active_models)
+            }
             forecasts[var]["model_detail"] = model_detail
             weights_out[var] = {m: float(w_arr[i])
-                                for i, m in enumerate(model_list)}
+                                for i, m in enumerate(active_models)}
 
         log.info(f"  Aggregert {len(forecasts)}/{len(self.variables)} variabler.")
 
