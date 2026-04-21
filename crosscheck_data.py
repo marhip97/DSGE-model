@@ -287,17 +287,18 @@ def _ssb_smart_query(table_id: str,
         elif sector_keywords:
             code = _ssb_find_value(vals, lbls, sector_keywords)
             if code:
+                label = dict(zip(vals, lbls)).get(code, "")
+                log.info(f"  SSB {table_id}/{vc}: valgte {code!r} ({label!r})")
                 query_parts.append({
                     "code": vc,
                     "selection": {"filter": "item", "values": [code]},
                 })
             else:
-                log.debug(f"SSB {table_id}/{vc}: ingen match for {sector_keywords}, "
-                          f"bruker første verdi '{vals[0]}'")
-                query_parts.append({
-                    "code": vc,
-                    "selection": {"filter": "item", "values": [vals[0]]},
-                })
+                log.warning(
+                    f"SSB {table_id}/{vc}: ingen match for {sector_keywords}; "
+                    f"tilgjengelig: {list(zip(vals[:8], lbls[:8]))}"
+                )
+                return pd.Series(dtype=float)
         else:
             query_parts.append({
                 "code": vc,
@@ -318,12 +319,22 @@ def _ssb_smart_query(table_id: str,
         return pd.Series(dtype=float)
 
 
+# ContentsCode for 09190: bruk faste priser sesongjustert (nivå i mill. kr, 2023-priser)
+# slik at vår egen log_diff_q gir korrekt kvartalsvekst.
+_NR_CONTENTS = ["FastePriserSesJust", "Faste priser, sesongjustert", "Faste"]
+
+
 def fetch_bnp_fastland() -> pd.Series:
-    """BNP Fastlands-Norge, volumindeks — SSB 09190."""
+    """BNP Fastlands-Norge, faste priser sesongjustert — SSB 09190."""
     s = _ssb_smart_query(
         "09190",
-        contents_keywords=["BNPB", "BNP", "bnp fastland", "fastland"],
-        sector_keywords=["fastland", "fn", "nr23_9fn", "9fn"],
+        contents_keywords=_NR_CONTENTS,
+        sector_keywords=[
+            "nr23_9fn", "9fn",
+            "bruttonasjonalprodukt fastlands-norge",
+            "bnp fastlands-norge",
+            "fastlands-norge",
+        ],
     )
     s = _period_series_to_quarterly(s)
     log.info(f"  BNP fastland:    {len(s)} kvartaler (SSB 09190)")
@@ -331,11 +342,14 @@ def fetch_bnp_fastland() -> pd.Series:
 
 
 def fetch_privat_konsum() -> pd.Series:
-    """Privat konsum, volumindeks — SSB 09190."""
+    """Konsum i husholdninger, faste priser sesongjustert — SSB 09190."""
     s = _ssb_smart_query(
         "09190",
-        contents_keywords=["PK", "konsum", "privat konsum"],
-        sector_keywords=["fastland", "fn", "nr23_9fn", "9fn"],
+        contents_keywords=_NR_CONTENTS,
+        sector_keywords=[
+            "nr23_6", "konsum i husholdninger",
+            "husholdninger", "privat konsum",
+        ],
     )
     s = _period_series_to_quarterly(s)
     log.info(f"  Privat konsum:   {len(s)} kvartaler (SSB 09190)")
@@ -343,11 +357,14 @@ def fetch_privat_konsum() -> pd.Series:
 
 
 def fetch_investering() -> pd.Series:
-    """Bruttoinvestering fastland, volumindeks — SSB 09190."""
+    """Bruttoinvestering i fast realkapital, faste priser sesongjustert — SSB 09190."""
     s = _ssb_smart_query(
         "09190",
-        contents_keywords=["BINV", "investering", "bruttoinvestering"],
-        sector_keywords=["fastland", "fn", "nr23_9fn", "9fn"],
+        contents_keywords=_NR_CONTENTS,
+        sector_keywords=[
+            "nr23_7", "bruttoinvestering i fast realkapital",
+            "bruttoinvestering", "fast realkapital", "investering",
+        ],
     )
     s = _period_series_to_quarterly(s)
     log.info(f"  Investering:     {len(s)} kvartaler (SSB 09190)")
@@ -355,11 +372,13 @@ def fetch_investering() -> pd.Series:
 
 
 def fetch_eksport() -> pd.Series:
-    """Eksport — SSB 09190."""
+    """Eksport i alt, faste priser sesongjustert — SSB 09190."""
     s = _ssb_smart_query(
         "09190",
-        contents_keywords=["EKSPORT", "eksport", "export"],
-        sector_keywords=["fastland", "fn", "nr23_9fn", "9fn"],
+        contents_keywords=_NR_CONTENTS,
+        sector_keywords=[
+            "nr23_11", "eksport i alt", "eksport",
+        ],
     )
     s = _period_series_to_quarterly(s)
     log.info(f"  Eksport:         {len(s)} kvartaler (SSB 09190)")
@@ -367,11 +386,13 @@ def fetch_eksport() -> pd.Series:
 
 
 def fetch_import() -> pd.Series:
-    """Import — SSB 09190."""
+    """Import i alt, faste priser sesongjustert — SSB 09190."""
     s = _ssb_smart_query(
         "09190",
-        contents_keywords=["IMPORT", "import"],
-        sector_keywords=["fastland", "fn", "nr23_9fn", "9fn"],
+        contents_keywords=_NR_CONTENTS,
+        sector_keywords=[
+            "nr23_14", "import i alt", "import",
+        ],
     )
     s = _period_series_to_quarterly(s)
     log.info(f"  Import:          {len(s)} kvartaler (SSB 09190)")
@@ -402,15 +423,23 @@ def fetch_lonnsindeks() -> pd.Series:
 
 
 def fetch_boligpris() -> pd.Series:
-    """Boligprisindeks, kvartalsvis — SSB 07241."""
-    s = _ssb_smart_query(
-        "07241",
-        contents_keywords=["BoligprIS", "boligpris", "prisindeks", "house price"],
-        sector_keywords=["00", "alle", "total", "i alt"],
-    )
-    s = _period_series_to_quarterly(s)
-    log.info(f"  Boligpris:       {len(s)} kvartaler (SSB 07241)")
-    return s
+    """Boligprisindeks, kvartalsvis — prøver 11136 → 07221 → 07241(KvPris)."""
+    candidates = [
+        ("11136", ["BoligprIS", "prisindeks", "indeks"],
+                  ["00", "i alt", "alle", "totalt"]),
+        ("07221", ["BoligprIS", "prisindeks", "indeks"],
+                  ["00", "i alt", "alle", "totalt"]),
+        ("07241", ["KvPris", "kvadratmeter", "pris"],
+                  ["00", "i alt", "alle", "boliger"]),
+    ]
+    for table_id, contents_kw, sector_kw in candidates:
+        s = _ssb_smart_query(table_id, contents_kw, sector_kw)
+        if not s.empty:
+            s = _period_series_to_quarterly(s)
+            log.info(f"  Boligpris:       {len(s)} kvartaler (SSB {table_id})")
+            return s
+    log.warning("  Boligpris:       0 kvartaler (alle tabeller feilet)")
+    return pd.Series(dtype=float)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -460,11 +489,53 @@ def fetch_styringsrente() -> pd.Series:
     return nb_api("IR/B.KPRA.SD.R", "Styringsrente:")
 
 
+@lru_cache(maxsize=1)
+def _nb_dataflows() -> list:
+    """Hent liste over tilgjengelige Norges Bank-dataflows for diagnostikk."""
+    try:
+        r = SESSION.get("https://data.norges-bank.no/api/dataflow",
+                        params={"format": "sdmx-json"}, timeout=TIMEOUT)
+        r.raise_for_status()
+        d = r.json()
+        flows = d.get("data", {}).get("dataflows", []) or d.get("dataflows", [])
+        ids = []
+        for f in flows:
+            fid = f.get("id", "")
+            name = f.get("name", f.get("names", {}).get("no", ""))
+            ids.append((fid, name))
+        return ids
+    except Exception as e:
+        log.warning(f"NB dataflow probe: {e}")
+        return []
+
+
+def _nb_try_paths(candidates: List[str], label: str) -> pd.Series:
+    """Prøv en rekke SDMX-stier til første 200 OK."""
+    for path in candidates:
+        s = nb_api(path, label)
+        if not s.empty:
+            return s
+    # Logg tilgjengelige dataflows ved totalt feil — hjelp fremtidig diagnostikk
+    flows = _nb_dataflows()
+    if flows:
+        log.info(f"  NB tilgjengelige dataflows ({len(flows)}): "
+                 f"{', '.join(fid for fid, _ in flows[:20])}")
+    return pd.Series(dtype=float)
+
+
 def fetch_nibor_3m() -> pd.Series:
-    # NIBOR publiseres ikke lenger av Norges Bank (overført til NoRe i 2022).
-    # Bruk NOWA (Norwegian Overnight Weighted Average) som erstatning for 3M-renter
-    # i nye serier. Fallback-CSV brukes hvis serien har for få observasjoner.
-    return nb_api("IR/B.NOWA.SD.R", "NOWA (proxy 3M):")
+    """Kortsiktig pengemarkedsrente — prøv NOWA, så NIBOR-varianter."""
+    return _nb_try_paths(
+        [
+            "IR/B.NOWA.SD.R",
+            "IR/B.NOWA.SP.R",
+            "IR/M.NOWA.SD.R",
+            "IR/B.NIBOR3M.SD.R",
+            "IR/B.NIBOR.3M.R",
+            "IR/B.NOK3M.SD.R",
+        ],
+        "NOWA (proxy 3M):",
+    )
 
 
 def fetch_nok_eur() -> pd.Series:
@@ -472,9 +543,17 @@ def fetch_nok_eur() -> pd.Series:
 
 
 def fetch_kredittvekst() -> pd.Series:
-    # K2 husholdninger (sesongjusterte indekser), månedlig vekst i indeks.
-    # Ny SDMX-sti etter API-restrukturering.
-    return nb_api("K2/M.A.B.A1.A.CA.Z5.A", "K2 husholdninger:")
+    """K2 husholdninger — prøv flere SDMX-stier for kredittindikator."""
+    return _nb_try_paths(
+        [
+            "K2/M.A.B.A1.A.CA.Z5.A",
+            "K2/M.A.B.A1.A.CA.Z5",
+            "K2/A.B.A1.A.CA.Z5.A",
+            "K2/M.A.B.A1.A.CA",
+            "CRE/M.A.B.A1.A.CA.Z5.A",
+        ],
+        "K2 husholdninger:",
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -542,13 +621,13 @@ def fetch_handelspartner_bnp() -> pd.Series:
     HP-filtrering med lambda=1600.
     """
     partner_series = {
-        "CLVMNACSCAB1GQDE": 0.20,   # Tyskland
-        "CLVMNACSCAB1GQSE": 0.16,   # Sverige
-        "ABMI":             0.15,   # UK (real GDP)
-        "GDPC1":            0.09,   # USA (real GDP, 2017-dollar)
-        "CLVMNACSCAB1GQFR": 0.08,   # Frankrike
-        "CLVMNACSCAB1GQNL": 0.06,   # Nederland
-        "CLVMNACSCAB1GQDNK":0.06,  # Danmark
+        "CLVMNACSCAB1GQDE": 0.20,   # Tyskland (Eurostat)
+        "CLVMNACSCAB1GQSE": 0.16,   # Sverige (Eurostat)
+        "CLVMNACSCAB1GQUK": 0.15,   # UK real GDP (Eurostat)
+        "GDPC1":            0.09,   # USA real GDP (2017-dollar)
+        "CLVMNACSCAB1GQFR": 0.08,   # Frankrike (Eurostat)
+        "CLVMNACSCAB1GQNL": 0.06,   # Nederland (Eurostat)
+        "CLVMNACSCAB1GQDK": 0.06,   # Danmark (Eurostat, korrekt 2-bokstavs)
     }
     remaining_weight = 1.0 - sum(partner_series.values())
 
