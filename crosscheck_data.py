@@ -342,13 +342,15 @@ def fetch_bnp_fastland() -> pd.Series:
 
 
 def fetch_privat_konsum() -> pd.Series:
-    """Konsum i husholdninger, faste priser sesongjustert — SSB 09190."""
+    """Privat konsum i husholdninger, faste priser sesongjustert — SSB 09190."""
     s = _ssb_smart_query(
         "09190",
         contents_keywords=_NR_CONTENTS,
         sector_keywords=[
-            "nr23_6", "konsum i husholdninger",
-            "husholdninger", "privat konsum",
+            "pk.",                        # «pk.»-prefiks i alle privat-konsum-koder
+            "konsum i husholdninger",
+            "privat konsum",
+            "husholdningers konsum",
         ],
     )
     s = _period_series_to_quarterly(s)
@@ -428,7 +430,7 @@ def fetch_boligpris() -> pd.Series:
         ("11136", ["BoligprIS", "prisindeks", "indeks"],
                   ["00", "i alt", "alle", "totalt"]),
         ("07221", ["BoligprIS", "prisindeks", "indeks"],
-                  ["00", "i alt", "alle", "totalt"]),
+                  ["0000", "hele landet", "hele landet i alt", "landet", "i alt", "totalt"]),
         ("07241", ["KvPris", "kvadratmeter", "pris"],
                   ["00", "i alt", "alle", "boliger"]),
     ]
@@ -524,15 +526,19 @@ def _nb_try_paths(candidates: List[str], label: str) -> pd.Series:
 
 
 def fetch_nibor_3m() -> pd.Series:
-    """Kortsiktig pengemarkedsrente — prøv NOWA, så NIBOR-varianter."""
+    """Kortsiktig pengemarkedsrente — prøv MONEY_MARKET, IR og NIBOR-varianter."""
     return _nb_try_paths(
         [
+            # MONEY_MARKET er listet i dataflow-katalogen — NOWA bor her
+            "MONEY_MARKET/B.NOWA.ON.R",
+            "MONEY_MARKET/D.NOWA.ON.R",
+            "MONEY_MARKET/B.NOWA.SD.R",
+            "MONEY_MARKET/D.NOWA.SD.R",
+            "MONEY_MARKET/B.NOK.ON.R",
+            # IR-dataflow (prøvde allerede, men ta med som backup)
             "IR/B.NOWA.SD.R",
-            "IR/B.NOWA.SP.R",
-            "IR/M.NOWA.SD.R",
             "IR/B.NIBOR3M.SD.R",
-            "IR/B.NIBOR.3M.R",
-            "IR/B.NOK3M.SD.R",
+            "IR/B.NIBOR.3M.SD.R",
         ],
         "NOWA (proxy 3M):",
     )
@@ -543,14 +549,18 @@ def fetch_nok_eur() -> pd.Series:
 
 
 def fetch_kredittvekst() -> pd.Series:
-    """K2 husholdninger — prøv flere SDMX-stier for kredittindikator."""
+    """K2 husholdninger — prøv FINANCIAL_INDICATORS og andre Norges Bank-flows."""
     return _nb_try_paths(
         [
+            # FINANCIAL_INDICATORS er listet i dataflow-katalogen
+            "FINANCIAL_INDICATORS/M.K2.HH.A.CA",
+            "FINANCIAL_INDICATORS/M.K2.HH.SA.G",
+            "FINANCIAL_INDICATORS/M.K2.HH",
+            "FINANCIAL_INDICATORS/M.K2.TP.A.G",
+            # MONEY_MARKET
+            "MONEY_MARKET/M.K2.HH.A.G",
+            # Gamle stier
             "K2/M.A.B.A1.A.CA.Z5.A",
-            "K2/M.A.B.A1.A.CA.Z5",
-            "K2/A.B.A1.A.CA.Z5.A",
-            "K2/M.A.B.A1.A.CA",
-            "CRE/M.A.B.A1.A.CA.Z5.A",
         ],
         "K2 husholdninger:",
     )
