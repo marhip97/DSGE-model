@@ -1,0 +1,156 @@
+{
+  "pipeline_version": "fase3_v1",
+  "run_timestamp": "2026-04-21T06:57:01",
+  "start_period": "2001Q1",
+  "end_period": "2026Q2",
+  "n_quarters": 102,
+  "n_variables": 21,
+  "columns": [
+    "pi_obs",
+    "pi_obs_level",
+    "dw_obs",
+    "dw_obs_level",
+    "i_R_obs",
+    "i_R_obs_level",
+    "ds_obs",
+    "ds_obs_level",
+    "dpO_obs",
+    "dpO_obs_level",
+    "dyS_obs",
+    "dyS_obs_level",
+    "covid_flag",
+    "dy_obs",
+    "dc_obs",
+    "dinv_obs",
+    "dx_obs",
+    "dm_obs",
+    "i_3m_obs",
+    "dh_obs",
+    "db_obs"
+  ],
+  "obs_series": [
+    "pi_obs",
+    "dw_obs",
+    "i_R_obs",
+    "ds_obs",
+    "dpO_obs",
+    "dyS_obs",
+    "dy_obs",
+    "dc_obs",
+    "dinv_obs",
+    "dx_obs",
+    "dm_obs",
+    "i_3m_obs",
+    "dh_obs",
+    "db_obs"
+  ],
+  "level_series": [
+    "pi_obs_level",
+    "dw_obs_level",
+    "i_R_obs_level",
+    "ds_obs_level",
+    "dpO_obs_level",
+    "dyS_obs_level"
+  ],
+  "demean_values": {
+    "pi_obs": 2.355797079183622,
+    "dw_obs": 15.272647519870773,
+    "i_R_obs": 0.680001761553099,
+    "ds_obs": 0.3384495189172465,
+    "dpO_obs": 1.2692281782995165,
+    "dyS_obs": 0.12389535130249564
+  },
+  "covid_exclusion": [
+    "2020Q1",
+    "2021Q4"
+  ],
+  "fetch_status": {
+    "bnp": {
+      "ok": false,
+      "n": 0,
+      "reason": "tom serie"
+    },
+    "konsum": {
+      "ok": false,
+      "n": 0,
+      "reason": "tom serie"
+    },
+    "investering": {
+      "ok": false,
+      "n": 0,
+      "reason": "tom serie"
+    },
+    "eksport": {
+      "ok": false,
+      "n": 0,
+      "reason": "tom serie"
+    },
+    "import": {
+      "ok": false,
+      "n": 0,
+      "reason": "tom serie"
+    },
+    "kpi": {
+      "ok": true,
+      "n": 188
+    },
+    "lonn": {
+      "ok": true,
+      "n": 52
+    },
+    "styringsrente": {
+      "ok": true,
+      "n": 102
+    },
+    "nibor": {
+      "ok": false,
+      "n": 0,
+      "reason": "tom serie"
+    },
+    "nok_eur": {
+      "ok": true,
+      "n": 102
+    },
+    "kreditt": {
+      "ok": false,
+      "n": 0,
+      "reason": "tom serie"
+    },
+    "oljepris": {
+      "ok": true,
+      "n": 157
+    },
+    "boligpris": {
+      "ok": false,
+      "n": 0,
+      "reason": "tom serie"
+    },
+    "handelspartner": {
+      "ok": true,
+      "n": 316
+    }
+  },
+  "sources": {
+    "bnp_konsum_inv_eks_imp": "SSB Statistikkbanken, tabell 09190",
+    "kpi": "SSB Statistikkbanken, tabell 03013 (månedlig → kvartal)",
+    "lonn": "SSB Statistikkbanken, tabell 09786",
+    "bolig": "SSB Statistikkbanken, tabell 07241",
+    "renter": "Norges Bank API (SDMX-JSON)",
+    "nok_eur": "Norges Bank API (SDMX-JSON)",
+    "kreditt": "Norges Bank API, K2 husholdninger",
+    "olje": "FRED, DCOILBRENTEU (Brent spot USD/fat)",
+    "partner": "FRED, volumindekser 7 handelspartnere, HP-gap λ=1600"
+  },
+  "transformations": {
+    "dy,dc,dinv,dx,dm": "Δlog(X) × 100 (kvartalsvekst pst.)",
+    "pi_obs": "Δlog(KPI) × 4 × 100 (annualisert)",
+    "dw_obs": "Δlog(lønn) × 4 × 100 (annualisert)",
+    "dh_obs": "Δlog(boligpris) × 100 (kvartalsvekst)",
+    "i_R_obs, i_3m_obs": "rente / 4 (kvartalsnivå, pst.)",
+    "ds_obs, dpO_obs": "Δlog(X) × 100",
+    "dyS_obs": "HP-gap, vektet snitt handelspartnere",
+    "db_obs": "K2 kredittvekst HH (råvekstrate)",
+    "*_level": "log-nivå av tilsvarende volumserie",
+    "covid_flag": "1 = 2020K1–2021K4, ellers 0"
+  }
+}
