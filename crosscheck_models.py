@@ -447,15 +447,21 @@ class ARModel:
     def fit(self,
             data: pd.DataFrame,
             covid_mask: Optional[np.ndarray] = None) -> "ARModel":
+        valid  = data[self.variable].notna().values
         y_full = data[self.variable].dropna().values.astype(float)
+
+        # Trim covid_mask to match y_full (removes rows dropped by dropna)
+        if covid_mask is not None and len(covid_mask) == len(valid):
+            cm = covid_mask[valid]
+        else:
+            cm = covid_mask
 
         # BIC-lagvalg
         best_p, best_bic = 1, np.inf
         for p in range(1, self.p_max + 1):
             X, Y_d = _lag_matrix(y_full.reshape(-1, 1), p)
-            T = len(Y_d)
-            if covid_mask is not None:
-                m = covid_mask[p:]
+            if cm is not None:
+                m = cm[p:]
                 X_f = X[~m]; Y_f = Y_d[~m]
             else:
                 X_f, Y_f = X, Y_d
@@ -472,8 +478,8 @@ class ARModel:
 
         self.p = best_p
         X, Y_d = _lag_matrix(y_full.reshape(-1, 1), self.p)
-        if covid_mask is not None:
-            m = covid_mask[self.p:]
+        if cm is not None:
+            m = cm[self.p:]
             X_f = X[~m]; Y_f = Y_d[~m]
         else:
             X_f, Y_f = X, Y_d
@@ -549,6 +555,17 @@ class MonthlyARIMA:
         self.variable_quarterly = variable_quarterly  # kolonnenavn i crosscheck_data
         self.model_fit          = None
         self.fitted             = False
+        # KPI-nowcast må konvertere fra indeksnivå til annualisert Δlog
+        # (samme enhet som pi_obs i crosscheck_data.csv: Δlog × 4 × 100).
+        # Rente-nowcast beholder nivå direkte (% p.a. matcher i_R_obs-enheten).
+        self.transform_to_pi      = (variable_quarterly == "pi_obs")
+        self.q_full_levels: Optional[pd.Series] = None
+        self.last_full_quarter_level: Optional[float] = None
+        # Settes i fit() basert på faktisk indeksfrekvens. raw_data['kpi'] er
+        # i praksis kvartalsvis (fetch_kpi kaller _period_series_to_quarterly),
+        # så "monthly"-klassen kjører ARIMA på kvartalsdata. Flagg er viktig
+        # for korrekt nowcast-semantikk og referansenivå.
+        self.is_quarterly_input   = False
 
     def fit(self, monthly_series: pd.Series) -> "MonthlyARIMA":
         """Estimer ARIMA på månedlig serie."""
@@ -590,9 +607,93 @@ class MonthlyARIMA:
         self.model_fit = best_fit
         self.fitted    = True
         self.last_obs  = s
+
+        # Detekter input-frekvens. "monthly"-parameteren er historisk; raw_data
+        # kan i praksis inneholde kvartalsvise serier fordi crosscheck_data.py
+        # aggregerer månedlig KPI til kvartal før lagring.
+        is_quarterly = False
+        if isinstance(s.index, pd.PeriodIndex):
+            is_quarterly = bool(s.index.freqstr and s.index.freqstr.startswith("Q"))
+        elif isinstance(s.index, pd.DatetimeIndex) and len(s) >= 2:
+            median_delta_days = s.index.to_series().diff().dt.days.dropna().median()
+            if median_delta_days is not None and median_delta_days > 45:
+                is_quarterly = True
+        self.is_quarterly_input = is_quarterly
+
+        try:
+            if is_quarterly:
+                q_full = s.copy()
+                if isinstance(q_full.index, pd.DatetimeIndex):
+                    q_full.index = q_full.index.to_period("Q")
+                elif not isinstance(q_full.index, pd.PeriodIndex):
+                    q_full.index = pd.PeriodIndex(pd.to_datetime(q_full.index),
+                                                  freq="Q")
+                self.q_full_levels = q_full
+                self.last_full_quarter_level = float(q_full.iloc[-1])
+            else:
+                s_dt = s.copy()
+                s_dt.index = pd.to_datetime(s.index)
+                grp     = s_dt.resample("QE")
+                q_mean  = grp.mean()
+                q_count = grp.count()
+                q_full  = q_mean[q_count >= 3]
+                q_full.index = q_full.index.to_period("Q")
+                self.q_full_levels = q_full
+                self.last_full_quarter_level = (
+                    float(q_full.iloc[-1]) if len(q_full) else None
+                )
+            if self.transform_to_pi and len(self.q_full_levels):
+                log.info(f"  {self.name}: siste fullstendige kvartalsnivå "
+                         f"{self.q_full_levels.index[-1]} = "
+                         f"{self.last_full_quarter_level:.3f} "
+                         f"({len(self.q_full_levels)} kvartaler, "
+                         f"{'kvartalsvis' if is_quarterly else 'månedlig'} input)")
+        except Exception as e:
+            log.warning(f"  {self.name}: kunne ikke beregne kvartalsnivåer: {e}")
+            self.q_full_levels = None
+            self.last_full_quarter_level = None
+
+        unit = "kv." if is_quarterly else "mnd"
         log.info(f"  {self.name}: ARIMA{best_order}, AIC={best_aic:.1f}, "
-                 f"T={len(s)} mnd")
+                 f"T={len(s)} {unit}")
         return self
+
+    def _level_to_pi(self, level_q: float, prev_level: Optional[float]) -> float:
+        """Δlog(KPI_q / KPI_{q-1}) × 4 × 100 — samme transform som pi_obs."""
+        if (prev_level is None or prev_level <= 0
+                or level_q is None or level_q <= 0
+                or not np.isfinite(prev_level) or not np.isfinite(level_q)):
+            return float("nan")
+        return float(np.log(level_q / prev_level) * 4.0 * 100.0)
+
+    def _prev_quarter_level(self) -> Optional[float]:
+        """Referansekvartalsnivå for pi-konvertering.
+
+        - Kvartalsvis input: siste observerte kvartal ER referansen, fordi
+          ARIMA-prognosen gjelder neste kvartal (ingen intra-kvartal aggregering).
+        - Månedlig input: siste FULLSTENDIGE kvartal (ekskluderer inneværende
+          partielt observerte kvartal).
+        """
+        if self.q_full_levels is None or len(self.q_full_levels) == 0:
+            log.warning(f"  {self.name}: q_full_levels mangler — "
+                        f"fallback til last_full_quarter_level="
+                        f"{self.last_full_quarter_level}")
+            return self.last_full_quarter_level
+        if self.is_quarterly_input:
+            return float(self.q_full_levels.iloc[-1])
+        try:
+            current_q = pd.Timestamp(self.last_obs.index[-1]).to_period("Q")
+        except Exception as e:
+            log.warning(f"  {self.name}: kunne ikke bestemme current_q: {e} "
+                        f"— bruker siste fulle kvartal som referanse")
+            return float(self.q_full_levels.iloc[-1])
+        mask = self.q_full_levels.index < current_q
+        prev = self.q_full_levels[mask]
+        if len(prev) > 0:
+            return float(prev.iloc[-1])
+        if len(self.q_full_levels) >= 2:
+            return float(self.q_full_levels.iloc[-2])
+        return float(self.q_full_levels.iloc[-1])
 
     def nowcast_current_quarter(self,
                                  months_observed: int = 1) -> Dict:
@@ -609,14 +710,46 @@ class MonthlyARIMA:
         """
         if not self.fitted:
             return {}
+
+        def _pack(n, lo50, hi50, lo90, hi90) -> Dict:
+            """Konverter nivå → pi_obs-enhet hvis transform_to_pi, ellers behold nivå."""
+            if self.transform_to_pi:
+                prev = self._prev_quarter_level()
+                return {
+                    "nowcast":  self._level_to_pi(n,    prev),
+                    "ci_50_lo": self._level_to_pi(lo50, prev),
+                    "ci_50_hi": self._level_to_pi(hi50, prev),
+                    "ci_90_lo": self._level_to_pi(lo90, prev),
+                    "ci_90_hi": self._level_to_pi(hi90, prev),
+                    "months_observed": months_observed,
+                }
+            return {
+                "nowcast":  float(n),
+                "ci_50_lo": float(lo50), "ci_50_hi": float(hi50),
+                "ci_90_lo": float(lo90), "ci_90_hi": float(hi90),
+                "months_observed": months_observed,
+            }
+
+        # Kvartalsvis input: ARIMA-prognosen h=1 er direkte kvartalsnivå for
+        # inneværende kvartal — ingen intra-kvartal aggregering nødvendig.
+        if self.is_quarterly_input:
+            try:
+                fc = self.model_fit.get_forecast(1)
+                ncast = float(fc.predicted_mean.values[0])
+                ci50  = fc.conf_int(alpha=0.50).values[0]
+                ci90  = fc.conf_int(alpha=0.10).values[0]
+                return _pack(ncast,
+                             float(ci50[0]), float(ci50[1]),
+                             float(ci90[0]), float(ci90[1]))
+            except Exception as e:
+                log.warning(f"  {self.name} nowcast (kvartalsvis): {e}")
+                return {}
+
         months_remaining = 3 - months_observed
         if months_remaining == 0:
             # Alle måneder observert — bruk observert kvartalssnitt
             q_val = float(self.last_obs.iloc[-3:].mean())
-            return {"nowcast": q_val,
-                    "ci_50_lo": q_val, "ci_50_hi": q_val,
-                    "ci_90_lo": q_val, "ci_90_hi": q_val,
-                    "months_observed": months_observed}
+            return _pack(q_val, q_val, q_val, q_val, q_val)
         try:
             fc = self.model_fit.get_forecast(months_remaining)
             fc_mean  = fc.predicted_mean.values
@@ -634,14 +767,11 @@ class MonthlyARIMA:
             all_lo90 = np.concatenate([obs_vals, fc_ci90[:, 0]])
             all_hi90 = np.concatenate([obs_vals, fc_ci90[:, 1]])
 
-            return {
-                "nowcast":   ncast,
-                "ci_50_lo":  float(all_lo50.mean()),
-                "ci_50_hi":  float(all_hi50.mean()),
-                "ci_90_lo":  float(all_lo90.mean()),
-                "ci_90_hi":  float(all_hi90.mean()),
-                "months_observed": months_observed,
-            }
+            return _pack(
+                ncast,
+                float(all_lo50.mean()), float(all_hi50.mean()),
+                float(all_lo90.mean()), float(all_hi90.mean()),
+            )
         except Exception as e:
             log.warning(f"  {self.name} nowcast: {e}")
             return {}
@@ -654,25 +784,67 @@ class MonthlyARIMA:
         """
         if not self.fitted:
             return {}
-        h_months = h_quarters * 3
         try:
-            fc  = self.model_fit.get_forecast(h_months)
-            mn  = fc.predicted_mean.values
-            ci50 = fc.conf_int(alpha=0.50).values
-            ci90 = fc.conf_int(alpha=0.10).values
+            if self.is_quarterly_input:
+                # ARIMA-steg er allerede kvartal — ingen aggregering
+                fc  = self.model_fit.get_forecast(h_quarters)
+                mn  = fc.predicted_mean.values
+                ci50 = fc.conf_int(alpha=0.50).values
+                ci90 = fc.conf_int(alpha=0.10).values
+                mean_levels = [float(v) for v in mn]
+                lo50_levels = [float(v) for v in ci50[:, 0]]
+                hi50_levels = [float(v) for v in ci50[:, 1]]
+                lo90_levels = [float(v) for v in ci90[:, 0]]
+                hi90_levels = [float(v) for v in ci90[:, 1]]
+            else:
+                h_months = h_quarters * 3
+                fc  = self.model_fit.get_forecast(h_months)
+                mn  = fc.predicted_mean.values
+                ci50 = fc.conf_int(alpha=0.50).values
+                ci90 = fc.conf_int(alpha=0.10).values
 
-            # Aggreger måneder til kvartal (gjennomsnitt per 3 måneder)
-            def agg_to_q(arr):
-                n = len(arr) // 3
-                return [float(arr[i*3:(i+1)*3].mean()) for i in range(n)]
+                # Aggreger måneder til kvartal (gjennomsnitt per 3 måneder)
+                def agg_to_q(arr):
+                    n = len(arr) // 3
+                    return [float(arr[i*3:(i+1)*3].mean()) for i in range(n)]
+
+                mean_levels = agg_to_q(mn)
+                lo50_levels = agg_to_q(ci50[:, 0])
+                hi50_levels = agg_to_q(ci50[:, 1])
+                lo90_levels = agg_to_q(ci90[:, 0])
+                hi90_levels = agg_to_q(ci90[:, 1])
+
+            if self.transform_to_pi:
+                # Kjed log-diff mot forrige kvartals nivå. Alle CI-grener deler
+                # samme sentrale prev-bane for å unngå at kvantil-bånd drifter
+                # urealistisk mye over horisonten.
+                anchor = self._prev_quarter_level()
+
+                def chain(levels: List[float]) -> List[float]:
+                    out, prev = [], anchor
+                    for lev in levels:
+                        out.append(self._level_to_pi(lev, prev))
+                        if lev is not None and lev > 0 and np.isfinite(lev):
+                            prev = lev
+                    return out
+
+                return {
+                    self.variable_quarterly: {
+                        "mean":      chain(mean_levels),
+                        "ci_50_lo":  chain(lo50_levels),
+                        "ci_50_hi":  chain(hi50_levels),
+                        "ci_90_lo":  chain(lo90_levels),
+                        "ci_90_hi":  chain(hi90_levels),
+                    }
+                }
 
             return {
                 self.variable_quarterly: {
-                    "mean":      agg_to_q(mn),
-                    "ci_50_lo":  agg_to_q(ci50[:, 0]),
-                    "ci_50_hi":  agg_to_q(ci50[:, 1]),
-                    "ci_90_lo":  agg_to_q(ci90[:, 0]),
-                    "ci_90_hi":  agg_to_q(ci90[:, 1]),
+                    "mean":      mean_levels,
+                    "ci_50_lo":  lo50_levels,
+                    "ci_50_hi":  hi50_levels,
+                    "ci_90_lo":  lo90_levels,
+                    "ci_90_hi":  hi90_levels,
                 }
             }
         except Exception as e:
