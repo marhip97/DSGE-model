@@ -1,10 +1,10 @@
 {
   "pipeline_version": "fase3_v1",
-  "run_timestamp": "2026-04-21T07:52:16",
+  "run_timestamp": "2026-04-21T08:00:47",
   "start_period": "2001Q1",
   "end_period": "2026Q2",
   "n_quarters": 102,
-  "n_variables": 27,
+  "n_variables": 28,
   "columns": [
     "dy_obs",
     "dy_obs_level",
@@ -24,6 +24,8 @@
     "dh_obs_level",
     "i_R_obs",
     "i_R_obs_level",
+    "i_3m_obs",
+    "i_3m_obs_level",
     "ds_obs",
     "ds_obs_level",
     "dpO_obs",
@@ -31,7 +33,6 @@
     "dyS_obs",
     "dyS_obs_level",
     "covid_flag",
-    "i_3m_obs",
     "db_obs"
   ],
   "obs_series": [
@@ -44,10 +45,10 @@
     "dw_obs",
     "dh_obs",
     "i_R_obs",
+    "i_3m_obs",
     "ds_obs",
     "dpO_obs",
     "dyS_obs",
-    "i_3m_obs",
     "db_obs"
   ],
   "level_series": [
@@ -60,6 +61,7 @@
     "dw_obs_level",
     "dh_obs_level",
     "i_R_obs_level",
+    "i_3m_obs_level",
     "ds_obs_level",
     "dpO_obs_level",
     "dyS_obs_level"
@@ -73,10 +75,11 @@
     "pi_obs": 2.355797079183622,
     "dw_obs": 15.272647519870773,
     "dh_obs": 1.43543523186722,
-    "i_R_obs": 0.680001761553099,
-    "ds_obs": 0.3384495189172465,
-    "dpO_obs": 1.2692281782995165,
-    "dyS_obs": 0.13178877275621506
+    "i_R_obs": 0.6858152211801718,
+    "i_3m_obs": 0.47611095489419447,
+    "ds_obs": 0.4466681072898107,
+    "dpO_obs": 0.8201887413276914,
+    "dyS_obs": 0.15459076480620448
   },
   "covid_exclusion": [
     "2020Q1",
@@ -113,16 +116,15 @@
     },
     "styringsrente": {
       "ok": true,
-      "n": 102
+      "n": 83
     },
     "nibor": {
-      "ok": false,
-      "n": 0,
-      "reason": "tom serie"
+      "ok": true,
+      "n": 48
     },
     "nok_eur": {
       "ok": true,
-      "n": 102
+      "n": 83
     },
     "kreditt": {
       "ok": false,
@@ -131,7 +133,7 @@
     },
     "oljepris": {
       "ok": true,
-      "n": 157
+      "n": 155
     },
     "boligpris": {
       "ok": true,
@@ -139,7 +141,7 @@
     },
     "handelspartner": {
       "ok": true,
-      "n": 316
+      "n": 204
     }
   },
   "sources": {
