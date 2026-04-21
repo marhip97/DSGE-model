@@ -350,11 +350,10 @@ select{font-size:11px;padding:4px 8px;border-radius:var(--rad);border:.5px solid
     <div><div class="sl" style="margin-bottom:4px">Variabel</div>
       <select id="cmpVar" onchange="renderCompare()">
         <option value="pi_obs">KPI-inflasjon</option>
-        <option value="i_R_obs">Styringsrente</option>
+        <option value="pi_jae_obs">KPI-JAE (kjerne)</option>
+        <option value="u_obs">AKU-ledighet</option>
         <option value="dy_obs">BNP fastland</option>
-        <option value="dh_obs">Boligpris</option>
-        <option value="ds_obs">NOK/EUR</option>
-        <option value="dw_obs">Lønnsvekst</option>
+        <option value="dh_obs">Boligprisvekst</option>
       </select>
     </div>
     <div id="cmpSignal" style="font-size:11.5px;padding:5px 10px;border-radius:var(--rad);background:var(--bg2);border:.5px solid var(--border2);color:var(--text3)">–</div>
@@ -416,26 +415,17 @@ select{font-size:11px;padding:4px 8px;border-radius:var(--rad);border:.5px solid
 // ═══════════════════════════════════════════════════════════════════════════
 
 const VAR_CFG = {
-  dy_obs:   {label:'BNP fastland',       unit:'% kv.vekst', color:'#1a5fa8', hasLevel:false},
-  dc_obs:   {label:'Privat konsum',      unit:'% kv.vekst', color:'#3a7fc8', hasLevel:false},
-  dinv_obs: {label:'Investering',        unit:'% kv.vekst', color:'#6aa0d8', hasLevel:false},
-  dx_obs:   {label:'Eksport',            unit:'% kv.vekst', color:'#9abfe8', hasLevel:false},
-  dm_obs:   {label:'Import',             unit:'% kv.vekst', color:'#bcd4f0', hasLevel:false},
-  pi_obs:   {label:'KPI-inflasjon',      unit:'% årsrate',  color:'#d0522a', hasLevel:false},
-  dw_obs:   {label:'Lønnsvekst',         unit:'% årsrate',  color:'#e07850', hasLevel:false},
-  dpO_obs:  {label:'Oljepris',           unit:'% kv.vekst', color:'#b07010', hasLevel:true, levelUnit:'USD/fat'},
-  dyS_obs:  {label:'Handelspartner-BNP', unit:'gap %',       color:'#c09030', hasLevel:false},
-  i_R_obs:  {label:'Styringsrente',      unit:'% p.a.',     color:'#1a9870', hasLevel:true, levelUnit:'% p.a.'},
-  i_3m_obs: {label:'NIBOR 3M',           unit:'% p.a.',     color:'#40b890', hasLevel:false},
-  ds_obs:   {label:'NOK/EUR',            unit:'% kv.vekst', color:'#c94f78', hasLevel:true, levelUnit:'NOK/EUR'},
-  dh_obs:   {label:'Boligpris',          unit:'% kv.vekst', color:'#9060a0', hasLevel:false},
-  db_obs:   {label:'Kredittvekst',       unit:'% vekst',    color:'#7a7870', hasLevel:false},
+  pi_obs:     {label:'KPI-inflasjon',    unit:'% årsrate',           color:'#d0522a', hasLevel:false},
+  pi_jae_obs: {label:'KPI-JAE (kjerne)', unit:'% årsrate',           color:'#e07850', hasLevel:false},
+  u_obs:      {label:'AKU-ledighet',     unit:'% av arb.styrken',    color:'#1a9870', hasLevel:false},
+  dy_obs:     {label:'BNP fastland',     unit:'% kv.vekst',          color:'#1a5fa8', hasLevel:false},
+  dh_obs:     {label:'Boligprisvekst',   unit:'% kv.vekst',          color:'#9060a0', hasLevel:false},
 };
 
-const KEY_VARS     = ['dy_obs','pi_obs','i_R_obs','dh_obs','ds_obs','dw_obs'];
+const KEY_VARS     = ['pi_obs','pi_jae_obs','u_obs','dy_obs','dh_obs'];
 const COVID_START  = '2020Q1';
 const COVID_END    = '2021Q4';
-const DEMO_LEVELS  = {dpO_obs:75.0, i_R_obs:4.5, ds_obs:11.80};
+const DEMO_LEVELS  = {};
 
 const SHOCK_DEFS = {
   monetary:  {label:'Pengepol.',    color:'#1a5fa8', sigma_key:'sigma_i'},
@@ -663,8 +653,8 @@ function makeDemoCK() {
   const mkFit=(obs,p)=>{const f=[0];for(let i=1;i<obs.length;i++)f.push(f[i-1]*p+obs[i]*(1-p)*.7);return f;};
   const forecasts={},historical={},evaluation={},weights={};
   Object.keys(VAR_CFG).forEach(v=>{
-    const pers=v==='i_R_obs'?.92:v==='dpO_obs'?.75:.55;
-    const sig=v==='i_R_obs'?.4:v==='pi_obs'?1.5:1.2;
+    const pers=v==='u_obs'?.92:.55;
+    const sig=v==='u_obs'?.3:v==='pi_obs'||v==='pi_jae_obs'?1.5:.8;
     const obs=dm(rw(T,pers,sig));
     const fit=mkFit(obs,pers*.6);
     const resid=obs.map((x,i)=>x-fit[i]);
@@ -683,16 +673,16 @@ function makeDemoCK() {
     forecasts[v]={label:VAR_CFG[v].label,unit:VAR_CFG[v].unit,periods:fc_p,mean:decay,
       ci_50:{lo:decay.map((m,i)=>m-.67*std[i]),hi:decay.map((m,i)=>m+.67*std[i])},
       ci_90:{lo:decay.map((m,i)=>m-1.64*std[i]),hi:decay.map((m,i)=>m+1.64*std[i])},
-      std,models_used:[VAR_CFG[v].color<'#5'?'bvar1':'bvar3'],last_level:DEMO_LEVELS[v]??null};
+      std,models_used:['bvar_inflasjon','bvar_konjunktur','bvar_kjerne','ar'],last_level:DEMO_LEVELS[v]??null};
     evaluation[v]={label:VAR_CFG[v].label,rmse:Math.round(rmse*1e4)/1e4,
       mae:Math.round(rmse*.82*1e4)/1e4,r2:Math.round(r2*1e3)/1e3,n_obs:vObs.length};
-    weights[v]={bvar:1.0};
+    weights[v]={bvar_inflasjon:.3,bvar_konjunktur:.2,bvar_kjerne:.3,ar:.2};
   });
-  return {meta:{end_period:'2025Q3',h:H,weighting:'rmse (demo)',n_variables:14,
-    nowcast_applied:['pi_obs','i_R_obs']},
+  return {meta:{end_period:'2025Q3',h:H,weighting:'rmse (demo)',n_variables:5,
+    nowcast_applied:['pi_obs','pi_jae_obs']},
     forecasts,historical,evaluation,weights,
     nowcast:{pi_obs:{nowcast:2.8,ci_90_lo:2.0,ci_90_hi:3.6,months_observed:2},
-             i_R_obs:{nowcast:4.25,ci_90_lo:4.0,ci_90_hi:4.5,months_observed:1}}};
+             pi_jae_obs:{nowcast:2.5,ci_90_lo:1.8,ci_90_hi:3.2,months_observed:2}}};
 }
 
 function makeDemoDFC() {
@@ -700,11 +690,10 @@ function makeDemoDFC() {
   for(let h=0;h<12;h++){cq++;if(cq>4){cq=1;cy++;}fc_p.push(`${cy}Q${cq}`);}
   const result={};
   const vals={pi_obs:[3.2,2.9,2.6,2.4,2.3,2.2,2.1,2.1,2.0,2.0,2.0,2.0],
-              i_R_obs:[4.2,4.1,3.9,3.7,3.5,3.3,3.2,3.1,3.0,2.9,2.8,2.7],
+              pi_jae_obs:[2.8,2.6,2.4,2.3,2.2,2.1,2.1,2.0,2.0,2.0,2.0,2.0],
+              u_obs:[4.1,4.0,3.9,3.8,3.8,3.8,3.8,3.9,3.9,3.9,4.0,4.0],
               dy_obs:[.5,.6,.7,.7,.7,.6,.6,.5,.5,.5,.5,.5],
-              dh_obs:[.8,.9,1.0,1.1,1.0,.9,.8,.7,.6,.5,.4,.3],
-              ds_obs:[-.2,-.1,.0,.1,.1,.0,-.1,-.1,-.1,.0,.0,.0],
-              dw_obs:[4.2,4.0,3.8,3.6,3.4,3.2,3.0,2.9,2.8,2.7,2.6,2.5]};
+              dh_obs:[.8,.9,1.0,1.1,1.0,.9,.8,.7,.6,.5,.4,.3]};
   Object.entries(vals).forEach(([k,v])=>{result[k]={mean:v,periods:fc_p,std:v.map(()=>.3)};});
   return result;
 }
@@ -1177,8 +1166,7 @@ function buildCKFcstGrid() {
 }
 
 function renderCKMini(v,color) {
-  // Renter og inflasjon vises som faktisk nivå i nøkkelvariabler-kortene
-  const useL=['i_R_obs','i_3m_obs','pi_obs'].includes(v);
+  const useL=false; // Alle 5 SMART-variabler vises som vekstenhet (ingen separat level)
   const d=makeCKChartData(v,useL); if(!d)return;
   const ctx=document.getElementById('ckMini_'+v); if(!ctx)return;
   const hLen=CK.historical?.[v]?.periods.length??0;
@@ -1298,8 +1286,7 @@ function renderCompare() {
   const v=document.getElementById('cmpVar')?.value||'pi_obs';
   const cfg=VAR_CFG[v];
   document.getElementById('cmpTitle').textContent=cfg.label+' — DSGE vs kryssjekk';
-  // Renter og inflasjon vises som faktisk nivå i sammenligningsgrafen
-  const useL=cfg.hasLevel&&['i_R_obs','i_3m_obs','pi_obs'].includes(v);
+  const useL=false; // Alle 5 SMART-variabler vises som vekstenhet
   const d=makeCKChartData(v,useL); if(!d)return;
   const hLen=CK.historical?.[v]?.periods.length??0;
   const startIdx=Math.max(0,hLen-12);
@@ -1344,7 +1331,7 @@ function renderCompare() {
 
 function buildCmpTable() {
   const tbody=document.getElementById('cmpTbl'); if(!tbody||tbody.children.length||!CK)return;
-  ['dy_obs','pi_obs','i_R_obs','dh_obs','ds_obs','dw_obs'].forEach(v=>{
+  ['pi_obs','pi_jae_obs','u_obs','dy_obs','dh_obs'].forEach(v=>{
     const fc=CK.forecasts?.[v]; const dfc=DFC?.[v]; if(!fc)return;
     const e1=fc.mean[0],e4=fc.mean[3]??NaN,s1=fc.std[0]||1,s4=fc.std[3]||1;
     const d1=dfc?.mean?.[0]??null,d4=dfc?.mean?.[3]??null;
@@ -1368,7 +1355,7 @@ function buildCmpTable() {
 function buildCKEval() {
   if(!CK)return;
   const wData={},wVars=[];
-  const mColors={bvar1:'#1a5fa8',bvar2:'#d0522a',bvar3:'#1a9870',bvar:'#7a6fa8',ar:'#b07010'};
+  const mColors={bvar_inflasjon:'#d0522a',bvar_konjunktur:'#1a5fa8',bvar_kjerne:'#1a9870',ar:'#b07010'};
   // Finn alle modellgrupper på tvers av variabler
   const allGrps=new Set();
   Object.values(CK.weights||{}).forEach(mw=>Object.keys(mw).forEach(m=>allGrps.add(m.startsWith('ar')?'ar':m)));

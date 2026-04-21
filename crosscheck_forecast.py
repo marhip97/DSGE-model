@@ -48,58 +48,33 @@ logging.basicConfig(
 )
 log = logging.getLogger("crosscheck_forecast")
 
-# ── Variabelkart ──────────────────────────────────────────────────────────────
+# ── Variabelkart (SMART-inspirert arkitektur) ─────────────────────────────────
 # Hvilke modeller som dekker hvilke variabler
+# "ar" = AR-benchmark (univariat), hentet som results["ar"][var]
 VAR_TO_MODELS = {
-    "dy_obs":   ["bvar1"],
-    "dc_obs":   ["bvar1"],
-    "dinv_obs": ["bvar1"],
-    "dx_obs":   ["bvar1"],
-    "dm_obs":   ["bvar1"],
-    "pi_obs":   ["bvar2"],          # + nowcast-justering
-    "dpO_obs":  ["bvar2", "ar_olje"],
-    "dyS_obs":  ["bvar2", "ar_partner"],
-    "i_R_obs":  ["bvar3"],          # + nowcast-justering
-    "i_3m_obs": ["bvar3"],
-    "ds_obs":   ["bvar3"],
-    "dh_obs":   ["bvar3"],
-    "db_obs":   ["bvar3"],
+    "pi_obs":     ["bvar_inflasjon", "bvar_kjerne", "ar"],
+    "pi_jae_obs": ["bvar_inflasjon", "bvar_kjerne", "ar"],
+    "u_obs":      ["bvar_inflasjon", "bvar_konjunktur", "bvar_kjerne", "ar"],
+    "dy_obs":     ["bvar_konjunktur", "bvar_kjerne", "ar"],
+    "dh_obs":     ["bvar_konjunktur", "bvar_kjerne", "ar"],
 }
 
 # Lesbare navn for output
 VAR_LABELS = {
-    "dy_obs":   "BNP fastland",
-    "dc_obs":   "Privat konsum",
-    "dinv_obs": "Investering",
-    "dx_obs":   "Eksport",
-    "dm_obs":   "Import",
-    "pi_obs":   "KPI-inflasjon",
-    "dw_obs":   "Lønnsvekst",
-    "dpO_obs":  "Oljepris",
-    "dyS_obs":  "Handelspartner-BNP",
-    "i_R_obs":  "Styringsrente",
-    "i_3m_obs": "NIBOR 3M",
-    "ds_obs":   "NOK/EUR",
-    "dh_obs":   "Boligpris",
-    "db_obs":   "Kredittvekst",
+    "pi_obs":     "KPI-inflasjon",
+    "pi_jae_obs": "KPI-JAE (kjerne)",
+    "u_obs":      "AKU-ledighet",
+    "dy_obs":     "BNP fastland",
+    "dh_obs":     "Boligprisvekst",
 }
 
 # Enheter for output
 VAR_UNITS = {
-    "dy_obs":   "pst. kv.vekst",
-    "dc_obs":   "pst. kv.vekst",
-    "dinv_obs": "pst. kv.vekst",
-    "dx_obs":   "pst. kv.vekst",
-    "dm_obs":   "pst. kv.vekst",
-    "pi_obs":   "pst. årsrate",
-    "dw_obs":   "pst. årsrate",
-    "dpO_obs":  "pst. kv.vekst",
-    "dyS_obs":  "gap, pst.",
-    "i_R_obs":  "pst. p.a. / 4",
-    "i_3m_obs": "pst. p.a. / 4",
-    "ds_obs":   "pst. kv.vekst",
-    "dh_obs":   "pst. kv.vekst",
-    "db_obs":   "pst. vekst",
+    "pi_obs":     "% årsrate",
+    "pi_jae_obs": "% årsrate",
+    "u_obs":      "% av arbeidsstyrken",
+    "dy_obs":     "% kvartalsvekst",
+    "dh_obs":     "% kvartalsvekst",
 }
 
 COVID_START = "2020Q1"
@@ -153,9 +128,15 @@ def _extract_model_forecast(results: Dict,
     """
     Hent (mean, variance) fra en modells prognose for en variabel.
     Returnerer None hvis modellen ikke har prognose for variabelen.
+
+    AR-modeller er lagret som results["ar"][variable] (én per målvariabel),
+    alle andre modeller som results[model_key][variable].
     """
-    model_fc = results.get(model_key, {})
-    var_fc   = model_fc.get(variable)
+    if model_key == "ar":
+        var_fc = results.get("ar", {}).get(variable)
+    else:
+        model_fc = results.get(model_key, {})
+        var_fc   = model_fc.get(variable)
     if var_fc is None:
         return None
 
@@ -205,7 +186,10 @@ def _rmse_weights(fitted: Dict,
         obs = data[var].values.astype(float) if var in data.columns else None
 
         for m_key in available:
-            fv = fitted.get(m_key, {}).get(var)
+            if m_key == "ar":
+                fv = fitted.get("ar", {}).get(var)
+            else:
+                fv = fitted.get(m_key, {}).get(var)
             if fv is None or obs is None:
                 rmse_vals.append(np.inf)
                 continue
@@ -310,7 +294,10 @@ def build_historical_fit(fitted: Dict,
         # Samle fitted values fra tilgjengelige modeller
         fv_list = []
         for m_key in model_list:
-            fv = fitted.get(m_key, {}).get(var)
+            if m_key == "ar":
+                fv = fitted.get("ar", {}).get(var)
+            else:
+                fv = fitted.get(m_key, {}).get(var)
             if fv is not None:
                 fv_list.append(np.array(fv, dtype=float))
 
@@ -438,7 +425,7 @@ class EnsembleForecaster:
         periods     = self._get_forecast_periods(h)
 
         # ── Beregn vekter ─────────────────────────────────────────────────────
-        all_model_keys = ["bvar1", "bvar2", "bvar3", "ar_olje", "ar_partner"]
+        all_model_keys = ["bvar_inflasjon", "bvar_konjunktur", "bvar_kjerne", "ar"]
         available_keys = [k for k in all_model_keys if k in self.results]
 
         if self.weighting == "rmse":
@@ -488,8 +475,8 @@ class EnsembleForecaster:
                 means_list, vars_list, w_arr
             )
 
-            # Nowcast-justering for KPI og styringsrente
-            if var in ("pi_obs", "i_R_obs"):
+            # Nowcast-justering for KPI og KPI-JAE
+            if var in ("pi_obs", "pi_jae_obs"):
                 ens_mean, ens_var = apply_nowcast(
                     ens_mean, ens_var, nowcast_raw, var, h
                 )

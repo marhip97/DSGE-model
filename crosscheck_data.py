@@ -427,6 +427,50 @@ def fetch_kpi() -> pd.Series:
     return s
 
 
+def fetch_kpi_jae() -> pd.Series:
+    """KPI justert for avgiftsendringer og uten energivarer (KPI-JAE), månedlig — SSB 08981."""
+    candidates = [
+        ("08981", ["KPIJAEAlt", "KPIJAEalt", "kpijae", "jae", "justert", "kjerne"],
+                  ["TOTAL", "total", "alle", "0"]),
+        ("10235", ["KPIJAEAlt", "kpijae", "justert"],
+                  ["TOTAL", "total", "alle"]),
+    ]
+    for table_id, contents_kw, sector_kw in candidates:
+        s = _ssb_smart_query(table_id, contents_kw, sector_kw)
+        if not s.empty:
+            s = _period_series_to_quarterly(s)
+            log.info(f"  KPI-JAE:         {len(s)} kvartaler (SSB {table_id})")
+            return s
+    log.warning("  KPI-JAE:         0 kvartaler (alle tabeller feilet)")
+    return pd.Series(dtype=float)
+
+
+def fetch_aku_ledighet() -> pd.Series:
+    """AKU-ledighet, sesongjustert, prosent av arbeidsstyrken — SSB 12046/05111."""
+    # Prøv flere tabeller og ContentsCodes
+    candidates = [
+        ("12046", ["Ledige", "AKUledige", "ledighet", "arbeidsledig"],
+                  ["prosent", "pst", "rate", "andel", "I alt", "i alt"]),
+        ("05111", ["AKULedigPst", "AKUledige", "ledighet", "ledige", "prosent"],
+                  ["prosent", "pst", "I alt", "i alt", "total"]),
+        ("12043", ["Ledige", "ledighet", "arbeidsledig"],
+                  ["prosent", "pst", "I alt"]),
+    ]
+    for table_id, contents_kw, sector_kw in candidates:
+        s = _ssb_smart_query(table_id, contents_kw, sector_kw)
+        if not s.empty:
+            # Konverter til kvartal (kan allerede være kvartal)
+            s = _period_series_to_quarterly(s)
+            # Sjekk at verdiene er rimelige for ledighetsprosent (1-15%)
+            med = s.dropna().median()
+            if 0.5 < med < 20:
+                log.info(f"  AKU-ledighet:    {len(s)} kvartaler (SSB {table_id}), median={med:.1f}%")
+                return s
+            log.warning(f"  SSB {table_id}: urimelige verdier (median={med:.2f}), prøver neste")
+    log.warning("  AKU-ledighet:    0 kvartaler (alle tabeller feilet)")
+    return pd.Series(dtype=float)
+
+
 def fetch_lonnsindeks() -> pd.Series:
     """Lønn per normalårsverk — SSB 09786."""
     s = _ssb_smart_query(
@@ -821,11 +865,12 @@ def transform_all(raw: dict) -> pd.DataFrame:
             lambda k=raw_key: np.log(raw[k]) if k in raw else None
         )
 
-    # ── KPI og lønn (annualisert inflasjon/vekst) ────────────────────────────
+    # ── KPI, KPI-JAE og lønn (annualisert inflasjon/vekst) ──────────────────
     for obs_name, raw_key, factor in [
-        ("pi_obs", "kpi",  4.0),
-        ("dw_obs", "lonn", 4.0),
-        ("dh_obs", "boligpris", 1.0),  # kvartalsvekst holder for bolig
+        ("pi_obs",     "kpi",     4.0),
+        ("pi_jae_obs", "kpi_jae", 4.0),
+        ("dw_obs",     "lonn",    4.0),
+        ("dh_obs",     "boligpris", 1.0),  # kvartalsvekst holder for bolig
     ]:
         try_transform(
             obs_name,
@@ -858,6 +903,10 @@ def transform_all(raw: dict) -> pd.DataFrame:
             obs_name + "_level",
             lambda k=raw_key: np.log(raw[k]) if k in raw else None
         )
+
+    # ── AKU-ledighet (nivå i %, ikke log-diff) ──────────────────────────────
+    try_transform("u_obs", lambda: raw.get("aku"))
+    # Ingen _level for u_obs — nivå er allerede den observerbare enheten
 
     # ── Handelspartner-BNP (allerede gap) ───────────────────────────────────
     try_transform("dyS_obs", lambda: raw.get("handelspartner"))
@@ -950,6 +999,8 @@ def run_pipeline(output_dir: str = ".", fallback_path: str = None) -> tuple:
         "eksport":        fetch_eksport,
         "import":         fetch_import,
         "kpi":            fetch_kpi,
+        "kpi_jae":        fetch_kpi_jae,
+        "aku":            fetch_aku_ledighet,
         "lonn":           fetch_lonnsindeks,
         "styringsrente":  fetch_styringsrente,
         "nibor":          fetch_nibor_3m,
@@ -1038,6 +1089,8 @@ def run_pipeline(output_dir: str = ".", fallback_path: str = None) -> tuple:
         "sources": {
             "bnp_konsum_inv_eks_imp": "SSB Statistikkbanken, tabell 09190",
             "kpi":    "SSB Statistikkbanken, tabell 03013 (månedlig → kvartal)",
+            "kpi_jae":"SSB Statistikkbanken, tabell 08981 (KPI-JAE, månedlig → kvartal)",
+            "aku":    "SSB Statistikkbanken, tabell 12046/05111 (AKU-ledighet, sesongjustert, %)",
             "lonn":   "SSB Statistikkbanken, tabell 09786",
             "bolig":  "SSB Statistikkbanken, tabell 07241",
             "renter": "Norges Bank API (SDMX-JSON)",
@@ -1049,6 +1102,8 @@ def run_pipeline(output_dir: str = ".", fallback_path: str = None) -> tuple:
         "transformations": {
             "dy,dc,dinv,dx,dm": "Δlog(X) × 100 (kvartalsvekst pst.)",
             "pi_obs":           "Δlog(KPI) × 4 × 100 (annualisert)",
+            "pi_jae_obs":       "Δlog(KPI-JAE) × 4 × 100 (annualisert)",
+            "u_obs":            "AKU-ledighet i % av arbeidsstyrken (nivå, sesongjustert)",
             "dw_obs":           "Δlog(lønn) × 4 × 100 (annualisert)",
             "dh_obs":           "Δlog(boligpris) × 100 (kvartalsvekst)",
             "i_R_obs, i_3m_obs":"rente / 4 (kvartalsnivå, pst.)",

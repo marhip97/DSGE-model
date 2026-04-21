@@ -56,12 +56,16 @@ log = logging.getLogger("crosscheck_models")
 COVID_START = "2020Q1"
 COVID_END   = "2021Q4"
 
-# Variabelgrupper
-BVAR1_VARS  = ["dy_obs", "dc_obs", "dinv_obs", "dx_obs", "dm_obs"]
-BVAR2_VARS  = ["pi_obs", "dpO_obs", "dyS_obs"]   # dw_obs fjernet: data kun til 2021Q1
-BVAR3_VARS  = ["i_R_obs", "i_3m_obs", "ds_obs", "dh_obs", "db_obs"]
-AR_VARS     = ["dpO_obs", "dyS_obs"]
-ALL_OBS     = BVAR1_VARS + BVAR2_VARS + BVAR3_VARS
+# ── Fase IV: 5-variabel SMART-inspirert kryssjekkarkitektur ──────────────────
+# Målvariabler (de 5 variablene kryssjekkene dekker)
+TARGET_VARS = ["pi_obs", "pi_jae_obs", "u_obs", "dy_obs", "dh_obs"]
+
+# BVAR-grupperinger med klar makroøkonomisk mekanisme
+BVAR_INFLASJON_VARS  = ["pi_jae_obs", "u_obs", "pi_obs"]    # Phillips-kurve
+BVAR_KONJUNKTUR_VARS = ["dy_obs", "u_obs", "dh_obs"]         # Okuns lov / boligmarked
+BVAR_KJERNE_VARS     = TARGET_VARS                            # 5-var joint
+
+ALL_OBS = TARGET_VARS  # Kun målvariablene lastes inn i modellene
 
 # Månedlige kolonnenavn (fra crosscheck_data_raw.csv)
 MONTHLY_KPI_COL   = "kpi"
@@ -492,6 +496,18 @@ class ARModel:
                  f"sigma={np.sqrt(self.sigma2):.4f}")
         return self
 
+    def fitted_values(self) -> List[float]:
+        """Returnerer in-sample tilpassede verdier (OLS-predikert, uten constant-trick)."""
+        if not self.fitted:
+            raise RuntimeError(f"{self.name}: kall fit() først.")
+        p = self.p
+        n = len(self.y_full)
+        fv = []
+        for t in range(p, n):
+            x_t = np.concatenate([[1.0], self.y_full[t - 1:t - p - 1:-1]])
+            fv.append(float(self.coef @ x_t))
+        return fv
+
     def forecast(self,
                  h: int = 12,
                  n_sim: int = 2000
@@ -886,46 +902,40 @@ class ModelLibrary:
         )
         self.covid_mask: np.ndarray = self._build_covid_mask()
 
-        # Definer modeller
+        # Definer modeller (SMART-inspirert arkitektur)
         prior = MinnesotaPrior(lambda1=0.15, lambda2=0.50, lambda3=1.0)
 
-        self.bvar1 = BVARMinnesota(
-            name="BVAR-1 Realøkonomi",
-            variables=BVAR1_VARS,
+        self.bvar_inflasjon = BVARMinnesota(
+            name="BVAR-Inflasjon (Phillips-kurve)",
+            variables=BVAR_INFLASJON_VARS,
             p=p, prior=prior,
             n_draws=n_draws, n_burnin=n_burnin,
         )
-        self.bvar2 = BVARMinnesota(
-            name="BVAR-2 Priser/lønn",
-            variables=BVAR2_VARS,
+        self.bvar_konjunktur = BVARMinnesota(
+            name="BVAR-Konjunktur (Okun/bolig)",
+            variables=BVAR_KONJUNKTUR_VARS,
             p=p, prior=prior,
             n_draws=n_draws, n_burnin=n_burnin,
         )
-        self.bvar3 = BVARMinnesota(
-            name="BVAR-3 Finansielle/bolig",
-            variables=BVAR3_VARS,
+        self.bvar_kjerne = BVARMinnesota(
+            name="BVAR-Kjerne (5-var joint)",
+            variables=BVAR_KJERNE_VARS,
             p=p, prior=prior,
             n_draws=n_draws, n_burnin=n_burnin,
         )
-        self.ar_olje = ARModel(
-            name="AR Oljepris",
-            variable="dpO_obs",
-            p_max=4,
-        )
-        self.ar_partner = ARModel(
-            name="AR Handelspartner",
-            variable="dyS_obs",
-            p_max=4,
-        )
+        self.ar_models: Dict[str, ARModel] = {
+            v: ARModel(name=f"AR {v}", variable=v, p_max=4)
+            for v in TARGET_VARS
+        }
         self.arima_kpi = MonthlyARIMA(
             name="ARIMA KPI månedlig",
             variable_monthly=MONTHLY_KPI_COL,
             variable_quarterly="pi_obs",
         )
-        self.arima_rente = MonthlyARIMA(
-            name="ARIMA Rente månedlig",
-            variable_monthly=MONTHLY_RATE_COL,
-            variable_quarterly="i_R_obs",
+        self.arima_kpi_jae = MonthlyARIMA(
+            name="ARIMA KPI-JAE månedlig",
+            variable_monthly=MONTHLY_KPI_COL,
+            variable_quarterly="pi_jae_obs",
         )
 
     def _load_data(self, path: str) -> pd.DataFrame:
@@ -975,51 +985,38 @@ class ModelLibrary:
     def fit_all(self) -> "ModelLibrary":
         """Estimer alle modeller."""
         log.info("\n" + "=" * 55)
-        log.info("  ESTIMERER KRYSSJEKKMODELLER")
+        log.info("  ESTIMERER KRYSSJEKKMODELLER (SMART-arkitektur)")
         log.info("=" * 55)
 
-        # Bruk BIC for å velge lagorden per BVAR
-        log.info("\n[1/5] BVAR-1 Realøkonomi...")
-        p1 = _select_lag_bic(
-            self.data[[c for c in BVAR1_VARS if c in self.data.columns]].values,
-            p_max=self.p, exclude_mask=self.covid_mask,
-        )
-        log.info(f"  Lagorden BIC: p={p1}")
-        self.bvar1.p = p1
-        self.bvar1.fit(self.data, covid_mask=self.covid_mask)
+        bvars = [
+            ("1/5", "BVAR-Inflasjon (Phillips-kurve)", self.bvar_inflasjon, BVAR_INFLASJON_VARS),
+            ("2/5", "BVAR-Konjunktur (Okun/bolig)",   self.bvar_konjunktur, BVAR_KONJUNKTUR_VARS),
+            ("3/5", "BVAR-Kjerne (5-var joint)",      self.bvar_kjerne,     BVAR_KJERNE_VARS),
+        ]
+        for step, label, model, var_list in bvars:
+            log.info(f"\n[{step}] {label}...")
+            cols = [c for c in var_list if c in self.data.columns]
+            if len(cols) >= 2:
+                p_opt = _select_lag_bic(
+                    self.data[cols].values,
+                    p_max=self.p, exclude_mask=self.covid_mask,
+                )
+                log.info(f"  Lagorden BIC: p={p_opt}")
+                model.p = p_opt
+            model.fit(self.data, covid_mask=self.covid_mask)
 
-        log.info("\n[2/5] BVAR-2 Priser/lønn...")
-        p2 = _select_lag_bic(
-            self.data[[c for c in BVAR2_VARS if c in self.data.columns]].values,
-            p_max=self.p, exclude_mask=self.covid_mask,
-        )
-        log.info(f"  Lagorden BIC: p={p2}")
-        self.bvar2.p = p2
-        self.bvar2.fit(self.data, covid_mask=self.covid_mask)
+        log.info("\n[4/5] AR-benchmark (univariat per målvariabel)...")
+        for v, ar in self.ar_models.items():
+            ar.fit(self.data, covid_mask=self.covid_mask)
 
-        log.info("\n[3/5] BVAR-3 Finansielle/bolig...")
-        p3 = _select_lag_bic(
-            self.data[[c for c in BVAR3_VARS if c in self.data.columns]].values,
-            p_max=self.p, exclude_mask=self.covid_mask,
-        )
-        log.info(f"  Lagorden BIC: p={p3}")
-        self.bvar3.p = p3
-        self.bvar3.fit(self.data, covid_mask=self.covid_mask)
-
-        log.info("\n[4/5] AR-modeller (eksogene drivere)...")
-        self.ar_olje.fit(self.data, covid_mask=self.covid_mask)
-        self.ar_partner.fit(self.data, covid_mask=self.covid_mask)
-
-        log.info("\n[5/5] Månedlige ARIMA-modeller (nowcast)...")
+        log.info("\n[5/5] Månedlige ARIMA-modeller (nowcast KPI / KPI-JAE)...")
         if self.raw_data is not None:
             if MONTHLY_KPI_COL in self.raw_data.columns:
-                self.arima_kpi.fit(self.raw_data[MONTHLY_KPI_COL].dropna())
+                monthly = self.raw_data[MONTHLY_KPI_COL].dropna()
+                self.arima_kpi.fit(monthly)
+                self.arima_kpi_jae.fit(monthly)
             else:
-                log.warning(f"  KPI månedlig ikke i rådata.")
-            if MONTHLY_RATE_COL in self.raw_data.columns:
-                self.arima_rente.fit(self.raw_data[MONTHLY_RATE_COL].dropna())
-            else:
-                log.warning(f"  Styringsrente månedlig ikke i rådata.")
+                log.warning(f"  KPI månedlig ikke i rådata — ARIMA hoppes over.")
         else:
             log.warning("  Ingen rådata angitt — ARIMA-modeller hoppes over.")
 
@@ -1047,13 +1044,18 @@ class ModelLibrary:
         }}
 
         # BVAR-prognoser
-        results["bvar1"] = self.bvar1.forecast(h=h) if self.bvar1.fitted else {}
-        results["bvar2"] = self.bvar2.forecast(h=h) if self.bvar2.fitted else {}
-        results["bvar3"] = self.bvar3.forecast(h=h) if self.bvar3.fitted else {}
+        results["bvar_inflasjon"]  = (self.bvar_inflasjon.forecast(h=h)
+                                      if self.bvar_inflasjon.fitted else {})
+        results["bvar_konjunktur"] = (self.bvar_konjunktur.forecast(h=h)
+                                      if self.bvar_konjunktur.fitted else {})
+        results["bvar_kjerne"]     = (self.bvar_kjerne.forecast(h=h)
+                                      if self.bvar_kjerne.fitted else {})
 
-        # AR-prognoser
-        results["ar_olje"]    = self.ar_olje.forecast(h=h)    if self.ar_olje.fitted else {}
-        results["ar_partner"] = self.ar_partner.forecast(h=h) if self.ar_partner.fitted else {}
+        # AR-prognoser (benchmark, én per målvariabel)
+        results["ar"] = {
+            v: ar.forecast(h=h) if ar.fitted else {}
+            for v, ar in self.ar_models.items()
+        }
 
         # Månedlig nowcast
         results["nowcast"] = {}
@@ -1064,24 +1066,29 @@ class ModelLibrary:
             results["nowcast"]["pi_obs_quarterly"] = self.arima_kpi.forecast_quarterly(
                 h_quarters=h
             ).get("pi_obs", {})
-
-        if self.arima_rente.fitted:
-            results["nowcast"]["i_R_obs"] = self.arima_rente.nowcast_current_quarter(
+        if self.arima_kpi_jae.fitted:
+            results["nowcast"]["pi_jae_obs"] = self.arima_kpi_jae.nowcast_current_quarter(
                 months_observed=months_observed_current_q
             )
 
-        # Tilpassede verdier (for historisk sammenligning mot DSGE)
+        # Tilpassede verdier (for historisk sammenligning)
         results["fitted"] = {}
         for model, name in [
-            (self.bvar1, "bvar1"),
-            (self.bvar2, "bvar2"),
-            (self.bvar3, "bvar3"),
+            (self.bvar_inflasjon,  "bvar_inflasjon"),
+            (self.bvar_konjunktur, "bvar_konjunktur"),
+            (self.bvar_kjerne,     "bvar_kjerne"),
         ]:
             if model.fitted:
                 fv = model.fitted_values()
                 results["fitted"][name] = {
                     col: fv[col].tolist() for col in fv.columns
                 }
+
+        # AR fitted values (lagret per variabel under "ar"-nøkkelen)
+        results["fitted"]["ar"] = {}
+        for v, ar in self.ar_models.items():
+            if ar.fitted:
+                results["fitted"]["ar"][v] = ar.fitted_values()
 
         log.info("  Fremskrivning ferdig.")
         return results
@@ -1095,18 +1102,18 @@ class ModelLibrary:
 
     def model_summary(self) -> str:
         """Skriv ut oppsummering av estimerte modeller."""
-        lines = ["\n  MODELLOVERSIKT", "  " + "─" * 50]
-        for model in [self.bvar1, self.bvar2, self.bvar3]:
+        lines = ["\n  MODELLOVERSIKT (SMART-arkitektur)", "  " + "─" * 50]
+        for model in [self.bvar_inflasjon, self.bvar_konjunktur, self.bvar_kjerne]:
             status = "estimert" if model.fitted else "ikke estimert"
-            lines.append(f"  {model.name:<35} p={model.p}  [{status}]")
+            lines.append(f"  {model.name:<40} p={model.p}  [{status}]")
             if model.fitted:
                 lines.append(f"    Variabler: {', '.join(model.variables)}")
-        for model in [self.ar_olje, self.ar_partner]:
+        for v, ar in self.ar_models.items():
+            status = "estimert" if ar.fitted else "ikke estimert"
+            lines.append(f"  {ar.name:<40} p={ar.p}  [{status}]")
+        for model in [self.arima_kpi, self.arima_kpi_jae]:
             status = "estimert" if model.fitted else "ikke estimert"
-            lines.append(f"  {model.name:<35} p={model.p}  [{status}]")
-        for model in [self.arima_kpi, self.arima_rente]:
-            status = "estimert" if model.fitted else "ikke estimert"
-            lines.append(f"  {model.name:<35} [{status}]")
+            lines.append(f"  {model.name:<40} [{status}]")
         return "\n".join(lines)
 
 

@@ -313,8 +313,8 @@ def _add_last_level(ck_data: Dict) -> None:
             fc["last_level"] = obs[-1]
 
 
-# Kvartalsrenter annualiseres (×4), andre variabler beholder sin skala
-_RATE_SCALE: Dict[str, float] = {"i_R_obs": 4.0, "i_3m_obs": 4.0}
+# Ingen av de 5 SMART-variablene krever spesiell skaleringsfaktor
+_RATE_SCALE: Dict[str, float] = {}
 
 
 def _add_level_series(
@@ -346,7 +346,8 @@ def _add_level_series(
     # ds_obs_level = ln(NOK/EUR) → konverteres via exp()
     # Andre _level-kolonner er log-pris-/volumindekser (ikke tolkbare som nivå for grafer)
     period_to_level: Dict[str, Dict[str, Optional[float]]] = {}
-    _LEVEL_COLS = {"i_R_obs", "i_3m_obs", "ds_obs"}
+    # De 5 SMART-variablene har ikke tolkbare _level-kolonner for direkte grafvisning
+    _LEVEL_COLS: set = set()
     if os.path.exists(csv_path):
         try:
             import pandas as pd
