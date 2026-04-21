@@ -1,10 +1,10 @@
 {
   "pipeline_version": "fase3_v1",
-  "run_timestamp": "2026-04-21T08:00:47",
+  "run_timestamp": "2026-04-21T08:05:05",
   "start_period": "2001Q1",
   "end_period": "2026Q2",
   "n_quarters": 102,
-  "n_variables": 28,
+  "n_variables": 29,
   "columns": [
     "dy_obs",
     "dy_obs_level",
@@ -32,8 +32,9 @@
     "dpO_obs_level",
     "dyS_obs",
     "dyS_obs_level",
-    "covid_flag",
-    "db_obs"
+    "db_obs",
+    "db_obs_level",
+    "covid_flag"
   ],
   "obs_series": [
     "dy_obs",
@@ -64,7 +65,8 @@
     "i_3m_obs_level",
     "ds_obs_level",
     "dpO_obs_level",
-    "dyS_obs_level"
+    "dyS_obs_level",
+    "db_obs_level"
   ],
   "demean_values": {
     "dy_obs": 0.6229836726882516,
@@ -74,12 +76,13 @@
     "dm_obs": 0.8918167148072716,
     "pi_obs": 2.355797079183622,
     "dw_obs": 15.272647519870773,
-    "dh_obs": 1.43543523186722,
+    "dh_obs": 1.2993826397712083,
     "i_R_obs": 0.6858152211801718,
     "i_3m_obs": 0.47611095489419447,
     "ds_obs": 0.4466681072898107,
     "dpO_obs": 0.8201887413276914,
-    "dyS_obs": 0.15459076480620448
+    "dyS_obs": 0.1420500992085834,
+    "db_obs": 7.717028985507248
   },
   "covid_exclusion": [
     "2020Q1",
@@ -127,9 +130,8 @@
       "n": 83
     },
     "kreditt": {
-      "ok": false,
-      "n": 0,
-      "reason": "tom serie"
+      "ok": true,
+      "n": 148
     },
     "oljepris": {
       "ok": true,
@@ -137,7 +139,7 @@
     },
     "boligpris": {
       "ok": true,
-      "n": 64
+      "n": 137
     },
     "handelspartner": {
       "ok": true,
