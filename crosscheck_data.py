@@ -207,7 +207,12 @@ def _period_series_to_quarterly(s: pd.Series) -> pd.Series:
             # Månedlig → kvartal via DatetimeIndex
             s_dt = s.copy()
             s_dt.index = s.index.to_timestamp()
-            return s_dt.resample("QE").mean().to_period("Q")
+            quarterly = s_dt.resample("QE").mean()
+            counts = s_dt.resample("QE").count()
+            # Forkast partielle kvartaler (< 3 månedsverdier) for å unngå
+            # at siste ufullstendige kvartal gir urimelige veksttall ved transformasjon.
+            quarterly = quarterly[counts >= 3]
+            return quarterly.to_period("Q")
         # Allerede kvartallig
         s.index = s.index.asfreq("Q")
         return s
