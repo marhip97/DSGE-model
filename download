@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtuelle miljø
+.env
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test- og dekningsrapporter
+.pytest_cache/
+.coverage
+htmlcov/
+
+# NEMO-data
+data/raw/
+
+# Referanse-PDF-er (offentlige dokumenter, ikke en del av prosjektets leveranser)
+docs/references/*.pdf
+
+# Midlertidige nedlastinger (filer som "navn (1).ext" fra nettleser)
+* (1).*
+* (2).*
+* (3).*
+* (4).*
+* (5).*
