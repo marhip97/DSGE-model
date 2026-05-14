@@ -12,6 +12,8 @@ skal brukes til å analysere sjokk og optimale pengepolitiske responser.
    `python -m nemo run --refresh-data --analyse`
 2. Datainnhenting fra SSB, Norges Bank og FRED uten syntetiske fallback
 3. Estimeringen konvergerer (PSRF < 1.10, ESS/n > 0.02) på 200k trekk
+   **Status pr. 2026-05-14: PSRF oppfylt (1.0046), ESS/n IKKE oppfylt
+   (0.0033, faktor 6 under krav).** Se Fase 0.5 Spor C8 og risikoregister.
 4. Alle 15 kvalitative IRF-krav passerer
 5. Månedlig nowcast oppdaterer prognosen mellom kvartaler
 6. Dashboard viser IRF, FEVD, historisk dekomposisjon, prognose
@@ -23,6 +25,9 @@ skal brukes til å analysere sjokk og optimale pengepolitiske responser.
 | 2026-05-14 | Innføre agentstruktur (PL + spesialister) | Se `AGENTER.md` |
 | 2026-05-14 | Legge til Fase 0.5 før Fase 1 | Modellen har kjente svakheter (h_c og psi_R ved prior-grense, sigma_rp dominerer FEVD); reestimering på ny data uten å adressere disse vil bare gi nye estimater på samme svakheter |
 | 2026-05-14 | Fase 0.5 skal være full revisjon, ikke fokusert | PE-valg: alle likninger gjennomgås mot K&M 2019 |
+| 2026-05-14 | Legge til ESS-mangel som eksplisitt risiko og Spor C8 | PSRF-konvergens er oppfylt, men effektivt antall trekk (ESS_min=662) er en faktor 6 under suksesskriterium 3. Dette gjør h_c=0.989 og psi_R=0.960 tolkningsmessig svake — vi vet ikke om verdiene er datadrevne eller samplingsartefakter. Må diagnostiseres før Fase 2. |
+| 2026-05-14 | B5 NB-benchmark bruker posterior-trekk, ikke kun mean | IRF basert på posterior mean med ESS=662 arver Monte Carlo-usikkerhet. Kvantitative avvik fra NB Memo 3/2024 Figur 1 kan ellers feiltolkes som spesifikasjonsproblem når det er samplingsstøy. B5 rapporterer mean-IRF + 5/95-bånd fra trekk. |
+| 2026-05-14 | Fase 2 omformulert fra "reestimering" til "revidert estimering med forbedret sampler / informert prior" | Den gamle formuleringen ga inntrykk av at det bare gjenstår å trykke "kjør på nytt". Faktisk arbeid: forbedre mixing (blokksampling for korrelerte parametere, reparametrisering, eller HMC etter PE-godkjenning) **og** revidere prior basert på Fase 0.5 Spor C-funn. |
 
 ## Fase 0 — Restart og fundament ✅
 
@@ -44,12 +49,16 @@ skal brukes til å analysere sjokk og optimale pengepolitiske responser.
 ## Fase 0.5 — Modellkvalitetssikring 🚧
 
 **Mål:** Verifisere at nåværende modellspesifikasjon er korrekt og
-veldokumentert *før* vi henter ny data og reestimerer. Adressere kjente
-svakheter (h_c og psi_R ved prior-grense, sigma_rp dominerer FEVD,
-sigma_A svakt identifisert) og avdekke ukjente.
+veldokumentert *før* vi reviderer estimeringen. Adressere kjente
+svakheter:
+- h_c og psi_R ved prior-grense (0.989/0.9995, 0.960/0.990)
+- sigma_rp dominerer FEVD (22 % BNP, 88 % RER)
+- sigma_A svakt identifisert (kalibrert fast = 0.006)
+- **ESS_min=662 langt under krav (4000) til tross for PSRF=1.0046** — vi
+  vet ikke om posterior-estimatene er datadrevne eller samplingsartefakter
 
 **Lead:** DSGE-økonom. **Bidrag fra:** NUM (numerisk verifikasjon), STAT
-(identifikasjon), QA (review og tester).
+(identifikasjon og mixing), QA (review og tester).
 
 ### Kildedokumenter (Fase 0.5)
 
@@ -88,7 +97,7 @@ tilpasning" med separat begrunnelse.
 - [ ] **A3.** Gjennomgang av `build_matrices_v3` — verifiser boligprislikning med b_sa / lambda_sa (Gelain et al. 2018), mimicking rule, og at h_c-oppdatering ikke etterlater inkonsistens.
 - [ ] **A4.** Spesifikk gjennomgang av mistenkelige punkter identifisert i forhåndssjekken:
   - Banklikning (ligning 26): `G0[26, NB] = 1.0` og senere `G0[26, NB] += p.phi_c` → faktisk verdi 11.0. Intendert?
-  - Mimicking rule (ligning 20) i v3: bruker `psi_R` på `(1-psi_R)*psi_Y` — er fortegnet konsistent med NEMO-spesifikasjon?
+  - Mimicking rule (ligning 20) i v3: bruker `G1[20, PI_L]` (lagg av inflasjon), men kommentaren beskriver fremoverskuende `E[π_{t+4}]`. **PE-beslutning kreves:** implementere fremoverskuende eller dokumentere bakseende som "egen tilpasning".
   - `EPS_PHI_H` i likning 22 og 23: står med samme fortegn (-1.0) — er det riktig at LTV-sjokk virker symmetrisk på begge utlånsrenter?
 - [ ] **A5.** Steady-state-konsistens: kontroller at CY+IY+GY+XY-MY ≈ 1, og at IHY (boliginvestering) er konsistent med IY.
 
@@ -97,27 +106,37 @@ tilpasning" med separat begrunnelse.
 - [ ] **B2.** Sammenlign IRF mellom v1/v2/v3 for de samme sjokkene — dokumenter hvor versjonene skiller seg.
 - [ ] **B3.** Verifiser Kalman-filterets håndtering av COVID-hullet i `kalman_hull` (`mcmc.py`): blir kovariansmatrisen reinitialisert riktig på post-blokken?
 - [ ] **B4.** Sjekk at Cholesky-fallback (`LinAlgError → -np.inf`) ikke skjuler legitime numeriske problemer.
-- [ ] **B5.** **NB Memo 3/2024 benchmark.** Beregne IRF for pengepolitikkjokk på dagens v3-modell med posterior mean, normalisere til samme styringsrente-topp som NB-figuren (~+1 pp), og sammenlikne mot Figur 1. Tabellere topp-magnitude, topp-tidspunkt og halveringstid for inflasjon, BNP, boligpris, RER, reallønn, styringsrente. Rapportere kvantitative avvik med hypoteser om årsak. Dette er **det viktigste eksterne valideringspunktet vi har**, og leverer kvantitativ grunnlag for diagnose av `sigma_rp`-anomalien (særlig RER-magnituden).
+- [ ] **B5.** **NB Memo 3/2024 benchmark — utvidet versjon.** Beregne IRF for pengepolitikkjokk på dagens v3-modell og sammenlikne mot Figur 1.
+  - **Steg 1 — punktestimat:** posterior mean, normalisert til samme styringsrente-topp som NB-figuren (~+1 pp). Tabellere topp-magnitude, topp-tidspunkt og halveringstid for inflasjon, BNP, boligpris, RER, reallønn, styringsrente.
+  - **Steg 2 — usikkerhetsbånd (NY).** Trekke N=500 posterior-trekk fra `chain_v3_v2_posterior.json` (eller løpende kjede hvis vi har rå-trekkene tilgjengelig), beregne IRF per trekk, rapportere mean + 5/95-bånd per variabel og horisont. Begrunnelse: posterior mean med ESS=662 har ikke ignorerbar Monte Carlo-usikkerhet; uten bånd vet vi ikke om kvantitative avvik fra NB-figuren er spesifikasjon eller sampling.
+  - **Steg 3 — rapportering.** Kvantitative avvik mot NB med hypoteser om årsak. Særlig fokus på RER-magnitude (kobles til `sigma_rp`-diagnose i Spor C3).
 
-#### Spor C: Identifikasjons- og posterior-analyse (STAT-lead)
+#### Spor C: Identifikasjons-, posterior- og mixing-analyse (STAT-lead)
 - [ ] **C1.** Plott prior vs. posterior for alle 17 estimerte parametere — visualiser hvor langt posterior har beveget seg.
-- [ ] **C2.** Spesifikk analyse: hvorfor traff `h_c` (0.989 mot grense 0.9995) og `psi_R` (0.960 mot 0.990) prior-grensa? Tre hypoteser å teste:
+- [ ] **C2.** Spesifikk analyse: hvorfor traff `h_c` (0.989 mot grense 0.9995) og `psi_R` (0.960 mot 0.990) prior-grensa? Fire hypoteser å teste:
   1. Modellen *trenger* veldig høy persistens — prior bør utvides
   2. Identifikasjon er svak — prior dominerer
   3. Modellspesifikasjonen mangler en kanal som ellers ville absorbert persistens
+  4. **(NY)** Likelihood har en *ridge* langs h_c-aksen: når h_c→1 blir a3_W=(1-h_c)/(σ(1+h_c))→0, så rentens påvirkning på konsum forsvinner i grensen. Sjekk: plott log-likelihood (ikke posterior) som funksjon av h_c langs MAP, alle andre parametere fast. Hvis flat for h_c ∈ [0.95, 0.999], er det H4. Tilsvarende for psi_R (renteglatting → 1 betyr renten følger random walk).
 - [ ] **C3.** FEVD-diagnose for `sigma_rp`: 22 % av BNP, 88 % av RER. Test hypotesene fra `CLAUDE.md`:
   1. UIP-likningen mangler dynamikk (kobles til B5 NB-benchmark)
   2. `phi_B` (gjeldsavhengig premie) for lav
   3. Mangler separat finansiell faktor
+  - **(NY) Kvantitativ test:** Fest `sigma_rp = 0.006` (K&M-verdi) og reestimer de andre 16 parameterne på samme data. Krever ~2 timer MCMC — eskaleres til PE før kjøring. Hvis likelihood faller drastisk, *trenger* modellen høyt sigma_rp (strukturproblem, mest sannsynlig UIP). Hvis likelihood er omtrent uendret med justeringer i andre sjokk-std, er sigma_rp en absorberende parameter (identifikasjonsproblem).
 - [ ] **C4.** Vurder om `sigma_A` (fast = 0.006) er svakt identifisert i nåværende modell, eller om det er en spesifikasjonsfeil. Hvis spesifikasjonsfeil — kan vi rette den og fri parameteren?
-- [ ] **C5.** **Designdokument for Fase 2-estimering** (forhåndsregistrering). Skrive ned hvilke prior-revisjoner vi forhåndsforplikter oss til *gitt funn fra C2-C4*, før vi ser ny posterior. Skal hindre p-hacking-ekvivalent (gjentatte reestimeringer med justert prior til "fine" estimater oppnås). Dokumentet skal være versjonskontrollert.
+- [ ] **C5.** **Designdokument for Fase 2-estimering** (forhåndsregistrering). Skrive ned hvilke prior-revisjoner vi forhåndsforplikter oss til *gitt funn fra C2-C4 og C8*, før vi ser ny posterior. Skal hindre p-hacking-ekvivalent (gjentatte reestimeringer med justert prior til "fine" estimater oppnås). Dokumentet skal være versjonskontrollert.
 - [ ] **C6.** **Observasjonsekvivalens-vurdering.** Kan vi skille mellom alternative spesifikasjoner med dagens 14 observasjonsserier? Konkret eksempel: høyt `sigma_rp` + flat UIP vs. lavt `sigma_rp` + dynamisk UIP. Hvis observasjonsekvivalente — trenger vi flere observerte serier (eks. terminkurs, kredittspread) eller informative priors.
 - [ ] **C7.** **Identifikasjons-styrke per parameter.** Måle prior-til-posterior-bevegelse (KL-divergens eller posterior_std / prior_std). Hvis posterior ≈ prior, er parameteren ikke identifisert av data. Liste alle 17 parametere etter identifikasjonsstyrke.
+- [ ] **C8.** **(NY) Mixing-diagnose.** PSRF=1.0046 oppfyller konvergenskravet, men ESS_min=662 (0.33 % av kjedelengden) er en faktor 6 under suksesskriterium 3 (ESS/n > 0.02 → 4000 av 200k). Leveranser:
+  1. **Autokorrelasjonsfunksjon per parameter** (ikke bare ESS-tall). Identifiser hvilke parametere som mikser tregest — sannsynlig kandidat: h_c, psi_R, rho_C, rho_rp.
+  2. **Korrelasjonsmatrise mellom parametere** fra posterior-trekk. Hvis h_c og rho_C er sterkt korrelerte (sannsynlig), forklarer det treg mixing under komponentvis RWMH.
+  3. **Anbefaling for Fase 2-sampler.** Konkrete alternativer å eskalere til PE: (a) blokksampling for korrelerte parametere innenfor RWMH, (b) reparametrisering (f.eks. logit-transformasjon av beta-parametere som binder mot grense), (c) bytte til HMC — sistnevnte krever eksplisitt PE-godkjenning iht. AGENTER.md eskaleringsliste.
+  4. **Implikasjon for C2-konklusjoner.** Hvis h_c-ESS i nåværende kjede er ~666, er punktestimatet 0.989 ikke pålitelig nok til å avgjøre H1 vs. H2 alene. C8 må derfor leveres *før* C2 konkluderer.
 
 #### Spor D: Test-suite (QA-lead, samarbeid ARK)
 - [ ] **D1.** `tests/conftest.py` med fixtures (kalibrert modell, syntetisk data)
 - [ ] **D2.** `tests/test_solver.py` — BK-stabilitet, dimensjoner, T-matrise-egenverdier
-- [ ] **D3.** `tests/test_irf_signs.py` — 15 kvalitative krav
+- [ ] **D3.** `tests/test_irf_signs.py` — 15 kvalitative krav. **Merknad:** nåværende `blanchard_kahn.py` lister 13 sjekker; D3 må spesifisere de to siste eksplisitt (sannsynlig: boligsjokk → boligpris(+), LTV-sjokk → konsum_NW(-)) før implementering.
 - [ ] **D4.** `tests/test_fevd_sum.py` — andeler summeres til ~100 %
 - [ ] **D5.** `tests/test_likelihood.py` — Kalman-filter sanity, COVID-hull
 - [ ] **D6.** GitHub Actions `tests.yml` som kjører `pytest tests/` ved push
@@ -131,7 +150,7 @@ tilpasning" med separat begrunnelse.
 
 - Alle Spor A-funn dokumentert i rapport. Hvert "spørsmål" eller "feil" har anbefalt løsning.
 - Alle tester i Spor D passerer på dagens modell *eller* feiler på en måte som dokumenterer en kjent svakhet.
-- Identifikasjonsanalysen (C2, C3) gir tydelig svar: skal vi endre prior, endre modellen, eller leve med svakheten?
+- Identifikasjons- og mixing-analysen (C2, C3, C8) gir tydelig svar: skal vi endre prior, endre modellen, bytte sampler, eller leve med svakheten?
 - `docs/MODEL.md` finnes og er komplett.
 - PE har godkjent eller revidert sluttrapport.
 
@@ -141,11 +160,19 @@ tilpasning" med separat begrunnelse.
 |--------|--------|
 | Spor A avdekker fundamentale modellfeil | Eskaler til PE — kan kreve omfattende refactoring av `equations.py` |
 | Spor C konkluderer at modellen mangler en kanal | Diskuter med PE: utvide modellen (Fase 0.6?) eller leve med svakheten |
-| Identifikasjonsanalysen krever ny MCMC-kjøring | 2 timer per kjøring; planlegg eventuelle reestimeringer i bunt |
+| **(NY) ESS_min=662 (0.33 % av kjede) langt under suksesskriterium 3** | Spor C8 diagnostiserer årsak (treg mixing, korrelerte parametere). Fase 2 må velge tiltak: blokksampling, reparametrisering, eller HMC (sistnevnte krever PE-godkjenning). Konsekvens for tolkning: h_c=0.989 og psi_R=0.960 i nåværende posterior kan være samplingsartefakter, ikke datadrevne — Spor C2 og C8 må leveres samlet før konklusjon. |
+| Identifikasjonsanalysen krever ny MCMC-kjøring (C3 sigma_rp-test) | 2 timer per kjøring; eskaleres til PE før kjøring. Planlegg eventuelle reestimeringer i bunt. |
 
 ### Estimert tid
 
-5–7 dager. Hvis Spor A eller C avdekker større problemer, kan dette utvides.
+5–7 dager opprinnelig estimat. **Justert oppover etter C8-tillegg og B5-utvidelse: 7–10 dager**, fordelt slik:
+- B5 (utvidet med posterior-trekk): 2–3 dager
+- A-spor (rask v3-fokus først): 1–2 dager
+- C-spor inkludert C8 mixing-diagnose: 3–4 dager
+- D-spor parallelt: 1–2 dager
+- E sluttrapport: 1 dag
+
+Hvis Spor A eller C avdekker større problemer, kan dette utvides.
 
 ## Fase 1 — Faktisk datainnhenting
 
@@ -171,22 +198,52 @@ tilpasning" med separat begrunnelse.
 **Risiko:** SSB-tabell-IDer kan endres. FRED krever API-nøkkel
 (`secrets.FRED_API_KEY` i GitHub Actions).
 
-## Fase 2 — Prior-revisjon og reestimering
+## Fase 2 — Revidert estimering med forbedret sampler / informert prior
 
-**Mål:** Adressere `h_c` og `psi_R` ved prior-grensa, og dokumentere
-identifikasjon. *Mye av forarbeidet skjer i Fase 0.5 Spor C.*
+**Mål:** Produsere en posterior som er (a) **mixet ordentlig**
+(ESS/n > 0.02 oppfylt for alle parametere), (b) basert på prior revidert
+ut fra Fase 0.5 Spor C-funn, og (c) kjørt på den utvidede dataserien fra
+Fase 1. Den gamle formuleringen "reestimering" antydet feilaktig at det
+bare var et spørsmål om å trykke "kjør på nytt" — faktisk arbeid
+inkluderer både sampler-forbedring og prior-revisjon.
 
-**Leveranser:**
+### Komponenter
+
+**1. Sampler-forbedring** (følger fra Spor C8-funn):
+- Implementere valgt sampler-strategi: blokksampling, reparametrisering,
+  eller HMC.
+- HMC krever PE-godkjenning iht. AGENTER.md eskaleringsliste.
+- Verifisere på syntetisk testcase at ny sampler oppnår ESS/n > 0.02 før
+  produksjonskjøring.
+
+**2. Prior-revisjon** (følger fra forhåndsregistrert C5-designdokument):
+- Revisjon av `src/nemo/estimation/priors.py` med begrunnelser per parameter.
+- Hvis prior utvides eller strammes på h_c, psi_R, sigma_rp eller andre
+  parametere — dokumenter i `data/results/mcmc_log.md` *før* kjøring.
+
+**3. Reestimering på fersk data** (forutsetter Fase 1 ferdig):
+- Bruke utvidet observasjonsserie (frem til siste tilgjengelige kvartal).
+- `data/results/posterior_v4.json` med PSRF, ESS, traceplots,
+  autokorrelasjonsplott per parameter.
+
+### Leveranser
+
 - [ ] `notebooks/identification.ipynb` — bygger på Fase 0.5 Spor C
+- [ ] Sampler-implementasjon (kode + tester på syntetisk data)
 - [ ] Revisjon av `src/nemo/estimation/priors.py` med begrunnelser
-- [ ] Reestimering på fersk data (Fase 1)
-- [ ] `data/results/posterior_v4.json` med PSRF, ESS, traceplots
+- [ ] Forhåndsregistrert designdokument (fra C5) sjekket inn før kjøring
+- [ ] Reestimering på fersk data
+- [ ] `data/results/posterior_v4.json` med fullstendig diagnostikk
 
-**Akseptansekriterier:**
+### Akseptansekriterier
+
+- **ESS/n > 0.02 for alle parametere** (var ikke oppfylt i v3)
+- **PSRF < 1.10 for alle parametere**
 - Ingen posterior-middel < 5 % fra prior-grensa (eller dokumentert hvorfor)
-- PSRF < 1.10 for alle parametere
-- ESS/n > 0.02 for alle parametere
-- Marginal likelihood dokumentert og høyere enn v3
+- Marginal likelihood dokumentert og høyere enn v3 (eller forklart hvorfor
+  lavere er akseptabelt, f.eks. strammere prior gir lavere ML men bedre
+  identifikasjon)
+- Designdokumentet fra C5 er fulgt (ingen post-hoc prior-justeringer)
 
 ## Fase 3 — Analyseverktøy konsolidering
 
@@ -241,9 +298,9 @@ dekomposisjon. Ingen kryssjekk.
 | Fase | Estimert tid | Avhengig av               |
 |------|--------------|---------------------------|
 | 0    | 1 dag        | ✅ Fullført               |
-| 0.5  | 5–7 dager    | Fase 0 ✅                 |
+| 0.5  | 7–10 dager   | Fase 0 ✅ (justert opp fra 5–7 etter C8 og B5-utvidelse) |
 | 1    | 3–5 dager    | SSB-API tilgjengelighet   |
-| 2    | 1 uke (kortere etter 0.5) | Fase 0.5 + Fase 1 |
+| 2    | 1–2 uker     | Fase 0.5 + Fase 1. Avhengig av sampler-valg (HMC krever PE-godkjenning og lengre implementasjonstid). |
 | 3    | 3 dager      | Fase 2 ferdig             |
 | 4    | 4 dager      | Fase 3 ferdig             |
 | 5    | 1 uke        | Fase 1, 3 ferdig          |
@@ -258,6 +315,8 @@ dekomposisjon. Ingen kryssjekk.
 | Modellen feiler Blanchard-Kahn etter ny data | Lav        | Høy        | `test_solver.py` kjører før hver estimering |
 | Prior-grensa fortsatt bindende            | Middels (lavere etter 0.5) | Middels | Fase 2 identifikasjonsanalyse |
 | Nowcasten gir misvisende signaler         | Middels       | Høy        | Tydelig "foreløpig"-merking; bånd inkluderer prognoseusikkerhet |
+| **(NY) ESS/n langt under krav i v3-posterior (0.0033 vs. krav 0.02)** | **Høy (allerede observert)** | **Høy** | Spor C8 diagnostiserer årsak. Fase 2 omformulert til å inkludere sampler-forbedring. Tolkningsadvarsel: nåværende posterior-estimater for h_c, psi_R, sigma_rp har høyere Monte Carlo-usikkerhet enn ESS-formelen for IID-trekk skulle tilsi. |
+| **(NY) Sampler-bytte til HMC kan kreve omfattende refactoring** | Middels | Middels | C8 må vurdere mindre invasive alternativer (blokksampling, reparametrisering) først. HMC-bytte eskaleres eksplisitt før implementering. |
 
 ## Beslutninger som krever prosjekteier
 
@@ -266,6 +325,8 @@ Se `AGENTER.md` for fullstendig eskaleringsliste. Hovedpunkter:
 - Endre modellens dimensjon (NZ, NE)
 - Endre COVID-hull-periodene
 - Legge til ny variabel i observasjonssettet
-- Bytte estimeringsalgoritme (f.eks. HMC i stedet for RWMH)
+- Bytte estimeringsalgoritme (f.eks. HMC i stedet for RWMH) — **relevant for Fase 2 etter C8-funn**
 - Publisere dashboardet offentlig
 - Endring i prior som strammer eller utvider støtten
+- **(NY) Kjøre sigma_rp-fastpunkts-eksperimentet i C3** (krever ~2 timer MCMC)
+- **(NY) Valg av mimicking rule-spesifikasjon** (lagg vs. fremoverskuende inflasjon, jf. Spor A4)
