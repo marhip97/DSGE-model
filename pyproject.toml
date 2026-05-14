@@ -1,0 +1,90 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nemo"
+version = "0.1.0"
+description = "DSGE-modell for norsk økonomi, bayesiansk estimert"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "NEMO-prosjektet" }]
+classifiers = [
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+]
+
+dependencies = [
+    "numpy>=1.26,<3.0",
+    "scipy>=1.11,<2.0",
+    "pandas>=2.1,<3.0",
+    "statsmodels>=0.14,<1.0",
+    "requests>=2.31,<3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.1",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "ipykernel>=6.29",
+    "jupyterlab>=4.2",
+]
+
+dashboard = [
+    "jinja2>=3.1",
+]
+
+[project.scripts]
+nemo = "nemo.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"nemo.dashboard" = ["templates/*.html"]
+
+# ─── Verktøykonfigurasjon ────────────────────────────────────────────────────
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --strict-markers"
+markers = [
+    "slow: tester som tar > 10 sek (deselect med '-m \"not slow\"')",
+    "integration: krever nettverkstilgang",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",  # pyflakes + pycodestyle
+    "I",            # isort
+    "N",            # pep8-naming
+    "UP",           # pyupgrade
+    "B",            # flake8-bugbear
+    "SIM",          # flake8-simplify
+]
+ignore = [
+    "N803",  # tillater store variabelnavn (matriser: G0, G1, T, R)
+    "N806",  # tillater store lokale variabler (samme grunn)
+    "E741",  # tillater l, I som variabelnavn (matematisk notasjon)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]  # tillater lange linjer i tester
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false  # gradvis innføring
+ignore_missing_imports = true
