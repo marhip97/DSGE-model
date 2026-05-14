@@ -85,9 +85,8 @@ Sjokk (NE = 13):
 """
  
 import numpy as np
-import sys, os
-sys.path.insert(0, os.path.dirname(__file__))
-from parameters import Parameters
+
+from nemo.model.parameters import Parameters
  
 # ── Dimensjoner ───────────────────────────────────────────────────────────────
 NZ = 48

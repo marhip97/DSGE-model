@@ -4,7 +4,7 @@ NEMO FASE II v3 — ADAPTIV MCMC MED KONVERGENSOVERVÅKNING (v2)
 ================================================================================
 Forbedringer fra v1:
   - sigma_A kalibreres fast til K&M-verdi (0.006) — svakt identifisert
-  - Starter fra posterior_v3_final.json hvis tilgjengelig
+  - Starter fra data/results/posterior_v3_final.json hvis tilgjengelig
   - Starter med kalibrert scale fra forrige kjøring
   - 200 000 produksjonstrekkninger for bedre ESS
   - Strengere konvergenskrav: PSRF < 1.10 (ned fra 1.15)
@@ -13,32 +13,29 @@ Krever i samme mappe:
     equations.py, parameters.py, blanchard_kahn.py
     nemo_data_faktisk_v2.csv
     T_v3.npy, R_v3.npy
-    posterior_v3_final.json  (valgfritt — brukes som startpunkt)
+    data/results/posterior_v3_final.json  (valgfritt — brukes som startpunkt)
     chain_baseline_v3.npy    (valgfritt — fallback startpunkt)
 ================================================================================
 """
+
+import json
+import time
+import warnings
 
 import numpy as np
 import pandas as pd
 from scipy.linalg import (solve as sp_solve, cholesky, LinAlgError,
                            solve_discrete_lyapunov)
 from scipy.special import betaln, gammaln
-import warnings
-import time
-import json
-import sys
-import os
 
-sys.path.insert(0, ".")
-
-from equations import (
+from nemo.model.equations import (
     build_matrices_v3, NZ, NE,
     Y, C, INV, X, M, PI, W, I_R, RER, PO, YS,
     Q_H, B_NW, C_NW, I_D, I_L_NW, L, MC,
     E_A, E_C, E_P, E_O, E_Ys, E_rp, E_i, E_H, E_phi_h
 )
-from blanchard_kahn import solve as bk_solve
-from parameters import Parameters
+from nemo.solver.blanchard_kahn import solve as bk_solve
+from nemo.model.parameters import Parameters
 
 # sigma_A kalibreres fast — svakt identifisert
 SIGMA_A_FIXED = 0.006
@@ -387,17 +384,17 @@ def adaptive_mcmc_with_monitoring(
 if __name__ == "__main__":
 
     print("Laster data...")
-    obs_df=pd.read_csv("nemo_data_faktisk_v2.csv",index_col=0,parse_dates=True)
+    obs_df=pd.read_csv("data/processed/nemo_data_faktisk_v2.csv",index_col=0,parse_dates=True)
     pre =obs_df[obs_df.index<="2019-12-31"][OBS_NAMES].values
     post=obs_df[obs_df.index>="2022-01-01"][OBS_NAMES].values
     print(f"  Pre={len(pre)} kv  Post={len(post)} kv")
     H=build_H(); Sv=build_Sv()
 
-    # Startverdi: foretrekker posterior_v3_final.json
+    # Startverdi: foretrekker data/results/posterior_v3_final.json
     scale_init = 0.676   # fra forrige kjøring
-    if os.path.exists("posterior_v3_final.json"):
-        print("Laster startverdi fra posterior_v3_final.json...")
-        with open("posterior_v3_final.json") as f:
+    if os.path.exists("data/results/posterior_v3_final.json"):
+        print("Laster startverdi fra data/results/posterior_v3_final.json...")
+        with open("data/results/posterior_v3_final.json") as f:
             prev = json.load(f)
         summ_prev = prev['summary']
         theta_start=np.zeros(N_PARAMS); post_std=np.zeros(N_PARAMS)
@@ -445,6 +442,6 @@ if __name__ == "__main__":
         check_every=10000, max_recalib=5,
         psrf_thr=1.10, ess_pct_thr=0.02,
         scale_init=scale_init, seed=42, verbose=True,
-        save_prefix="chain_v3_v2",
+        save_prefix="data/results/chain_v3_v2",
     )
     print("\nEstimering fullfort.")

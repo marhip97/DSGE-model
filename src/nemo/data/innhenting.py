@@ -29,7 +29,7 @@ from datetime import datetime
 # ─── Konfigurasjon ─────────────────────────────────────────────────────────────
 START_YEAR   = 2001
 START_QUARTER = 1
-OUTPUT_DIR   = "."   # Endre til ønsket mappe
+OUTPUT_DIR   = "data/processed"   # Endre til ønsket mappe
 
 print("=" * 65)
 print("  NEMO FASE II — DATAINNHENTING")

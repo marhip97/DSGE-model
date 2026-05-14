@@ -16,25 +16,20 @@ Krever i samme mappe (eller tilgjengelig i Python-path):
 ================================================================================
 """
 
+import json
+import warnings
+
 import numpy as np
 import pandas as pd
-import json
-import sys
-import warnings
-import os
 from scipy.linalg import solve_discrete_lyapunov
 
-# Legg til parent-dir i sti for importering
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'model'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'solver'))
-
-from equations import (
+from nemo.model.equations import (
     build_matrices_v3, NZ, NE,
     Y, PI, I_R, RER, Q_H, B_NW, C, INV, W, L, PO, YS,
     E_A, E_C, E_P, E_O, E_Ys, E_rp, E_i, E_H
 )
-from blanchard_kahn import solve as bk_solve
-from parameters import Parameters as P
+from nemo.solver.blanchard_kahn import solve as bk_solve
+from nemo.model.parameters import Parameters as P
 
 # ── KONFIGURASJON ─────────────────────────────────────────────────────────────
 PARAM_NAMES = ['rho_A','rho_C','rho_O','rho_Ys','rho_rp','rho_H',
@@ -353,12 +348,12 @@ def print_fevd_table(fevd_pct: dict, horizons: list = [1, 4, 8, 20]):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='NEMO v3 analyse')
-    parser.add_argument('--posterior', default='chain_v3_v2_posterior.json')
-    parser.add_argument('--data',      default='nemo_data_faktisk_v2.csv')
+    parser.add_argument('--posterior', default='data/results/chain_v3_v2_posterior.json')
+    parser.add_argument('--data',      default='data/processed/nemo_data_faktisk_v2.csv')
     parser.add_argument('--n-irf',     type=int, default=20)
     parser.add_argument('--n-fevd',    type=int, default=20)
     parser.add_argument('--n-fcst',    type=int, default=16)
-    parser.add_argument('--output',    default='analyse_resultater.json')
+    parser.add_argument('--output',    default='data/results/analyse_resultater.json')
     args = parser.parse_args()
 
     print("Laster posterior...")
