@@ -59,8 +59,8 @@ def test_g0_full_rang():
 
 
 def test_modell_dimensjonskonstanter():
-    """NZ=48 og NE=13 er uendret (beskyttet mot accidentell resizing)."""
-    assert NZ == 48, f"NZ = {NZ}, forventet 48"
+    """NZ=49 (etter Alt. A: variabel kapitalutnyttelse) og NE=13."""
+    assert NZ == 49, f"NZ = {NZ}, forventet 49 (Alt. A 2026-05-15)"
     assert NE == 13, f"NE = {NE}, forventet 13"
 
 

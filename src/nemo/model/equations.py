@@ -89,9 +89,11 @@ import numpy as np
 from nemo.model.parameters import Parameters
  
 # ── Dimensjoner ───────────────────────────────────────────────────────────────
-NZ = 48
+# Alt. A (2026-05-15): NZ 48→49 — variabel kapitalutnyttelse u_t lagt til
+# (K&M 2019 Tabell 8 φ_u=0.2192 var kalibrert men ikke implementert)
+NZ = 49
 NE = 13
- 
+
 # ── Variabelindekser ─────────────────────────────────────────────────────────
 PI=0; C_W=1; C_NW=2; C=3; PIW=4; W=5; Q_H=6; H_W=7; H_NW=8
 Y=9; L=10; K=11; INV=12; MC=13; Q_K=14
@@ -102,6 +104,7 @@ K_L=29; INV_L=30; H_W_L=31; H_NW_L=32; I_R_L=33; RER_L=34; W_L=35; PI_L=36
 A=37; EPS_C=38; EPS_H=39; EPS_G=40
 YS=41; EPS_RP=42; PI_STAR=43; I_STAR=44
 EPS_PHI_H=45; EPS_PREM=46; EPS_I_ADJ=47  # siste plass: investeringssjokk
+U_K=48  # Alt. A: kapitalutnyttelse (utilization rate)
  
 # ── Sjokk-indekser ───────────────────────────────────────────────────────────
 E_A=0; E_C=1; E_H=2; E_G=3; E_O=4; E_Ys=5; E_rp=6
@@ -115,7 +118,8 @@ VAR_NAMES = [
     'g','pO',
     'k_lag','inv_lag','h_W_lag','h_NW_lag','i_R_lag','rer_lag','w_lag','pi_lag',
     'a','eps_C','eps_H','eps_G',
-    'yS','eps_rp','pi_star','i_star','eps_phi_h','eps_prem','eps_I_adj'
+    'yS','eps_rp','pi_star','i_star','eps_phi_h','eps_prem','eps_I_adj',
+    'u_K',  # Alt. A: kapitalutnyttelse
 ]
  
 SHOCK_NAMES = [
@@ -449,7 +453,11 @@ def build_matrices(p=None):
     G0[45,EPS_PHI_H]=1.0;G1[45,EPS_PHI_H]=p.rho_phi_h;Psi[45,E_phi_h]=1.0
     G0[46,EPS_PREM]=1.0; G1[46,EPS_PREM]=p.rho_prem; Psi[46,E_prem]=1.0
     G0[47,EPS_I_ADJ]=1.0;G1[47,EPS_I_ADJ]=p.rho_I;  Psi[47,E_I]=1.0
- 
+
+    # Alt. A bakoverkompatibilitet: U_K eksisterer som tilstand men er triviell
+    # i v1/v2 (settes til 0 via identitetsligning)
+    G0[U_K, U_K] = 1.0
+
     return G0, G1, Psi, Pi
  
  
@@ -683,8 +691,9 @@ def build_matrices_v3(p=None, theta_H: float = 0.05):
     G0[MC, A]    =  (1.0 + p.phi_L / (1.0 - _alpha_K))
     G0[MC, K_L]  =  _alpha_K / (1.0 - _alpha_K)  # 1-periodes lagg (K_L_t = K_{t-1})
 
-    # Ligning 14: Tobin's Q  q_K_t + i_R_t − π_t − α_K·(mc_t + y_t − k_{t-1}) − β(1-δ)·E[q_K_{t+1}] = 0
+    # Ligning 14: Tobin's Q  q_K_t + i_R_t − π_t − α_K·(mc_t + y_t − k̂_t) − β(1-δ)·E[q_K_{t+1}] = 0
     # v2-fix brukte G1[Q_K, K_L] = −α_K → K_{t-2}; rettelse: G0[Q_K, K_L] = +α_K
+    # Alt. A: r_K avhenger av effektiv kapital k̂_t = K_L_t + U_K_t, så U_K-term legges til
     G0[Q_K, :] = 0.0; G1[Q_K, :] = 0.0; Pi[Q_K, :] = 0.0
     G0[Q_K, Q_K] =  1.0
     G0[Q_K, I_R] =  1.0
@@ -692,7 +701,25 @@ def build_matrices_v3(p=None, theta_H: float = 0.05):
     G0[Q_K, MC]  = -_alpha_K
     G0[Q_K, Y]   = -_alpha_K
     G0[Q_K, K_L] = +_alpha_K                      # 1-periodes lagg (K_L_t = K_{t-1})
+    G0[Q_K, U_K] = +_alpha_K                      # Alt. A: effektiv kapital
     Pi[Q_K, Q_K] =  (1.0 - _delta)
     Pi[Q_K, PI]  = -1.0
+
+    # ── 6. Alt. A (2026-05-15): variabel kapitalutnyttelse ────────────────────
+    # Gjenoppretting av K&M (2019) §2.7-spesifikasjon. φ_u=0.2192 (Tabell 8).
+    # k̂_t = k_{t-1} + u_t (log-deviasjoner: effektiv kapital)
+    # FOC for u_t:  r_K_t = φ_u · u_t
+    # hvor r_K_t = α·MC_t + α·Y_t − α·K_L_t − α·U_K_t
+    # → (α + φ_u)·U_K = α·MC + α·Y − α·K_L
+    _phi_u = p.phi_u
+    G0[U_K, :] = 0.0; G1[U_K, :] = 0.0; Pi[U_K, :] = 0.0
+    G0[U_K, U_K] =  (_alpha_K + _phi_u)
+    G0[U_K, MC]  = -_alpha_K
+    G0[U_K, Y]   = -_alpha_K
+    G0[U_K, K_L] = +_alpha_K
+
+    # Modifisere L-ligning (10) og MC-ligning (13) til å bruke k̂ = K_L + U_K
+    G0[10, U_K] = _alpha_K / (1.0 - _alpha_K)  # produksjonsfunksjon: l avh. av k̂
+    G0[MC, U_K] = _alpha_K / (1.0 - _alpha_K)  # mc avh. av k̂
 
     return G0, G1, Psi, Pi
