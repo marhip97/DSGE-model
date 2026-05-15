@@ -627,5 +627,58 @@ def build_matrices_v3(p=None, theta_H: float = 0.05):
     G0[20, PI]    = -(1.0 - psi_R) * psi_P1   # samtid inflasjon
     G0[20, I_R_L] = -psi_R                     # 1-periodes lagg via lagg-tilstand
     Psi[20, E_i]  =  1.0
- 
+
+    # ── 5. Rettelse systemic lag-state bug (Spor A4a/A4c, 2026-05-15) ────────
+    # G1 på lagg-tilstander (K_L, INV_L, H_W_L, H_NW_L, W_L) gir 2-periodes
+    # lagg: G1[r, X_L] * X_L_{t-1} = X_L_{t-1} = X_{t-2} (feil).
+    # Rettelse: G0[r, X_L] = −koeff  →  X_L_t = X_{t-1} (korrekt 1-periodes lagg).
+    # Se docs/oppgaver/A_funn_rapport.md for full analyse.
+    _delta   = p.delta
+    _delta_H = p.delta_H  # re-bruker allerede satt delta_H
+    _phi_I1  = p.phi_I1
+    _phi_I2  = p.phi_I2
+    _alpha_K = p.alpha_K
+    _sigma_t = p.sigma + p.phi_L / (1.0 - _alpha_K)
+
+    # Ligning 5: reallønn  w_t = w_{t-1} + π_W_t − π_t
+    G0[5, :] = 0.0; G1[5, :] = 0.0
+    G0[5, W]    =  1.0
+    G0[5, PIW]  = -1.0
+    G0[5, PI]   =  1.0
+    G0[5, W_L]  = -1.0                          # 1-periodes lagg: W_L_t = W_{t-1}
+
+    # Ligning 7: h_W_t = (1−δ_H)·h_W_{t-1} + δ_H·q_H_t
+    G0[7, :] = 0.0; G1[7, :] = 0.0
+    G0[7, H_W]   =  1.0
+    G0[7, H_W_L] = -(1.0 - _delta_H)            # 1-periodes lagg
+    G0[7, Q_H]   = -_delta_H
+
+    # Ligning 8: h_NW_t = (1−δ_H)·h_NW_{t-1} + δ_H·q_H_t
+    G0[8, :] = 0.0; G1[8, :] = 0.0
+    G0[8, H_NW]    =  1.0
+    G0[8, H_NW_L]  = -(1.0 - _delta_H)          # 1-periodes lagg
+    G0[8, Q_H]     = -_delta_H
+
+    # Ligning 11: k_t = (1−δ)·k_{t-1} + δ·inv_t
+    G0[11, :] = 0.0; G1[11, :] = 0.0
+    G0[11, K]     =  1.0
+    G0[11, INV]   = -_delta
+    G0[11, K_L]   = -(1.0 - _delta)             # 1-periodes lagg
+
+    # Ligning 12: investering (Tobin's Q med justeringskostnader)
+    G0[12, :] = 0.0; G1[12, :] = 0.0; Psi[12, :] = 0.0; Pi[12, :] = 0.0
+    G0[12, INV]   =  1.0
+    G0[12, Q_K]   = -1.0 / _phi_I1
+    G0[12, INV_L] = -(_phi_I1 / (_phi_I1 + _phi_I2))  # 1-periodes lagg
+    Pi[12, INV]   =  _phi_I2 / (_phi_I1 + _phi_I2)
+    Psi[12, E_I]  =  1.0
+
+    # Ligning 13: marginal kostnad  mc_t = σ̃·y_t − (1+φ_L/(1-α))·a_t − α/(1-α)·k_{t-1}
+    # (v2-fix brukte G1[MC, K_L] = −α/(1-α) → K_{t-2}; rettelse: G0[MC, K_L] = +α/(1-α))
+    G0[MC, :] = 0.0; G1[MC, :] = 0.0
+    G0[MC, MC]   =  1.0
+    G0[MC, Y]    = -_sigma_t
+    G0[MC, A]    =  (1.0 + p.phi_L / (1.0 - _alpha_K))
+    G0[MC, K_L]  =  _alpha_K / (1.0 - _alpha_K)  # 1-periodes lagg (K_L_t = K_{t-1})
+
     return G0, G1, Psi, Pi
