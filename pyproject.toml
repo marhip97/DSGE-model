@@ -40,6 +40,10 @@ dashboard = [
     "jinja2>=3.1",
 ]
 
+viz = [
+    "matplotlib>=3.8,<4.0",
+]
+
 [project.scripts]
 nemo = "nemo.__main__:main"
 
