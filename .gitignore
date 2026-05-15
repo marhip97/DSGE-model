@@ -32,6 +32,9 @@ htmlcov/
 # NEMO-data
 data/raw/
 
+# Store MCMC-kjeder (binærfiler — ikke commit, for store for git)
+data/results/*.npy
+
 # Referanse-PDF-er (offentlige dokumenter, ikke en del av prosjektets leveranser)
 docs/references/*.pdf
 

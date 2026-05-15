@@ -1,0 +1,24 @@
+{
+  "n_production": 20000,
+  "burnin": 5000,
+  "acc_rate": 0.2682,
+  "final_scale": 0.43581929876994113,
+  "n_recalibrations": 2,
+  "recalib_log": [
+    {
+      "round": 0,
+      "psrf_max": 2.8722717114060243,
+      "ess_min": 6.616241673866892,
+      "scale_new": 1.4633351894037994
+    },
+    {
+      "round": 1,
+      "psrf_max": 2.6528261853740216,
+      "ess_min": 8.46761685685737,
+      "scale_new": 1.7764620751106959
+    }
+  ],
+  "psrf_final": 1.214790869034594,
+  "sigma_A_fixed": 0.006,
+  "ess_min": 34.79535999470534
+}
