@@ -89,6 +89,10 @@ PARAM_PRIORS = {
     'psi_R':   ('beta',   4.0, 2.0,  0.30, 0.990),
     'psi_P1':  ('normal', 0.29, 0.10, 0.05, 1.50),
     'psi_Y':   ('normal', 0.24, 0.05, 0.01, 0.80),
+    # NB Trinn 1-funn (2026-05-15): h_c < 0.92 → BK-ustabil med K&M-verdier.
+    # Alt. B (prior-relaksering) er derfor ikke en mulig løsning på TFP→BNP-bug.
+    # Strukturell endring (Alt. A: variabel kapitalutnyttelse) er nødvendig.
+    # Se: docs/trinn1_hc_diagnose.md
     'h_c':     ('beta',   4.0, 1.5,  0.30, 0.9995),
     # Fase 2 (2026-05-15): Inv.-justeringskost estimeres nå etter A4a-fix
     'phi_I1':  ('normal', 4.0,  2.0, 0.5,  20.0),
