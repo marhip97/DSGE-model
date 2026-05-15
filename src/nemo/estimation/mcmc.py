@@ -90,6 +90,9 @@ PARAM_PRIORS = {
     'psi_P1':  ('normal', 0.29, 0.10, 0.05, 1.50),
     'psi_Y':   ('normal', 0.24, 0.05, 0.01, 0.80),
     'h_c':     ('beta',   4.0, 1.5,  0.30, 0.9995),
+    # Fase 2 (2026-05-15): Inv.-justeringskost estimeres nå etter A4a-fix
+    'phi_I1':  ('normal', 4.0,  2.0, 0.5,  20.0),
+    'phi_I2':  ('normal', 8.0,  4.0, 0.5,  40.0),
 }
 PARAM_NAMES = list(PARAM_PRIORS.keys())
 N_PARAMS    = len(PARAM_NAMES)
@@ -102,7 +105,7 @@ KM = {'rho_A':0.804,'rho_C':0.725,'rho_O':0.874,'rho_Ys':0.783,
       'rho_rp':0.737,'rho_H':0.694,'sigma_C':0.030,
       'sigma_O':0.079,'sigma_Ys':0.011,'sigma_rp':0.006,'sigma_i':0.0003,
       'sigma_P':0.003,'sigma_H':0.050,'psi_R':0.666,'psi_P1':0.292,
-      'psi_Y':0.242,'h_c':0.938}
+      'psi_Y':0.242,'h_c':0.938,'phi_I1':4.0,'phi_I2':8.0}
 
 def log_prior(theta):
     lp = 0.0
@@ -249,7 +252,10 @@ def adaptive_mcmc_with_monitoring(
 
     rng=np.random.default_rng(seed); N=N_PARAMS
     scale=scale_init; post_std=post_std_init.copy()
+    # Start med diagonal proposal; bytt til empirisk kovarians etter burn-in
+    # (Haario adaptive Metropolis — fanger sigma_C/h_c-korrelasjon automatisk)
     C_prop=np.diag((scale*2.38/np.sqrt(N)*post_std)**2+1e-12)
+    use_empirical_cov=False  # settes True etter burn-in
     theta=theta_init.copy()
     lp_cur=log_posterior(theta,H,Sv,Y_pre,Y_post)
     if not np.isfinite(lp_cur):
@@ -275,7 +281,13 @@ def adaptive_mcmc_with_monitoring(
                 elif rate>0.32: scale*=1.20
                 elif rate>0.28: scale*=1.10
                 scale=float(np.clip(scale,0.005,10.0))
-                C_prop=np.diag((scale*2.38/np.sqrt(N)*post_std)**2+1e-12)
+                if use_empirical_cov and i+1>=2*adapt_every:
+                    # Empirisk kovarians fra siste segment (Haario AM)
+                    seg=ch[max(0,i+1-5000):i+1]
+                    C_emp=np.cov(seg.T)+1e-10*np.eye(N)
+                    C_prop=(scale*2.38)**2/N*C_emp
+                else:
+                    C_prop=np.diag((scale*2.38/np.sqrt(N)*post_std)**2+1e-12)
             if monitor and (i+1)%check_every==0:
                 ok,pmax,emin,_=check_convergence(ch[:i+1],psrf_thr,ess_pct_thr)
                 rem=(time.time()-t0)/(i+1)*(n_steps-i-1)
@@ -306,6 +318,27 @@ def adaptive_mcmc_with_monitoring(
     ch_bi,_,acc_bi=_run(burnin,"BURN-IN",adapt=True)
     if verbose: print(f"  Ferdig. acc={acc_bi:.3f}  scale={scale:.4f}")
 
+    # Aktiver empirisk kovariansproposal — fanger korrelasjoner (sigma_C/h_c)
+    # NB: Reset scale=1.0 siden empirisk cov allerede enkoder posterior-størrelse
+    # (Haario et al. 2001: C_prop = 2.38²/N · Σ, scale-tuning gjøres deretter)
+    use_empirical_cov=True
+    scale=1.0
+    C_emp_init=np.cov(ch_bi[-min(burnin,5000):].T)+1e-10*np.eye(N)
+    C_prop=(scale*2.38)**2/N*C_emp_init
+    if verbose:
+        # Vis sterkeste korrelasjoner i empirisk C
+        D=np.sqrt(np.diag(C_emp_init))
+        R_emp=C_emp_init/np.outer(D,D)
+        idx=np.argsort(np.abs(R_emp).flatten())[::-1]
+        print(f"  Empirisk kovarians aktivert. Sterkeste korrelasjoner:")
+        seen=set()
+        for k in idx[:20]:
+            i,j=k//N,k%N
+            if i==j or (j,i) in seen: continue
+            seen.add((i,j))
+            if len(seen)>3: break
+            print(f"    {PARAM_NAMES[i]:10s} ↔ {PARAM_NAMES[j]:10s}: r={R_emp[i,j]:+.3f}")
+
     if verbose: print(f"\n--- FASE 2: Konvergensovervåkning ---")
     monitor_ch=ch_bi.copy(); n_recalib=0
 
@@ -323,7 +356,10 @@ def adaptive_mcmc_with_monitoring(
         actual_std=np.where(actual_std<1e-8,post_std_init,actual_std)
         scale=float(np.clip(scale*3.0,0.01,10.0))
         post_std=actual_std.copy()
-        C_prop=np.diag((scale*2.38/np.sqrt(N)*post_std)**2+1e-12)
+        # Empirisk kovarians fra siste segment av monitor_ch
+        seg=monitor_ch[-min(5000,len(monitor_ch)):]
+        C_emp=np.cov(seg.T)+1e-10*np.eye(N)
+        C_prop=(scale*2.38)**2/N*C_emp
         n_recalib+=1
         recalib_log.append({'round':rd,'psrf_max':float(pmax),
                             'ess_min':float(emin),'scale_new':float(scale)})
@@ -403,7 +439,9 @@ if __name__ == "__main__":
                 theta_start[i] = summ_prev[name]['mean']
                 post_std[i]    = max(summ_prev[name]['std'], 1e-4)
             else:
-                theta_start[i] = KM.get(name,0.5); post_std[i]=0.05
+                theta_start[i] = KM.get(name,0.5)
+                # Parameter-spesifikke startstandardavvik (Fase 2)
+                post_std[i] = {'phi_I1':1.0,'phi_I2':2.0}.get(name,0.05)
         scale_init = prev.get('final_scale', 0.676)
         print(f"  Startscale fra forrige kjøring: {scale_init:.4f}")
 
