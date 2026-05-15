@@ -319,7 +319,10 @@ def adaptive_mcmc_with_monitoring(
     if verbose: print(f"  Ferdig. acc={acc_bi:.3f}  scale={scale:.4f}")
 
     # Aktiver empirisk kovariansproposal — fanger korrelasjoner (sigma_C/h_c)
+    # NB: Reset scale=1.0 siden empirisk cov allerede enkoder posterior-størrelse
+    # (Haario et al. 2001: C_prop = 2.38²/N · Σ, scale-tuning gjøres deretter)
     use_empirical_cov=True
+    scale=1.0
     C_emp_init=np.cov(ch_bi[-min(burnin,5000):].T)+1e-10*np.eye(N)
     C_prop=(scale*2.38)**2/N*C_emp_init
     if verbose:
