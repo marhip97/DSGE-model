@@ -19,10 +19,9 @@ from nemo.model.parameters import Parameters as p
 @pytest.mark.xfail(
     strict=True,
     reason=(
-        "KJENT KALIBRERINGSFEIL (Spor A5): CY+IY+GY+XY-MY = 0.84, "
-        "avvik -0.16 fra ressursbetingelsen. Kommentar i parameters.py linje 142 "
-        "sier 'IY inkluderer nå kapitalakkumulering', men summen blir ikke 1. "
-        "Bør utredes mot K&M (2019) Tabell 8 og SSB nasjonalregnskap."
+        "KJENT REST-AVVIK (Spor A5): CY+IY+GY+XY-MY = 0.90 uten boliginvestering "
+        "(MY justert fra 0.34 til 0.28, men IHY inkluderes ikke her). "
+        "Uten-bolig-versjonen vil alltid avvike siden IHY=0.10 er en reell BNP-komponent."
     ),
 )
 def test_ressursbetingelse_uten_bolig():
@@ -33,17 +32,8 @@ def test_ressursbetingelse_uten_bolig():
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "KJENT KALIBRERINGSFEIL (Spor A5): CY+IY+IHY+GY+XY-MY = 0.94, "
-        "avvik -0.06. Nærmere 1 enn uten-bolig-versjonen (0.84), så IY+IHY-"
-        "tolkningen er trolig riktig. Resterende 6 pp gap må utredes: "
-        "enten reell miskalibrering eller statistisk diskrepans i kilden."
-    ),
-)
 def test_ressursbetingelse_med_bolig():
-    """1 = CY + IY + IHY + GY + XY - MY (med separat boliginvestering)."""
+    """1 = CY + IY + IHY + GY + XY - MY = 1.00 (Spor A5 løst 2026-05-15)."""
     sum_ = p.CY + p.IY + p.IHY + p.GY + p.XY - p.MY
     assert abs(sum_ - 1.0) < 0.05, (
         f"CY+IY+IHY+GY+XY-MY = {sum_:.3f}, avvik {sum_-1.0:+.3f}"

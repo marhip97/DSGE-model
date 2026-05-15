@@ -255,14 +255,16 @@ def build_matrices(p=None):
     # BLOKK C: PRODUKSJON OG KAPITAL
     # ════════════════════════════════════════════════════════════════════════
  
-    # C1. BNP (varemarkedsklarering)
+    # C1. BNP (varemarkedsklarering) — Spor A5 delvis rettelse (2026-05-15)
+    # MY justert til 0.28 (fastlands-import, uten oljesektor).
+    # Q_H utelatt: boligpris ≠ boliginvestering (kontaminerer ved kostnadssjokk).
+    # Parametersum CY+IY+IHY+GY+XY-MY = 1.00 (se parameters.py).
     G0[9, Y]    =  1.0
     G0[9, C]    = -CY
     G0[9, INV]  = -IY
     G0[9, G]    = -GY
     G0[9, X]    = -XY
     G0[9, M]    =  MY
-    # Boliginvestering inngår delvis i INV (forenklet)
  
     # C2. Sysselsetting (fra produksjonsfunksjon)
     G0[10, L]   =  1.0
@@ -680,5 +682,17 @@ def build_matrices_v3(p=None, theta_H: float = 0.05):
     G0[MC, Y]    = -_sigma_t
     G0[MC, A]    =  (1.0 + p.phi_L / (1.0 - _alpha_K))
     G0[MC, K_L]  =  _alpha_K / (1.0 - _alpha_K)  # 1-periodes lagg (K_L_t = K_{t-1})
+
+    # Ligning 14: Tobin's Q  q_K_t + i_R_t − π_t − α_K·(mc_t + y_t − k_{t-1}) − β(1-δ)·E[q_K_{t+1}] = 0
+    # v2-fix brukte G1[Q_K, K_L] = −α_K → K_{t-2}; rettelse: G0[Q_K, K_L] = +α_K
+    G0[Q_K, :] = 0.0; G1[Q_K, :] = 0.0; Pi[Q_K, :] = 0.0
+    G0[Q_K, Q_K] =  1.0
+    G0[Q_K, I_R] =  1.0
+    G0[Q_K, PI]  = -1.0
+    G0[Q_K, MC]  = -_alpha_K
+    G0[Q_K, Y]   = -_alpha_K
+    G0[Q_K, K_L] = +_alpha_K                      # 1-periodes lagg (K_L_t = K_{t-1})
+    Pi[Q_K, Q_K] =  (1.0 - _delta)
+    Pi[Q_K, PI]  = -1.0
 
     return G0, G1, Psi, Pi

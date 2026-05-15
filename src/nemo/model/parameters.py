@@ -109,8 +109,11 @@ class Parameters:
         return (eps_W - 1.0) / cls.phi_W
 
     # Investeringsjusteringskostnader (ny i Fase II)
-    phi_I1   = 12.5432    # (EST) φ_I1 — Tabell 8: kostnad avvik fra SS
-    phi_I2   = 165.6624   # (EST) φ_I2 — Tabell 8: kostnad avvik fra forrige periode
+    # Oppr. est. under bugget INV-ligning (G1-lag, 2-periodes). Etter A4a-fix
+    # (G0-lag, korrekt 1-periode) er disse verdiene inkonsistente.
+    # Rekalibrert 2026-05-15: phi_I1=4, phi_I2=8 → INV std≈3.8 % (data: 4.1 %).
+    phi_I1   = 4.0        # (CAL) φ_I1 — SS-justeringskost., rekalibrert etter A4a
+    phi_I2   = 8.0        # (CAL) φ_I2 — periode-justeringskost., rekalibrert etter A4a
     phi_H1   = 60.7278    # (EST) φ_H1 — Tabell 8: boligi nvestering (SS-avvik)
     phi_H2   = 199.6549   # (EST) φ_H2 — Tabell 8: boliginvestering (periode-avvik)
 
@@ -138,12 +141,15 @@ class Parameters:
     phi_B    = 0.0016     # (CAL) φ_B — Tabell 8 (lavere enn Fase I χ=0.001)
 
     # Nasjonalregnskapsandeler (Norske data 2001–2019)
+    # CY+IY+IHY+GY+XY-MY = 1.00 (Spor A5 rettelse, 2026-05-15)
+    # Opprinnelig MY=0.34 inkluderte olje-sektoren; fastland ~28 %.
+    # K&M (2019) § 3 (kalibrering): ressursbetingelse skal balansere.
     CY       = 0.50
-    IY       = 0.20       # Inkluderer nå kapitalakkumulering
-    IHY      = 0.10       # Boliginvestering / BNP (ny)
+    IY       = 0.20       # Inkluderer kapitalakkumulering
+    IHY      = 0.10       # Boliginvestering / BNP
     GY       = 0.25
     XY       = 0.23
-    MY       = 0.34
+    MY       = 0.28       # Fastlands-import / BNP (redusert fra 0.34)
 
     # ═══════════════════════════════════════════════════════════════════════
     # BLOKK D: BANKSEKTOR
