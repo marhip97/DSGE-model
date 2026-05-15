@@ -64,7 +64,67 @@ spread-inntekt-koblingen blir reell.
 
 ---
 
-## A4b — Mimicking rule: bakover- vs. fremoverskuende inflasjon (linje 357)
+## A4b — IMPLEMENTERT (2026-05-15): Mimicking rule samtid π OG lagg-tilstand-fiks
+
+**Status:** ✅ Implementert i `build_matrices_v3` etter PE-godkjenning.
+
+**Endring 1 (opprinnelig A4b):** `G1[20, PI_L]` → `G0[20, PI]` — samtid π i stedet for π_{t-1}.
+
+**Endring 2 (avdekket under implementering):** `G1[20, I_R_L] = psi_R` → `G0[20, I_R_L] = -psi_R`.
+
+Da endring 1 ble implementert isolert, viste B5-benchmarken **ingen** effekt. Diagnose av
+T-matrisen avdekket at `T[I_R, I_R] = 0` — rentepersistensen var ikke der.
+
+**Rotårsak:** I tilstandsrom-formuleringen `z_t = T z_{t-1} + R ε_t` representerer
+G1-koeffisienter avhengighet av `z_{t-1}`. Lagg-tilstanden `I_R_L(t)` defineres som
+`I_R(t-1)` via identitet i rad 33. Dermed gir `G1[20, I_R_L] * I_R_L_{t-1} = G1[20, I_R_L] * I_R(t-2)`
+— et **2-periodes etterslep**, ikke 1.
+
+Resultatet var en 2-periodes oscillasjon i rentestien: q1=+25bp, q2≈0, q3=+24bp, q4≈0, ...
+Når B5 målte ved q4, q8, q12 (alle "tomme" kvartaler), fremstod rentestien som å være død.
+
+**Korrekt bruk:** `G0[20, I_R_L] = -psi_R` refererer `I_R_L(t)` ved samme tidspunkt,
+som via identiteten er `I_R(t-1)` — det riktige 1-periodes etterslepet.
+
+**Effekt på B5-benchmark:**
+
+| Variabel | Før (q4) | Etter (q4) | NB Memo (q4) |
+|----------|---------:|-----------:|-------------:|
+| Rente    | 0.000    | **+0.875** | +0.600       |
+| BNP-gap  | +0.014   | **-0.220** | -0.450       |
+| KPI-infl.| 0.000    | **-0.036** | -0.150       |
+| RER      | -0.003   | **-0.918** | -0.400       |
+
+Alle fire variablene har nå riktig fortegn og persistens. Nivåfeilene som gjenstår
+(rente for høy, RER 2× for stor) peker direkte på psi_R-estimatet (trolig oppjustert
+for å kompensere for buggy persistens) og sigma_rp.
+
+**Endring beholdt kun i v3** (`build_matrices_v3`) for å unngå BK-instabilitet i v1/v2
+ved default psi_R=0.666 (rett på stabilitetsgrensen). Siden v3 er produksjonsversjonen
+brukt i `mcmc.py`, er dette tilstrekkelig.
+
+---
+
+## VIKTIG SYSTEMISK FUNN (ny, 2026-05-15)
+
+Samme bug-mønster (G1 på lagg-tilstand) finnes i flere ligninger i v1/v2/v3:
+
+| Ligning | G1-bruk | Antatt feil-tolkning |
+|---------|---------|----------------------|
+| Row 5 (W, reallønn) | `G1[5, W_L] = 1.0` | W(t-2) i stedet for W(t-1) |
+| Row 7 (H_W, bolig sparere) | `G1[7, H_W_L] = (1-δ_H)` | H_W(t-2) |
+| Row 8 (H_NW, bolig låntakere) | `G1[8, H_NW_L] = (1-δ_H)` | H_NW(t-2) |
+| Row 11 (K, kapital) | `G1[11, K_L] = (1-δ)` | K(t-2) |
+| Row 12 (INV) | `G1[12, INV_L] = ...` | INV(t-2) |
+
+Ingen av disse er fikset i denne PR-en — krever separat granskning og PE-godkjenning.
+Anbefales tatt som egen oppgave i Spor A før Fase 2.
+
+---
+
+## A4b (opprinnelig analyse, beholdt for sporing)
+
+### Funn
 
 ### Funn
 

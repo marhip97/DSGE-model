@@ -350,6 +350,8 @@ def build_matrices(p=None):
     # i_R = ψ_R·i_R_{t-1} + (1-ψ_R)·[ψ_P1·E[π_{t+4}] + ψ_Y·y + ψ_S·rer + ψ_W·π_W] + ε_i
     # Fase II-implementering: bruker π_{t-1} (lagg) for ψ_P1-leddet i første iterasjon
     # Fremoverskuende π: E[π_{t+4}] ≈ ψ_P1·π_t (forenkling for BK-løsning)
+    # NB: Denne v1-versjonen er bevart for å holde BK-stabilitet ved default psi_R=0.666.
+    # v3 (build_matrices_v3) overstyrer med den korrigerte mimicking rule fra Spor A4b.
     G0[20, I_R]    =  1.0
     G0[20, Y]      = -(1.0 - psi_R) * psi_Y
     G0[20, RER]    = -(1.0 - psi_R) * psi_S
@@ -608,18 +610,22 @@ def build_matrices_v3(p=None, theta_H: float = 0.05):
     G0[8, Q_H]     = -delta_H
  
     # ── 4. Oppdater mimicking rule med estimerte parametere ───────────────────
-    # Ligning 20: i_R = ψ_R·i_{t-1} + (1-ψ_R)·[ψ_P1·π_{t-1} + ψ_Y·y + ψ_S·rer] + ε_i
+    # Ligning 20: i_R = ψ_R·i_{t-1} + (1-ψ_R)·[ψ_P1·π_t + ψ_Y·y + ψ_S·rer] + ε_i
+    # Spor A4b (2026-05-15):
+    #   1) samtid π (G0[20, PI]) i stedet for π_{t-1}
+    #   2) G0[20, I_R_L] = -psi_R i stedet for G1[20, I_R_L] = psi_R
+    #      (G1-bruken ga 2-periodes oscillasjon)
     psi_R  = p.psi_R
     psi_P1 = p.psi_P1
     psi_Y  = p.psi_Y
     psi_S  = p.psi_S
- 
+
     G0[20, :] = 0.0; G1[20, :] = 0.0; Psi[20, :] = 0.0
     G0[20, I_R]   =  1.0
     G0[20, Y]     = -(1.0 - psi_R) * psi_Y
     G0[20, RER]   = -(1.0 - psi_R) * psi_S
-    G1[20, I_R_L] =  psi_R
-    G1[20, PI_L]  =  (1.0 - psi_R) * psi_P1
+    G0[20, PI]    = -(1.0 - psi_R) * psi_P1   # samtid inflasjon
+    G0[20, I_R_L] = -psi_R                     # 1-periodes lagg via lagg-tilstand
     Psi[20, E_i]  =  1.0
  
     return G0, G1, Psi, Pi
