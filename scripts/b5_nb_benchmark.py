@@ -14,9 +14,8 @@ Output:
   - data/results/B5_nb_benchmark.png:  4-panels figur (BNP, KPI, Rente, RER)
   - data/results/B5_avvik_tabell.md:   markdown-tabell med avvik
 
-NB: Bruker Gaussian-approksimering av posterior fordi
-data/results/chain_v3_v2_posterior.json bare inneholder summary-statistikk.
-Full posteriorkorrelasjon krever ny MCMC-kjøring (PE-godkjenning).
+Fase 2v2: Bruker reelle posteriortrekk fra chain_fase2v2_prod.npy (100k trekk, 20 param).
+Usikkerhetsbånd basert på 500 tilfeldig utvalgte trekk fra kjeden.
 """
 
 from __future__ import annotations
@@ -174,12 +173,12 @@ def plot_irf(punkt: np.ndarray, baand: dict[str, np.ndarray], ut_sti: Path) -> N
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     rot = Path(__file__).resolve().parents[1]
-    posterior_sti = rot / "data" / "results" / "chain_v3_v2_posterior.json"
+    posterior_sti = rot / "data" / "results" / "chain_fase2v2_prod_posterior.json"
+    kjede_sti     = rot / "data" / "results" / "chain_fase2v2_prod.npy"
     ut_dir = rot / "data" / "results"
 
     summary = les_posterior(posterior_sti)
     theta_mean = np.array([summary[n]["mean"] for n in PARAM_NAMES])
-    theta_std  = np.array([summary[n]["std"]  for n in PARAM_NAMES])
 
     logger.info("Steg 1/3 — Punkt-estimat (posterior mean)")
     irf_mean = lag_irf(theta_mean)
@@ -187,22 +186,22 @@ def main() -> None:
         raise RuntimeError("BK-feil ved posterior mean — kan ikke fortsette")
     punkt = normaliser_til_1pp(irf_mean)
 
-    logger.info("Steg 2/3 — Usikkerhetsbånd (Gaussian approks., %d trekk)", N_SAMPLES)
+    logger.info("Steg 2/3 — Usikkerhetsbånd (%d trekk fra kjeden)", N_SAMPLES)
+    kjede = np.load(kjede_sti)  # (100000, 20)
     rng = np.random.default_rng(2024)
+    idx = rng.choice(len(kjede), size=N_SAMPLES * 4, replace=False)
     samples_norm: list[np.ndarray] = []
     avvist = 0
-    while len(samples_norm) < N_SAMPLES:
-        theta = rng.normal(theta_mean, theta_std)
-        # Klipp til priorbegrensninger (forenklet)
-        theta = np.clip(theta, 1e-6, 0.9994)
+    for i in idx:
+        if len(samples_norm) >= N_SAMPLES:
+            break
+        theta = kjede[i]
         irf = lag_irf(theta)
         if irf is None:
             avvist += 1
-            if avvist > N_SAMPLES * 4:
-                raise RuntimeError(f"For mange BK-feil ({avvist}) — sjekk prior")
             continue
         samples_norm.append(normaliser_til_1pp(irf))
-    logger.info("  %d trekk akseptert, %d avvist (BK-feil)", N_SAMPLES, avvist)
+    logger.info("  %d trekk akseptert, %d avvist (BK-feil)", len(samples_norm), avvist)
 
     baand = baand_fra_samples(samples_norm)
 
@@ -221,19 +220,19 @@ def main() -> None:
         "p95":           baand["p95"].tolist(),
         "nb_referanse":  NB_FIGUR1,
         "meta": {
-            "n_samples":   N_SAMPLES,
+            "n_samples":   len(samples_norm),
             "n_avvist":    avvist,
             "shock_size":  SHOCK_SIZE,
             "normalisert": "+1 pp toppunkt I_R",
             "posterior":   posterior_sti.name,
-            "merknad":     "Gaussian approks. av posterior — ignorerer korrelasjon",
+            "merknad":     "Reelle posteriortrekk fra chain_fase2v2_prod.npy (100k, 20 param)",
         },
     }
     json_sti.write_text(json.dumps(resultat, indent=2))
     md_sti.write_text(
         "# B5 — Avvik mot NB Memo 3/2024 Figur 1\n\n"
         "Pengepolitikkssjokk, normalisert til +1 pp toppunkt i styringsrenten.\n"
-        "Vår modell = posterior mean fra `chain_v3_v2_posterior.json`.\n\n"
+        f"Vår modell = posterior mean fra `{posterior_sti.name}` (Fase 2v2, NZ=49, 20 param).\n\n"
         + tabell + "\n"
     )
 
