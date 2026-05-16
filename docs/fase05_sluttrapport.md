@@ -1,8 +1,8 @@
 # Fase 0.5 — Sluttrapport: Modellkvalitetssikring
 
-**Dato:** 2026-05-15  
-**Status:** Under avslutning  
-**Neste fase:** Fase 1 (datainnhenting) og Fase 2 (reestimering med blokksampling)
+**Dato:** 2026-05-15 (oppdatert 2026-05-16)  
+**Status:** Fullført — alle leveranser levert  
+**Neste fase:** Fase 1 (datainnhenting) og Fase 2 (reestimering med blokksampling, se C5)
 
 ---
 
@@ -93,15 +93,51 @@ Identifikasjonsstyrke og H1–H4-vurdering for h_c og psi_R:
 
 ---
 
+## Tilleggsresultater (2026-05-16)
+
+### Fase 2v2 — NZ=49, phi_u estimert (PR #25, #26)
+
+Ny MCMC-kjøring (100k trekk, 54 min) med 20 parametre inkl. `phi_u` (kapitalutnyttelse):
+
+| Parameter | K&M | Fase 2v2 | Merknad |
+|-----------|-----|----------|---------|
+| `phi_u` | 0.219 | **0.704** | Data-drevet, 3× K&M |
+| `h_c` | — | 0.987 | Fortsatt ved priorbegrensning |
+| `sigma_rp` | 0.006 | 0.016 | Vedvarende overestimering |
+| max PSRF | — | 1.118 | Marginalt over 1.10 |
+| ESS/n min | — | 0.21% | Godt under 2%-krav |
+
+B5-benchmark oppdatert med Fase 2v2 posterior: BNP q4/q8 er rimelig, men
+rente-persistens og RER-respons er fortsatt dobbelt for stor.
+
+### C4 — sigma_A sterkt identifisert (2026-05-16)
+
+Log-posterior-grid over (sigma_A, rho_A) viser:
+- sigma_A=0.006→0.015 gir Δlp=+76 — **K&M-kalibrasjon er bindende og suboptimal**
+- rho_A variasjon gir Δlp<17 — svakt identifisert (bekrefter C7)
+- rho_A=0.186 (mot K&M 0.804) er sannsynligvis artefakt av fast lav sigma_A
+
+**Anbefaling:** Fristille sigma_A i Fase 2, prior N(0.010, 0.004). Krever PE-godkjenning.
+
+### C5 — Fase 2 designdokument fullført (2026-05-16)
+
+`docs/oppgaver/C5_fase2_design.md` forhåndsregistrerer alle Fase 2-valg:
+blokksampling {sigma_C, h_c}, logit-reparametrisering, trangere sigma_rp-prior.
+Ingen endringer tillatt etter Fase 2 er startet.
+
+---
+
 ## Åpne spørsmål til PE
 
 Følgende krever eksplisitt PE-godkjenning før handling:
 
 | # | Spørsmål | Begrunnelse |
 |---|----------|-------------|
-| 1 | **Spor C3: Reestimering med sigma_rp=0.006 (fast)** | Vil avklare H3. ~2 timer MCMC. |
+| 1 | ~~**Spor C3: Reestimering med sigma_rp=0.006 (fast)**~~ | ✅ Gjennomført — H3 støttes |
 | 2 | **Spor A4a/A4c: Rette bank- og LTV-likninger** | Retter 5 systemic lag-state bugs (rader 5,7,8,11,12) + LTV-fortegn |
-| 3 | **Prior-utvidelse h_c og psi_R** | Basert på C2-konklusjon. Avhenger av C3-resultat. |
+| 3 | **Prior-utvidelse h_c og psi_R** | Logit-reparametrisering i Fase 2, ingen prior-utvidelse foreløpig |
+| 4 | **Fristille sigma_A** (N_PARAMS→21) | C4: data vil ha sigma_A≈0.010–0.015, Δlp=+76 |
+| 5 | **HMC-bytte** | Dersom blokksampling ikke gir ESS/n>0.02 etter Fase 2 |
 
 ---
 
@@ -150,3 +186,7 @@ xfail-tester og deres eskaleringsreferanse:
 - `data/results/C8_acf_rapport.md` — mixing-diagnose, ACF, IAT, korrelasjon
 - `data/results/C2_C7_rapport.md` — prior vs. posterior, H1–H4, identifikasjon
 - `docs/MODEL.md` — komplett modellbeskrivelse
+- `data/results/C4_rapport.md` — sigma_A identifikasjonsvurdering
+- `docs/oppgaver/C5_fase2_design.md` — forhåndsregistrert Fase 2-design
+- `data/results/chain_fase2v2_prod_posterior.json` — NZ=49 posterior (20 param)
+- `docs/D_modellfit_fase2v2.md` — Fase 2v2 analyserapport
