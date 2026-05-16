@@ -19,3 +19,66 @@ Start lp = 3575.81
   [   5000/20000] acc=0.249  lp=3558.8  scale=0.4498  gjenstår≈4.8min  [BURN-IN]
   [  10000/20000] acc=0.244  lp=3564.4  scale=0.3429  gjenstår≈3.2min  [BURN-IN]
   [  15000/20000] acc=0.248  lp=3553.3  scale=0.3887  gjenstår≈1.6min  [BURN-IN]
+  [  20000/20000] acc=0.253  lp=3556.4  scale=0.5245  gjenstår≈0.0min  [BURN-IN]
+  Ferdig. acc=0.253  scale=0.5245
+  Empirisk kovarians aktivert. Sterkeste korrelasjoner:
+
+--- FASE 2: Konvergensovervåkning ---
+
+  Sjekk runde 0: IKKE OK — PSRF=1.894, ESS=21
+  Problemer: ['rho_A', 'rho_C', 'rho_O', 'rho_Ys', 'rho_rp', 'rho_H']
+  Rekalibrering 1: scale→3.0000. Ekstra burn-in (10,000 trekk)...
+  [   5000/10000] acc=0.377  lp=3556.6  scale=1.0454  gjenstår≈3.1min  [REKALIB-1]
+  [  10000/10000] acc=0.431  lp=3561.3  scale=0.9200  gjenstår≈0.0min  [REKALIB-1]
+  Ekstra burn-in ferdig. acc=0.216
+
+  Sjekk runde 1: IKKE OK — PSRF=1.270, ESS=22
+  Problemer: ['rho_A', 'rho_C', 'rho_O', 'rho_Ys', 'rho_rp', 'rho_H']
+  Rekalibrering 2: scale→2.7600. Ekstra burn-in (10,000 trekk)...
+  [   5000/10000] acc=0.393  lp=3563.0  scale=0.8464  gjenstår≈2.9min  [REKALIB-2]
+  [  10000/10000] acc=0.432  lp=3557.9  scale=0.9012  gjenstår≈0.0min  [REKALIB-2]
+  Ekstra burn-in ferdig. acc=0.216
+
+  Sjekk runde 2: IKKE OK — PSRF=1.119, ESS=43
+  Problemer: ['rho_A', 'rho_C', 'rho_O', 'rho_Ys', 'rho_rp', 'rho_H']
+  Rekalibrering 3: scale→2.7037. Ekstra burn-in (10,000 trekk)...
+  [   5000/10000] acc=0.427  lp=3566.0  scale=0.9422  gjenstår≈3.0min  [REKALIB-3]
+  [  10000/10000] acc=0.453  lp=3563.2  scale=0.8828  gjenstår≈0.0min  [REKALIB-3]
+  Ekstra burn-in ferdig. acc=0.226
+
+  Sjekk runde 3: IKKE OK — PSRF=1.151, ESS=37
+  Problemer: ['rho_A', 'rho_C', 'rho_O', 'rho_Ys', 'rho_rp', 'rho_H']
+  Maks rekalibreringer nådd. Fortsetter.
+
+--- FASE 3: Produksjonskjøring (200,000 trekk) ---
+  Endelig scale: 0.8828
+  [   5000/200000] acc=0.518  lp=3554.5  scale=0.8828  gjenstår≈121.3min  [PROD]
+  [  10000/200000] acc=0.516  lp=3554.2  scale=0.8828  gjenstår≈116.7min  [PROD]
+  [  15000/200000] acc=0.505  lp=3561.9  scale=0.8828  gjenstår≈115.0min  [PROD]
+  [  20000/200000] acc=0.495  lp=3564.5  scale=0.8828  konv=PSRF=1.12 ESS=32  gjenstår≈113.1min
+  [  25000/200000] acc=0.484  lp=3561.1  scale=0.8828  gjenstår≈109.7min  [PROD]
+  [  30000/200000] acc=0.481  lp=3563.7  scale=0.8828  gjenstår≈105.2min  [PROD]
+  [  35000/200000] acc=0.476  lp=3564.3  scale=0.8828  gjenstår≈100.9min  [PROD]
+  [  40000/200000] acc=0.479  lp=3561.6  scale=0.8828  konv=PSRF=1.06 ESS=69  gjenstår≈97.5min
+  [  45000/200000] acc=0.477  lp=3564.9  scale=0.8828  gjenstår≈94.0min  [PROD]
+  [  50000/200000] acc=0.473  lp=3561.8  scale=0.8828  gjenstår≈90.3min  [PROD]
+  [  55000/200000] acc=0.470  lp=3561.4  scale=0.8828  gjenstår≈86.6min  [PROD]
+  [  60000/200000] acc=0.471  lp=3557.6  scale=0.8828  konv=PSRF=1.05 ESS=108  gjenstår≈83.5min
+  [  65000/200000] acc=0.471  lp=3564.8  scale=0.8828  gjenstår≈80.5min  [PROD]
+  [  70000/200000] acc=0.471  lp=3563.6  scale=0.8828  gjenstår≈77.3min  [PROD]
+  [  75000/200000] acc=0.470  lp=3562.6  scale=0.8828  gjenstår≈74.2min  [PROD]
+  [  80000/200000] acc=0.466  lp=3554.7  scale=0.8828  konv=PSRF=1.06 ESS=146  gjenstår≈70.9min
+  [  85000/200000] acc=0.471  lp=3556.8  scale=0.8828  gjenstår≈68.2min  [PROD]
+  [  90000/200000] acc=0.470  lp=3564.2  scale=0.8828  gjenstår≈65.1min  [PROD]
+  [  95000/200000] acc=0.470  lp=3557.3  scale=0.8828  gjenstår≈62.0min  [PROD]
+  [ 100000/200000] acc=0.470  lp=3563.7  scale=0.8828  konv=PSRF=1.06 ESS=180  gjenstår≈59.1min
+  [ 105000/200000] acc=0.470  lp=3563.2  scale=0.8828  gjenstår≈56.0min  [PROD]
+  [ 110000/200000] acc=0.471  lp=3556.8  scale=0.8828  gjenstår≈53.1min  [PROD]
+  [ 115000/200000] acc=0.470  lp=3559.1  scale=0.8828  gjenstår≈50.1min  [PROD]
+  [ 120000/200000] acc=0.467  lp=3559.1  scale=0.8828  konv=PSRF=1.05 ESS=217  gjenstår≈47.0min
+  [ 125000/200000] acc=0.466  lp=3557.0  scale=0.8828  gjenstår≈44.0min  [PROD]
+  [ 130000/200000] acc=0.466  lp=3559.5  scale=0.8828  gjenstår≈41.1min  [PROD]
+  [ 135000/200000] acc=0.468  lp=3561.1  scale=0.8828  gjenstår≈38.2min  [PROD]
+  [ 140000/200000] acc=0.468  lp=3561.8  scale=0.8828  konv=PSRF=1.03 ESS=259  gjenstår≈35.2min
+  [ 145000/200000] acc=0.467  lp=3561.7  scale=0.8828  gjenstår≈32.3min  [PROD]
+  [ 150000/200000] acc=0.467  lp=3563.7  scale=0.8828  gjenstår≈29.3min  [PROD]
