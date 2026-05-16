@@ -72,7 +72,8 @@ def build_Sv():
 # ══════════════════════════════════════════════════════════════════════════════
 
 PARAM_PRIORS = {
-    'rho_A':   ('beta',     2.0,  0.5,  0.01, 0.9995),
+    # PE-godkjent 2026-05-16: Beta(2,2) — symmetrisk; data støtter ikke K&M rho_A=0.804
+    'rho_A':   ('beta',     2.0,  2.0,  0.01, 0.9995),
     'rho_C':   ('beta',     2.0,  0.5,  0.01, 0.9995),
     'rho_O':   ('beta',     2.0,  0.5,  0.01, 0.9995),
     'rho_Ys':  ('beta',     2.0,  0.5,  0.01, 0.9995),
@@ -94,8 +95,8 @@ PARAM_PRIORS = {
     # Strukturell endring (Alt. A: variabel kapitalutnyttelse) er nødvendig.
     # Se: docs/trinn1_hc_diagnose.md
     'h_c':     ('beta',   4.0, 1.5,  0.30, 0.9995),
-    # Fase 2 (2026-05-15): Inv.-justeringskost estimeres nå etter A4a-fix
-    'phi_I1':  ('normal', 4.0,  2.0, 0.5,  20.0),
+    # PE-godkjent 2026-05-16: Strammet rundt datamodus 0.51 (Δlp=+98 mot K&M 4.0)
+    'phi_I1':  ('normal', 0.51, 0.05, 0.5,  2.0),
     'phi_I2':  ('normal', 8.0,  4.0, 0.5,  40.0),
     # Fase 2v2 (2026-05-15): kapitalutnyttelseselastisitet (Alt. A, K&M Tabell 8)
     'phi_u':   ('normal', 0.22, 0.10, 0.01, 2.0),
@@ -254,7 +255,8 @@ def adaptive_mcmc_with_monitoring(
         check_every=10000, max_recalib=5,
         psrf_thr=1.10, ess_pct_thr=0.02,
         scale_init=0.676, seed=42, verbose=True,
-        save_prefix="chain_v3_v2", use_reparam=False):
+        save_prefix="chain_v3_v2", use_reparam=False,
+        block_indices=None):
 
     rng=np.random.default_rng(seed); N=N_PARAMS
     scale=scale_init; post_std=post_std_init.copy()
@@ -302,14 +304,28 @@ def adaptive_mcmc_with_monitoring(
         nonlocal theta,lp_cur,scale,C_prop
         ch=np.zeros((n_steps,N)); lp_v=np.zeros(n_steps)
         acc=0; acc_win=0; t0=time.time()
+        # Blokksampling (PE-godkjent 2026-05-16): Metropolis-within-Gibbs per blokk.
+        # Brukes kun etter burn-in (use_empirical_cov=True) der sub-kovariansen er meningsfull.
+        # Proposal per blokk: C_block = C_prop[blk,blk] * (N/nb) — justerer for blokkdimensjon.
+        use_blocks = block_indices is not None and use_empirical_cov
+        n_moves = len(block_indices) if use_blocks else 1
         for i in range(n_steps):
-            tp=theta+rng.multivariate_normal(np.zeros(N),C_prop)
-            lpp=log_post_fn(tp,H,Sv,Y_pre,Y_post)
-            if np.log(rng.uniform())<lpp-lp_cur:
-                theta=tp; lp_cur=lpp; acc+=1; acc_win+=1
+            if use_blocks:
+                for blk in block_indices:
+                    tp=theta.copy(); nb=len(blk)
+                    C_blk=C_prop[np.ix_(blk,blk)]*(N/nb)
+                    tp[blk]+=rng.multivariate_normal(np.zeros(nb),C_blk)
+                    lpp=log_post_fn(tp,H,Sv,Y_pre,Y_post)
+                    if np.log(rng.uniform())<lpp-lp_cur:
+                        theta=tp; lp_cur=lpp; acc+=1; acc_win+=1
+            else:
+                tp=theta+rng.multivariate_normal(np.zeros(N),C_prop)
+                lpp=log_post_fn(tp,H,Sv,Y_pre,Y_post)
+                if np.log(rng.uniform())<lpp-lp_cur:
+                    theta=tp; lp_cur=lpp; acc+=1; acc_win+=1
             ch[i]=theta; lp_v[i]=lp_cur
             if adapt and (i+1)%adapt_every==0:
-                rate=acc_win/adapt_every; acc_win=0
+                rate=acc_win/(adapt_every*n_moves); acc_win=0
                 if   rate<0.10: scale*=0.60
                 elif rate<0.15: scale*=0.75
                 elif rate<0.20: scale*=0.88
@@ -339,7 +355,7 @@ def adaptive_mcmc_with_monitoring(
                 print(f"  [{i+1:7d}/{n_steps}] acc={acc/(i+1):.3f}  "
                       f"lp={lp_cur:.1f}  scale={scale:.4f}  "
                       f"gjenstår≈{rem/60:.1f}min  [{phase}]")
-        return ch, lp_v, acc/n_steps
+        return ch, lp_v, acc/(n_steps*n_moves)
 
     if verbose:
         print(f"\n{'='*65}")
@@ -347,6 +363,11 @@ def adaptive_mcmc_with_monitoring(
         print(f"  T_pre={len(Y_pre)} kv  T_post={len(Y_post)} kv  N={N} param")
         print(f"  Produksjon={n_production:,}  Burn-in={burnin:,}")
         print(f"  Startscale={scale_init:.4f}  PSRF-krav<{psrf_thr}")
+        if block_indices is not None:
+            blk_str = " | ".join(
+                "{"+",".join(PARAM_NAMES[j] for j in blk)+"}" for blk in block_indices
+            )
+            print(f"  Blokksampling: {blk_str}")
         print(f"{'='*65}")
         print(f"\n  Startverdi log-posterior: {lp_cur:.2f}")
         print(f"\n--- FASE 1: Adaptiv burn-in ({burnin:,} trekk) ---")
