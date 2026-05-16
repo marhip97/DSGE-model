@@ -1,0 +1,12 @@
+{
+  "n_production": 6000,
+  "burnin": 4000,
+  "acc_rate": 0.2643333333333333,
+  "final_scale": 1.0,
+  "n_recalibrations": 0,
+  "recalib_log": [],
+  "psrf_final": 3.781354306221933,
+  "sigma_A_fixed": 0.006,
+  "use_reparam": true,
+  "ess_min": 6.871122191270427
+}
