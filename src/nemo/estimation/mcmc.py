@@ -254,16 +254,46 @@ def adaptive_mcmc_with_monitoring(
         check_every=10000, max_recalib=5,
         psrf_thr=1.10, ess_pct_thr=0.02,
         scale_init=0.676, seed=42, verbose=True,
-        save_prefix="chain_v3_v2"):
+        save_prefix="chain_v3_v2", use_reparam=False):
 
     rng=np.random.default_rng(seed); N=N_PARAMS
     scale=scale_init; post_std=post_std_init.copy()
+
+    # Logit-reparametrisering (Fase 2, C5 §2): h_c og psi_R sampler i ubegrenset rom.
+    # Chain lagres internt i ubegrenset rom; transformeres tilbake ved diagnostikk/lagring.
+    if use_reparam:
+        from nemo.estimation.reparam import (
+            to_natural, to_unconstrained, wrap_log_posterior, REPARAM_PARAMS,
+        )
+        log_post_fn = wrap_log_posterior(log_posterior)
+        theta_internal = to_unconstrained(theta_init)
+        # post_std for reparametriserte parametre tolkes nå i unc-rom — sett til 1.0
+        # som default skala (logit-rom; presis verdi tunes av sampleren).
+        for n in REPARAM_PARAMS:
+            i = PARAM_NAMES.index(n)
+            post_std[i] = 1.0
+        if verbose:
+            print(f"  Logit-reparametrisering AKTIV for: {REPARAM_PARAMS}")
+    else:
+        log_post_fn = log_posterior
+        theta_internal = theta_init.copy()
+        to_natural = None  # ikke brukt
+
+    def _chain_natural(ch_internal):
+        """Transformer chain tilbake til naturlig rom hvis reparam er aktiv."""
+        if not use_reparam:
+            return ch_internal
+        out = np.empty_like(ch_internal)
+        for i in range(len(ch_internal)):
+            out[i] = to_natural(ch_internal[i])
+        return out
+
     # Start med diagonal proposal; bytt til empirisk kovarians etter burn-in
     # (Haario adaptive Metropolis — fanger sigma_C/h_c-korrelasjon automatisk)
     C_prop=np.diag((scale*2.38/np.sqrt(N)*post_std)**2+1e-12)
     use_empirical_cov=False  # settes True etter burn-in
-    theta=theta_init.copy()
-    lp_cur=log_posterior(theta,H,Sv,Y_pre,Y_post)
+    theta=theta_internal
+    lp_cur=log_post_fn(theta,H,Sv,Y_pre,Y_post)
     if not np.isfinite(lp_cur):
         raise ValueError(f"Startverdi gir ikke-endelig log-posterior: {lp_cur}")
     recalib_log=[]; t_total=time.time()
@@ -274,7 +304,7 @@ def adaptive_mcmc_with_monitoring(
         acc=0; acc_win=0; t0=time.time()
         for i in range(n_steps):
             tp=theta+rng.multivariate_normal(np.zeros(N),C_prop)
-            lpp=log_posterior(tp,H,Sv,Y_pre,Y_post)
+            lpp=log_post_fn(tp,H,Sv,Y_pre,Y_post)
             if np.log(rng.uniform())<lpp-lp_cur:
                 theta=tp; lp_cur=lpp; acc+=1; acc_win+=1
             ch[i]=theta; lp_v[i]=lp_cur
@@ -381,6 +411,13 @@ def adaptive_mcmc_with_monitoring(
 
     prod_ch,lp_prod,acc_prod=_run(n_production,"PROD",monitor=True)
 
+    # Hvis reparametrisering: konverter chain tilbake til naturlig rom før
+    # diagnostikk og lagring. _unc.npy beholdes for posterior-analyse i unc-rom.
+    prod_ch_internal = prod_ch
+    if use_reparam:
+        np.save(f"{save_prefix}_unc.npy", prod_ch_internal)
+        prod_ch = _chain_natural(prod_ch_internal)
+
     if verbose:
         print(f"\n  Produksjon ferdig. acc={acc_prod:.3f}  "
               f"Total tid: {(time.time()-t_total)/60:.1f} min")
@@ -394,6 +431,7 @@ def adaptive_mcmc_with_monitoring(
           'n_recalibrations':n_recalib,'recalib_log':recalib_log,
           'psrf_final':float(ps_final.max()),
           'sigma_A_fixed':SIGMA_A_FIXED,
+          'use_reparam':bool(use_reparam),
           'ess_min':float(min(compute_ess(prod_ch[:,i]) for i in range(N_PARAMS)))}
     with open(f"{save_prefix}_meta.json",'w') as f: json.dump(meta,f,indent=2)
 
