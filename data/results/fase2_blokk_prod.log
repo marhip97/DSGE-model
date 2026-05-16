@@ -1,0 +1,18 @@
+Fase 2 blokksampling — 20 parametre
+Blokk 1: {h_c, psi_R, psi_P1}  Blokk 2: (øvrige 17 param)
+Krav: PSRF < 1.05, ESS/n > 0.02 per parameter
+
+Start lp = 3575.81
+  Logit-reparametrisering AKTIV for: ('h_c', 'psi_R')
+
+=================================================================
+  NEMO v3 — ADAPTIV MCMC v2 (sigma_A fast=0.006)
+  T_pre=75 kv  T_post=15 kv  N=20 param
+  Produksjon=200,000  Burn-in=20,000
+  Startscale=0.4000  PSRF-krav<1.05
+  Blokksampling: {h_c,psi_R,psi_P1} | {rho_A,rho_C,rho_O,rho_Ys,rho_rp,rho_H,sigma_C,sigma_O,sigma_Ys,sigma_rp,sigma_i,sigma_P,sigma_H,psi_Y,phi_I1,phi_I2,phi_u}
+=================================================================
+
+  Startverdi log-posterior: 3567.74
+
+--- FASE 1: Adaptiv burn-in (20,000 trekk) ---
