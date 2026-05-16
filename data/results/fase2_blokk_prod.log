@@ -16,3 +16,6 @@ Start lp = 3575.81
   Startverdi log-posterior: 3567.74
 
 --- FASE 1: Adaptiv burn-in (20,000 trekk) ---
+  [   5000/20000] acc=0.249  lp=3558.8  scale=0.4498  gjenstår≈4.8min  [BURN-IN]
+  [  10000/20000] acc=0.244  lp=3564.4  scale=0.3429  gjenstår≈3.2min  [BURN-IN]
+  [  15000/20000] acc=0.248  lp=3553.3  scale=0.3887  gjenstår≈1.6min  [BURN-IN]
