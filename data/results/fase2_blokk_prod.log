@@ -82,3 +82,55 @@ Start lp = 3575.81
   [ 140000/200000] acc=0.468  lp=3561.8  scale=0.8828  konv=PSRF=1.03 ESS=259  gjenstår≈35.2min
   [ 145000/200000] acc=0.467  lp=3561.7  scale=0.8828  gjenstår≈32.3min  [PROD]
   [ 150000/200000] acc=0.467  lp=3563.7  scale=0.8828  gjenstår≈29.3min  [PROD]
+  [ 155000/200000] acc=0.468  lp=3559.3  scale=0.8828  gjenstår≈26.4min  [PROD]
+  [ 160000/200000] acc=0.469  lp=3561.6  scale=0.8828  konv=PSRF=1.04 ESS=302  gjenstår≈23.5min
+  [ 165000/200000] acc=0.468  lp=3562.7  scale=0.8828  gjenstår≈20.5min  [PROD]
+  [ 170000/200000] acc=0.467  lp=3565.0  scale=0.8828  gjenstår≈17.5min  [PROD]
+  [ 175000/200000] acc=0.465  lp=3559.4  scale=0.8828  gjenstår≈14.6min  [PROD]
+  [ 180000/200000] acc=0.463  lp=3565.6  scale=0.8828  konv=PSRF=1.05 ESS=337  gjenstår≈11.6min
+  [ 185000/200000] acc=0.464  lp=3561.3  scale=0.8828  gjenstår≈8.7min  [PROD]
+  [ 190000/200000] acc=0.463  lp=3559.1  scale=0.8828  gjenstår≈5.8min  [PROD]
+  [ 195000/200000] acc=0.464  lp=3560.9  scale=0.8828  gjenstår≈2.9min  [PROD]
+  [ 200000/200000] acc=0.463  lp=3555.5  scale=0.8828  konv=PSRF=1.03 ESS=387  gjenstår≈0.0min
+
+  Produksjon ferdig. acc=0.232  Total tid: 141.0 min
+
+  ========================================================================
+  DIAGNOSTIKK — PRODUKSJONSKJØRING
+  sigma_A kalibrert fast til 0.006
+  Parameter        K&M     Mean     Std       [5%,95%]    ESS   PSRF
+  ────────────────────────────────────────────────────────────────────
+  rho_A         0.8040   0.0977  0.0645 [0.025,0.224]    591 1.004 
+  rho_C         0.7250   0.8552  0.1662 [0.502,0.999]    588 1.004 
+  rho_O         0.8740   0.3947  0.1031 [0.230,0.568]    732 1.001 
+  rho_Ys        0.7830   0.7882  0.0628 [0.684,0.890]    666 1.008 
+  rho_rp        0.7370   0.8195  0.1907 [0.406,0.998]    910 1.002 
+  rho_H         0.6940   0.9014  0.1169 [0.658,0.999]    387 1.017 
+  sigma_C       0.0300   0.0161  0.0024 [0.012,0.020]    555 1.003 
+  sigma_O       0.0790   0.0878  0.0074 [0.076,0.101]    720 1.003 
+  sigma_Ys      0.0110   0.0059  0.0007 [0.005,0.007]    700 1.006 
+  sigma_rp      0.0060   0.0164  0.0015 [0.014,0.019]    751 1.003 
+  sigma_i       0.0003   0.0003  0.0000 [0.000,0.000]   1329 1.005 
+  sigma_P       0.0030   0.0055  0.0005 [0.005,0.006]    939 1.003 
+  sigma_H       0.0500   0.1498  0.0123 [0.131,0.171]    660 1.004 
+  psi_R         0.6660   0.9611  0.0119 [0.940,0.979]  17013 1.001 
+  psi_P1        0.2920   0.2816  0.0865 [0.141,0.427]  17552 1.000 
+  psi_Y         0.2420   0.2348  0.0403 [0.170,0.301]    387 1.029 
+  h_c           0.9380   0.9869  0.0020 [0.984,0.990]   1452 1.002 
+  phi_I1        4.0000   0.5055  0.0047 [0.500,0.515]    501 1.008 
+  phi_I2        8.0000  10.9115  2.7899 [6.589,15.685]    722 1.000 
+  phi_u         0.2192   0.7208  0.0519 [0.635,0.806]    808 1.007 
+
+  Konvergens: 20/20 OK  max PSRF=1.029  min ESS=387
+  ========================================================================
+
+  Lagret: /home/user/DSGE-model/data/results/chain_fase2_blokk_prod.npy
+          /home/user/DSGE-model/data/results/chain_fase2_blokk_prod_lp.npy
+          /home/user/DSGE-model/data/results/chain_fase2_blokk_prod_meta.json
+          /home/user/DSGE-model/data/results/chain_fase2_blokk_prod_posterior.json
+
+Ferdig på 141.1 min
+Lagret: /home/user/DSGE-model/data/results/chain_fase2_blokk_prod_posterior.json
+
+Konvergens: PSRF<1.05 for 20/20  |  ESS/n>0.02 for 2/20
+Noen kriterier ikke nådd — sjekk diagnostikk
