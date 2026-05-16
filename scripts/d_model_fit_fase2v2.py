@@ -19,7 +19,6 @@ ROT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROT / "src"))
 
 from nemo.estimation.mcmc import PARAM_NAMES, N_PARAMS, build_H, build_Sv, KM
-from nemo.estimation.kalman import kalman_filter
 
 POST_PATH = ROT / "data" / "results" / "chain_fase2v2_prod_posterior.json"
 PREV_PATH = ROT / "data" / "results" / "chain_fase2_prod_posterior.json"
@@ -78,7 +77,7 @@ Sv = build_Sv()
 theta_mean = np.array([summ[n]['mean'] for n in PARAM_NAMES])
 
 from nemo.model.equations import build_matrices_v3
-from nemo.model.parameters import NemoParams
+from nemo.model.parameters import Parameters as NemoParams
 import importlib, nemo.model.parameters as _pm
 
 p = NemoParams()
@@ -95,7 +94,7 @@ try:
         T_obs = nobs
         y_hat = np.zeros_like(Y)
         try:
-            from nemo.estimation.kalman import kalman_filter as kf
+            from nemo.analysis.analyse import kalman_filter as kf
             ll, states = kf(T, R_mat, H, Sv, Y, return_states=True)
             y_hat = (H @ states.T).T
         except Exception:
