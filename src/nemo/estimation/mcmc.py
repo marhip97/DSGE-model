@@ -97,6 +97,8 @@ PARAM_PRIORS = {
     # Fase 2 (2026-05-15): Inv.-justeringskost estimeres nå etter A4a-fix
     'phi_I1':  ('normal', 4.0,  2.0, 0.5,  20.0),
     'phi_I2':  ('normal', 8.0,  4.0, 0.5,  40.0),
+    # Fase 2v2 (2026-05-15): kapitalutnyttelseselastisitet (Alt. A, K&M Tabell 8)
+    'phi_u':   ('normal', 0.22, 0.10, 0.01, 2.0),
 }
 PARAM_NAMES = list(PARAM_PRIORS.keys())
 N_PARAMS    = len(PARAM_NAMES)
@@ -109,7 +111,7 @@ KM = {'rho_A':0.804,'rho_C':0.725,'rho_O':0.874,'rho_Ys':0.783,
       'rho_rp':0.737,'rho_H':0.694,'sigma_C':0.030,
       'sigma_O':0.079,'sigma_Ys':0.011,'sigma_rp':0.006,'sigma_i':0.0003,
       'sigma_P':0.003,'sigma_H':0.050,'psi_R':0.666,'psi_P1':0.292,
-      'psi_Y':0.242,'h_c':0.938,'phi_I1':4.0,'phi_I2':8.0}
+      'psi_Y':0.242,'h_c':0.938,'phi_I1':4.0,'phi_I2':8.0,'phi_u':0.2192}
 
 def log_prior(theta):
     lp = 0.0
