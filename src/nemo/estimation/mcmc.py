@@ -39,6 +39,9 @@ from nemo.model.parameters import Parameters
 
 # sigma_A kalibreres fast — svakt identifisert
 SIGMA_A_FIXED = 0.006
+# phi_I1 kalibreres fast — PE-godkjent 2026-05-17: data driver til nedre grense (0.5),
+# K&M-verdi (4.0) gjenoppretter transmisjonsinertia og er konsistent med DSGE-litteraturen
+PHI_I1_FIXED  = 4.0
 
 # ══════════════════════════════════════════════════════════════════════════════
 # OBSERVASJONSLIKNING
@@ -95,8 +98,7 @@ PARAM_PRIORS = {
     # Strukturell endring (Alt. A: variabel kapitalutnyttelse) er nødvendig.
     # Se: docs/trinn1_hc_diagnose.md
     'h_c':     ('beta',   4.0, 1.5,  0.30, 0.9995),
-    # PE-godkjent 2026-05-16: Strammet rundt datamodus 0.51 (Δlp=+98 mot K&M 4.0)
-    'phi_I1':  ('normal', 0.51, 0.05, 0.5,  2.0),
+    # phi_I1 er fjernet fra estimering — fiksert til PHI_I1_FIXED=4.0 (PE-godkjent 2026-05-17)
     'phi_I2':  ('normal', 8.0,  4.0, 0.5,  40.0),
     # Fase 2v2 (2026-05-15): kapitalutnyttelseselastisitet (Alt. A, K&M Tabell 8)
     'phi_u':   ('normal', 0.22, 0.10, 0.01, 2.0),
@@ -182,7 +184,8 @@ def log_posterior(theta, H, Sv, Y_pre, Y_post):
     try:
         class Pt(Parameters): pass
         for i,n in enumerate(PARAM_NAMES): setattr(Pt,n,float(theta[i]))
-        setattr(Pt,'sigma_A',SIGMA_A_FIXED)   # fast
+        setattr(Pt,'sigma_A', SIGMA_A_FIXED)   # fast
+        setattr(Pt,'phi_I1',  PHI_I1_FIXED)    # fast — PE-godkjent 2026-05-17
         G0,G1,Psi,Pi=build_matrices_v3(Pt,theta_H=0.05)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
