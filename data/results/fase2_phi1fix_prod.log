@@ -37,3 +37,20 @@ Start lp = 3474.47
   Problemer: ['rho_A', 'rho_C', 'rho_O', 'rho_Ys', 'rho_rp', 'rho_H']
   Rekalibrering 2: scale→2.8213. Ekstra burn-in (10,000 trekk)...
   [   5000/10000] acc=0.944  lp=3487.1  scale=0.9517  gjenstår≈5.7min  [REKALIB-2]
+  [  10000/10000] acc=1.063  lp=3490.2  scale=0.9517  gjenstår≈0.0min  [REKALIB-2]
+  Ekstra burn-in ferdig. acc=0.213
+
+  Sjekk runde 2: IKKE OK — PSRF=1.018, ESS=284
+  Problemer: ['rho_rp']
+  Rekalibrering 3: scale→2.8551. Ekstra burn-in (10,000 trekk)...
+  [   5000/10000] acc=0.967  lp=3477.8  scale=0.9949  gjenstår≈5.6min  [REKALIB-3]
+  [  10000/10000] acc=1.065  lp=3478.5  scale=0.8755  gjenstår≈0.0min  [REKALIB-3]
+  Ekstra burn-in ferdig. acc=0.213
+
+  Sjekk runde 3: IKKE OK — PSRF=1.016, ESS=217
+  Problemer: ['sigma_C', 'h_c']
+  Maks rekalibreringer nådd. Fortsetter.
+
+--- FASE 3: Produksjonskjøring (200,000 trekk) ---
+  Endelig scale: 0.8755
+  [   5000/200000] acc=1.277  lp=3488.9  scale=0.8755  gjenstår≈240.4min  [PROD]
