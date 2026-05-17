@@ -16,3 +16,24 @@ Start lp = 3474.47
   Startverdi log-posterior: 3466.48
 
 --- FASE 1: Adaptiv burn-in (20,000 trekk) ---
+  [   5000/20000] acc=0.220  lp=3479.0  scale=0.3764  gjenstår≈3.3min  [BURN-IN]
+  [  10000/20000] acc=0.229  lp=3477.5  scale=0.2767  gjenstår≈2.0min  [BURN-IN]
+  [  15000/20000] acc=0.236  lp=3483.0  scale=0.2688  gjenstår≈1.0min  [BURN-IN]
+  [  20000/20000] acc=0.232  lp=3484.3  scale=0.1360  gjenstår≈0.0min  [BURN-IN]
+  Ferdig. acc=0.232  scale=0.1360
+  Empirisk kovarians aktivert. Sterkeste korrelasjoner:
+    sigma_O    ↔ phi_u     : r=+0.851
+
+--- FASE 2: Konvergensovervåkning ---
+
+  Sjekk runde 0: IKKE OK — PSRF=3.555, ESS=21
+  Problemer: ['rho_A', 'rho_C', 'rho_O', 'rho_Ys', 'rho_rp', 'rho_H']
+  Rekalibrering 1: scale→3.0000. Ekstra burn-in (10,000 trekk)...
+  [   5000/10000] acc=1.026  lp=3483.7  scale=1.0687  gjenstår≈5.9min  [REKALIB-1]
+  [  10000/10000] acc=1.123  lp=3484.6  scale=0.9404  gjenstår≈0.0min  [REKALIB-1]
+  Ekstra burn-in ferdig. acc=0.225
+
+  Sjekk runde 1: IKKE OK — PSRF=1.163, ESS=36
+  Problemer: ['rho_A', 'rho_C', 'rho_O', 'rho_Ys', 'rho_rp', 'rho_H']
+  Rekalibrering 2: scale→2.8213. Ekstra burn-in (10,000 trekk)...
+  [   5000/10000] acc=0.944  lp=3487.1  scale=0.9517  gjenstår≈5.7min  [REKALIB-2]
