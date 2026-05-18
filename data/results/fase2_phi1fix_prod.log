@@ -60,3 +60,29 @@ Start lp = 3474.47
   [  25000/200000] acc=1.244  lp=3486.1  scale=0.8755  gjenstår≈213.0min  [PROD]
   [  30000/200000] acc=1.244  lp=3480.2  scale=0.8755  gjenstår≈207.2min  [PROD]
   [  35000/200000] acc=1.242  lp=3488.8  scale=0.8755  gjenstår≈201.2min  [PROD]
+  [  40000/200000] acc=1.239  lp=3488.9  scale=0.8755  konv=PSRF=1.00 ESS=524  gjenstår≈195.0min
+  [  45000/200000] acc=1.238  lp=3487.2  scale=0.8755  gjenstår≈188.7min  [PROD]
+  [  50000/200000] acc=1.235  lp=3492.4  scale=0.8755  gjenstår≈182.7min  [PROD]
+  [  55000/200000] acc=1.233  lp=3486.9  scale=0.8755  gjenstår≈176.5min  [PROD]
+  [  60000/200000] acc=1.237  lp=3483.1  scale=0.8755  konv=PSRF=1.00 ESS=812  gjenstår≈170.6min
+  [  65000/200000] acc=1.237  lp=3481.5  scale=0.8755  gjenstår≈164.5min  [PROD]
+  [  70000/200000] acc=1.236  lp=3492.0  scale=0.8755  gjenstår≈158.3min  [PROD]
+  [  75000/200000] acc=1.239  lp=3485.8  scale=0.8755  gjenstår≈152.2min  [PROD]
+  [  80000/200000] acc=1.237  lp=3489.0  scale=0.8755  konv=PSRF=1.00 ESS=1298  gjenstår≈146.0min
+  [  85000/200000] acc=1.238  lp=3483.7  scale=0.8755  gjenstår≈140.0min  [PROD]
+  [  90000/200000] acc=1.237  lp=3484.7  scale=0.8755  gjenstår≈133.9min  [PROD]
+  [  95000/200000] acc=1.236  lp=3490.2  scale=0.8755  gjenstår≈127.7min  [PROD]
+  [ 100000/200000] acc=1.235  lp=3491.2  scale=0.8755  konv=PSRF=1.00 ESS=1690  gjenstår≈121.6min
+  [ 105000/200000] acc=1.235  lp=3480.8  scale=0.8755  gjenstår≈115.5min  [PROD]
+  [ 110000/200000] acc=1.237  lp=3485.0  scale=0.8755  gjenstår≈109.4min  [PROD]
+  [ 115000/200000] acc=1.235  lp=3487.2  scale=0.8755  gjenstår≈103.3min  [PROD]
+  [ 120000/200000] acc=1.235  lp=3484.1  scale=0.8755  konv=PSRF=1.00 ESS=2034  gjenstår≈97.2min
+  [ 125000/200000] acc=1.234  lp=3488.6  scale=0.8755  gjenstår≈91.2min  [PROD]
+  [ 130000/200000] acc=1.235  lp=3489.6  scale=0.8755  gjenstår≈85.0min  [PROD]
+  [ 135000/200000] acc=1.233  lp=3487.4  scale=0.8755  gjenstår≈78.9min  [PROD]
+  [ 140000/200000] acc=1.234  lp=3487.4  scale=0.8755  konv=PSRF=1.00 ESS=2435  gjenstår≈72.8min
+  [ 145000/200000] acc=1.235  lp=3488.7  scale=0.8755  gjenstår≈66.6min  [PROD]
+  [ 150000/200000] acc=1.236  lp=3485.6  scale=0.8755  gjenstår≈60.5min  [PROD]
+  [ 155000/200000] acc=1.237  lp=3482.8  scale=0.8755  gjenstår≈54.5min  [PROD]
+  [ 160000/200000] acc=1.236  lp=3482.8  scale=0.8755  konv=PSRF=1.00 ESS=2861  gjenstår≈48.4min
+  [ 165000/200000] acc=1.236  lp=3481.2  scale=0.8755  gjenstår≈42.3min  [PROD]
