@@ -3,7 +3,7 @@
 NEMO FASE II — LIKNINGSSYSTEM
 Γ₀ z_t = Γ₁ z_{t-1} + Ψ ε_t + Π η_t
  
-Tilstandsvektor (NZ = 48):
+Tilstandsvektor (NZ = 49, Alt. A 2026-05-15):
   HUSHOLDNINGER OG KONSUM:
     0  pi        KPI-inflasjon
     1  c_W       Konsum, sparere (W = workers / optimizers)
@@ -65,7 +65,10 @@ Tilstandsvektor (NZ = 48):
     45 i_star     Utenlandsk rente
     46 eps_phi_h  LTV-sjokk husholdninger
     47 eps_prem   Pengemarkedspremie
- 
+
+  ALT. A (2026-05-15) — VARIABEL KAPITALUTNYTTELSE:
+    48 u_K        Kapitalutnyttelse (utilization rate), K&M §2.7
+
 Sjokk (NE = 13):
     0  E_A       TFP
     1  E_C       Konsumpreferanse

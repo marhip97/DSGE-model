@@ -103,7 +103,51 @@ fordi det dobler MCMC-budsjett (2+2 timer) når diagnosen allerede peker entydig
 
 ---
 
-## 5. Åpne spørsmål til PE
+## 5. Ny inkonsistens etter A4c — LTV-fortegn i utlånsrenter (E3/E4)
+
+**Identifisert ved kryssgransking 2026-05-18.**
+
+A4c snudde fortegnet i gjeldslikningen (lign 25): `Psi[25, E_phi_h] = -1.0`
+(strammere LTV → mindre gjeld). Men de korresponderende utlånsrente-likningene
+ble ikke oppdatert samtidig:
+
+```python
+# E3 (lign 22) — utlånsrente sparere
+G0[22, EPS_PHI_H] = -1.0   # strammere LTV → lavere utlånsrente?
+
+# E4 (lign 23) — utlånsrente låntakere
+G0[23, EPS_PHI_H] = -1.0   # samme
+```
+
+**Problem:** Etter A4c betyr positiv `E_phi_h` = strammere LTV. Da burde utlåns-
+spread *øke*, ikke synke. Nåværende kode gir motsatt fortegn → intern inkonsistens
+med gjeldslikningen.
+
+**Forslag (krever PE-godkjenning):**
+
+Snu fortegnet i E3/E4 til `G0[22/23, EPS_PHI_H] = +1.0` (eller behold -1.0 men
+snu fortegnet på Psi[42, ...] hvis konsistent definert mot K&M §2.5).
+
+Konkret algebraisk gjennomgang mot K&M (2019) Tabell 7 / §2.5.4 trengs før
+endelig fortegn fastsettes. Bør gjøres som del av re-estimering (steg 2 over).
+
+---
+
+## 6. Lavprioritets-funn (info, ikke krever beslutning)
+
+- **v1/v2-arv:** v3 arver finansiell sektor (lign 21–26) uendret fra v1.
+  Latente v1-feil i ligninger som ikke eksplisitt overstyres i v3 lever videre
+  (LTV-fortegnsproblemet over er ett eksempel). Vurder refaktorering der v3
+  bygges som standalone i en senere fase.
+- **Dokumentasjon NZ=48 → 49:** rettet i `equations.py`, `CLAUDE.md`,
+  `docs/MODEL.md` (commit i denne PR).
+- **`phi_c=10.0` i `parameters.py`:** brukes i bankspread-likningene (E2/E3/E4)
+  uten dokumentert K&M-referanse. Verdt å sjekke mot Gerali et al. (2010)
+  som typisk har kapitaldekning-koeffisienter << 1.
+
+---
+
+## 7. Åpne spørsmål til PE
 
 - **`phi_I1`-status:** Data foretrekker `phi_I1 ≈ 0.5` ved fri estimering, men K&M-verdi
   4.0 er nåværende fix. Skal vi un-fix samtidig, eller holde det til separat runde?
