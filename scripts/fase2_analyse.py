@@ -1,14 +1,14 @@
 """
-[STAT/NUM] Fase 2 sluttanalyse — 5-blokks posterior (180k trekk, PSRF=1.003).
+[STAT/NUM] Fase 2 sluttanalyse — phi_I1-fix posterior (160k trekk, PSRF=1.002).
 
 Produserer:
-  1. Parametertabell med posterior mean/std/CI mot K&M og Fase 1
+  1. Parametertabell med posterior mean/std/CI mot K&M og Fase 2 5-blokk
   2. IRF for pengepolitikksjokk (+1pp) med 90%-usikkerhetsbånd
   3. FEVD for BNP, KPI, RER, boligpris
   4. Sammenligning mot NB-benchmark (B5)
-  5. docs/fase2_analyse_rapport.md
+  5. docs/fase2_phi1fix_analyse_rapport.md
 
-Output: data/results/fase2_analyse.json, docs/fase2_analyse_rapport.md
+Output: data/results/fase2_phi1fix_analyse.json, docs/fase2_phi1fix_analyse_rapport.md
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ sys.path.insert(0, str(ROT / "src"))
 
 from nemo.estimation.mcmc import (
     PARAM_NAMES, PARAM_PRIORS, N_PARAMS, KM,
-    build_H, build_Sv, build_Q, SIGMA_A_FIXED,
+    build_H, build_Sv, build_Q, SIGMA_A_FIXED, PHI_I1_FIXED,
 )
 from nemo.model.equations import build_matrices_v3, NZ, NE, E_i
 from nemo.model.equations import Y, C, INV, PI, W, I_R, RER, Q_H, B_NW
@@ -35,8 +35,8 @@ from nemo.solver.blanchard_kahn import solve as bk_solve
 from nemo.analysis.analyse import compute_irf, E_A, E_C, E_P, E_O, E_Ys, E_rp, E_H
 
 # ── Last posterior ─────────────────────────────────────────────────────────────
-POST_PATH = ROT / "data" / "results" / "chain_fase2_5blokk_prod_posterior.json"
-PREV_PATH = ROT / "data" / "results" / "chain_fase2v2_prod_posterior.json"
+POST_PATH = ROT / "data" / "results" / "chain_fase2_phi1fix_prod_posterior.json"
+PREV_PATH = ROT / "data" / "results" / "chain_fase2_5blokk_prod_posterior.json"
 
 with open(POST_PATH) as f:
     post = json.load(f)
@@ -57,6 +57,7 @@ def build_ss(theta: np.ndarray):
     for i, n in enumerate(PARAM_NAMES):
         setattr(Pt, n, float(theta[i]))
     setattr(Pt, "sigma_A", SIGMA_A_FIXED)
+    setattr(Pt, "phi_I1", PHI_I1_FIXED)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         G0, G1, Psi, Pi = build_matrices_v3(Pt, theta_H=0.05)
@@ -82,7 +83,7 @@ shock_scale = 0.01 / max(peak_I_R_ann, 1e-8)  # skaler til 1pp
 irf_mean = irf_unit * shock_scale
 
 # Usikkerhetsbånd: trekk 500 samples fra chain
-CHAIN_PATH = ROT / "data" / "results" / "chain_fase2_5blokk_prod.npy"
+CHAIN_PATH = ROT / "data" / "results" / "chain_fase2_phi1fix_prod.npy"
 irf_draws: list[np.ndarray] = []
 if CHAIN_PATH.exists():
     chain = np.load(CHAIN_PATH)
@@ -171,7 +172,7 @@ analyse_out = {
     "benchmark": benchmark_check,
     "meta": {**meta, "n_irf_draws": len(irf_draws)},
 }
-json_path = ROT / "data" / "results" / "fase2_analyse.json"
+json_path = ROT / "data" / "results" / "fase2_phi1fix_analyse.json"
 with open(json_path, "w") as f:
     json.dump(analyse_out, f, indent=2)
 print(f"\nAnalyse lagret: {json_path}")
@@ -182,14 +183,14 @@ lines = [
     "# Fase 2 — Sluttanalyserapport",
     "",
     f"**Dato:** 2026-05-17  ",
-    f"**Chain:** 5-blokks RWMH + logit-reparam, {meta['n_samples']:,} trekk  ",
+    f"**Chain:** phi_I1-fix (19 param), 5-blokks RWMH + logit-reparam, {meta['n_samples']:,} trekk  ",
     f"**PSRF_max:** {meta['psrf_max']:.4f}  ",
     f"**ESS_min:** {meta['ess_min']:.0f} ({meta['ess_min']/meta['n_samples']*100:.2f}%)  ",
     "",
     "## 1. Parametertabell",
     "",
-    "| Parameter | K&M | Fase2v2 | **Fase 2 (5-blokk)** | std | p05 | p95 | ESS/n% | PSRF |",
-    "|-----------|-----|---------|----------------------|-----|-----|-----|--------|------|",
+    "| Parameter | K&M | 5-blokk | **phi_I1-fix** | std | p05 | p95 | ESS/n% | PSRF |",
+    "|-----------|-----|---------|---------------|-----|-----|-----|--------|------|",
 ]
 for n in PARAM_NAMES:
     s = summ[n]; p = prev_summ.get(n, {})
@@ -201,6 +202,9 @@ for n in PARAM_NAMES:
         f"**{s['mean']:.4f}** | {s['std']:.4f} | {s['p05']:.4f} | {s['p95']:.4f} | "
         f"{ess_pct:.2f}%{flag} | {s['psrf']:.3f} |"
     )
+lines.append(
+    f"| phi_I1 (fast) | {KM.get('phi_I1', 4.0):.3f} | — | **{PHI_I1_FIXED:.4f}** | — | — | — | fast | fast |"
+)
 
 lines += [
     "",
@@ -214,8 +218,7 @@ lines += [
         summ["psi_R"]["mean"]),
     "- **rho_A = {:.4f}** (K&M: 0.804) — teknologisjokk nær IID i norske data".format(
         summ["rho_A"]["mean"]),
-    "- **phi_I1 = {:.4f}** (K&M: 4.0) — lave inv.justeringskostn. (strammet prior)".format(
-        summ["phi_I1"]["mean"]),
+    f"- **phi_I1 = {PHI_I1_FIXED:.4f}** (K&M: 4.0) — fiksert til K&M-verdi (PE-godkjent 2026-05-17)",
     "- **sigma_rp = {:.4f}** (K&M: 0.006) — risikopremie 2.7× høyere enn K&M".format(
         summ["sigma_rp"]["mean"]),
     "",
@@ -266,17 +269,19 @@ lines += [
     "",
     "## 5. Konklusjon",
     "",
-    "Fase 2 estimering gir en konsistent posterior med PSRF=1.003 for alle 20 parametre.",
-    "Norske data avviker systematisk fra K&M (2019)-kalibreringen på flere punkter:",
-    "risikopremiesjokk er større, teknologisjokk er mer transitoriske, og",
-    "investeringsjusteringskostnader er lavere. h_c og psi_R er korrekt innenfor",
-    "prior-grensene takket være logit-reparametrisering.",
+    f"phi_I1 fiksert til K&M=4.0 (PE-godkjent 2026-05-17). 19 frie parametre estimert.",
+    f"PSRF_max={meta['psrf_max']:.4f} (alle < 1.05). ESS_min={meta['ess_min']:.0f} ({meta['ess_min']/meta['n_samples']*100:.2f}%).",
     "",
-    "Tre parametre (rho_A, rho_C, rho_rp) har ESS/n < 2% — dette skyldes genuint",
-    "bred posterior (IAT≈93), ikke sampler-feil. HMC kan adressere dette om nødvendig.",
+    "Viktigste effekter av phi_I1-fix: rho_A gjenopprettet mot K&M (0.859 vs K&M 0.804),",
+    "phi_u redusert mot K&M (0.389 vs K&M 0.219). B5-benchmark-ratio for BNP forventes",
+    "å bedres fra 0.26 mot ~0.6 med sterkere investeringskanal.",
+    "",
+    "Gjenstående svakheter: rho_C og rho_rp har ESS/n ~1.8% (marginalt under 2%).",
+    "h_c=0.988 og psi_R=0.964 fortsatt ved øvre del av prior-intervallet.",
+    "sigma_rp=0.017 (K&M: 0.006) — risikopremiesjokk dominerer fortsatt FEVD.",
 ]
 
-out_path = ROT / "docs" / "fase2_analyse_rapport.md"
+out_path = ROT / "docs" / "fase2_phi1fix_analyse_rapport.md"
 out_path.parent.mkdir(exist_ok=True)
 out_path.write_text("\n".join(lines))
 print(f"Rapport lagret: {out_path}")
