@@ -37,3 +37,10 @@ Start lp = 3391.81
   Sjekk runde 1: IKKE OK — PSRF=1.185, ESS=41
   Problemer: ['rho_A', 'rho_C', 'rho_O', 'rho_Ys', 'rho_rp', 'rho_H']
   Rekalibrering 2: scale→2.4288. Ekstra burn-in (10,000 trekk)...
+  [   5000/10000] acc=1.027  lp=3388.0  scale=0.9618  gjenstår≈5.0min  [REKALIB-2]
+  [  10000/10000] acc=1.097  lp=3398.2  scale=0.9310  gjenstår≈0.0min  [REKALIB-2]
+  Ekstra burn-in ferdig. acc=0.219
+
+  Sjekk runde 2: IKKE OK — PSRF=1.029, ESS=107
+  Problemer: ['rho_A', 'rho_C', 'rho_O', 'rho_rp', 'phi_I2', 'phi_u']
+  Rekalibrering 3: scale→2.7930. Ekstra burn-in (10,000 trekk)...
