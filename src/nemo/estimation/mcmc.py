@@ -42,6 +42,10 @@ SIGMA_A_FIXED = 0.006
 # phi_I1 kalibreres fast — PE-godkjent 2026-05-17: data driver til nedre grense (0.5),
 # K&M-verdi (4.0) gjenoppretter transmisjonsinertia og er konsistent med DSGE-litteraturen
 PHI_I1_FIXED  = 4.0
+# sigma_rp kalibreres fast — PE-godkjent 2026-05-18 (C3): estimert 0.017 dominerer
+# FEVD (88% RER-varians) og gir IRF 6-44x for stor vs NB Memo 3/2024. K&M-verdi 0.006
+# gir BNP-ratio 1.8x og KPI-ratio 1.0x (nesten perfekt match).
+SIGMA_RP_FIXED = 0.006
 
 # ══════════════════════════════════════════════════════════════════════════════
 # OBSERVASJONSLIKNING
@@ -86,15 +90,14 @@ PARAM_PRIORS = {
     'sigma_C':  ('inv_gamma', 2.0, 0.0182, 1e-5, 0.5),
     'sigma_O':  ('inv_gamma', 2.0, 0.0475, 1e-5, 1.0),
     'sigma_Ys': ('inv_gamma', 2.0, 0.0067, 1e-5, 0.5),
-    'sigma_rp': ('inv_gamma', 2.0, 0.0037, 1e-5, 0.5),
+    # sigma_rp er fjernet fra estimering — kalibreres fast til K&M=0.006 (PE-godkjent 2026-05-18)
     'sigma_i':  ('inv_gamma', 2.0, 0.0002, 1e-5, 0.1),
     'sigma_P':  ('inv_gamma', 2.0, 0.0027, 1e-5, 0.5),
     'sigma_H':  ('inv_gamma', 2.0, 0.0500, 1e-5, 1.0),
-    # PE-godkjent 2026-05-18: innstrammet fra Beta(4,2) på (0.30, 0.990) til
-    # Beta(2,2) på (0.01, 0.85). Begrunnelse: posterior psi_R=0.964 var trolig
-    # bug-kompensasjon for pre-A4a manglende bank-dynamikk. K&M (2019)=0.667 og
-    # GEORG ω_r=0.74 korroborerer at 0.964 er urealistisk høyt.
-    'psi_R':   ('beta',   2.0, 2.0,  0.01, 0.85),
+    # PE-godkjent 2026-05-18 (C3): utvidet fra (0.01, 0.85) til (0.01, 0.92).
+    # Posterior psi_R=0.842 traff prior-grensen 0.85 i kjøring 3 — data trykker høyere.
+    # 0.92 gir data rom uten å tillate patologiske verdier > GEORG ω_r=0.74 + 2σ.
+    'psi_R':   ('beta',   2.0, 2.0,  0.01, 0.92),
     'psi_P1':  ('normal', 0.29, 0.10, 0.05, 1.50),
     'psi_Y':   ('normal', 0.24, 0.05, 0.01, 0.80),
     # NB Trinn 1-funn (2026-05-15): h_c < 0.92 → BK-ustabil med K&M-verdier.
@@ -145,11 +148,12 @@ def log_prior(theta):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def build_Q(theta):
-    # sigma_A er fast
+    # sigma_A og sigma_rp er faste (K&M-kalibrert)
     smap = {E_C:'sigma_C',E_P:'sigma_P',E_O:'sigma_O',
-            E_Ys:'sigma_Ys',E_rp:'sigma_rp',E_i:'sigma_i',E_H:'sigma_H'}
+            E_Ys:'sigma_Ys',E_i:'sigma_i',E_H:'sigma_H'}
     Q = np.zeros((NE,NE))
-    Q[E_A,E_A] = SIGMA_A_FIXED**2   # fast
+    Q[E_A,E_A]  = SIGMA_A_FIXED**2    # fast
+    Q[E_rp,E_rp]= SIGMA_RP_FIXED**2  # fast — PE-godkjent 2026-05-18 (C3)
     for idx,pn in smap.items():
         s = theta[PARAM_NAMES.index(pn)] if pn in PARAM_NAMES else getattr(Parameters,pn,0.01)
         Q[idx,idx] = s**2
@@ -188,8 +192,9 @@ def log_posterior(theta, H, Sv, Y_pre, Y_post):
     try:
         class Pt(Parameters): pass
         for i,n in enumerate(PARAM_NAMES): setattr(Pt,n,float(theta[i]))
-        setattr(Pt,'sigma_A', SIGMA_A_FIXED)   # fast
-        setattr(Pt,'phi_I1',  PHI_I1_FIXED)    # fast — PE-godkjent 2026-05-17
+        setattr(Pt,'sigma_A',  SIGMA_A_FIXED)   # fast
+        setattr(Pt,'phi_I1',   PHI_I1_FIXED)   # fast — PE-godkjent 2026-05-17
+        setattr(Pt,'sigma_rp', SIGMA_RP_FIXED) # fast — PE-godkjent 2026-05-18 (C3)
         G0,G1,Psi,Pi=build_matrices_v3(Pt,theta_H=0.05)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
