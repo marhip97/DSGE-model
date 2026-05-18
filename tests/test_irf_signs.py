@@ -164,16 +164,6 @@ def test_14_bolig_boligpris_opp(krav_data):
 
 # ── LTV-sjokk ────────────────────────────────────────────────────────────────
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "KJENT MODELLFEIL (Spor A4c): LTV-sjokk gir positiv C_NW fra t=2. "
-        "t=1 er korrekt negativ, men kollateral-oppgangseffekten via q_H dominerer. "
-        "Mulig feil: EPS_PHI_H-fortegn i utlånsrente-likning (G0[22,EPS_PHI_H]=-1.0 "
-        "og G0[23,EPS_PHI_H]=-1.0 senker renter ved positivt sjokk, øker kreditt). "
-        "Krever review av LTV-sjokk-konvensjon mot K&M (2019) seksjon 2.2 / Gerali et al. 2010."
-    ),
-)
 def test_15_ltv_laantakerkonsum_ned(krav_data):
     """Krav 15: LTV-sjokk → låntakerkonsum (c_NW) ned (strammet belåningsgrense)."""
     T, R = krav_data

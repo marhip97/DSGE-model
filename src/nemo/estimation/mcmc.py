@@ -90,7 +90,11 @@ PARAM_PRIORS = {
     'sigma_i':  ('inv_gamma', 2.0, 0.0002, 1e-5, 0.1),
     'sigma_P':  ('inv_gamma', 2.0, 0.0027, 1e-5, 0.5),
     'sigma_H':  ('inv_gamma', 2.0, 0.0500, 1e-5, 1.0),
-    'psi_R':   ('beta',   4.0, 2.0,  0.30, 0.990),
+    # PE-godkjent 2026-05-18: innstrammet fra Beta(4,2) på (0.30, 0.990) til
+    # Beta(2,2) på (0.01, 0.85). Begrunnelse: posterior psi_R=0.964 var trolig
+    # bug-kompensasjon for pre-A4a manglende bank-dynamikk. K&M (2019)=0.667 og
+    # GEORG ω_r=0.74 korroborerer at 0.964 er urealistisk høyt.
+    'psi_R':   ('beta',   2.0, 2.0,  0.01, 0.85),
     'psi_P1':  ('normal', 0.29, 0.10, 0.05, 1.50),
     'psi_Y':   ('normal', 0.24, 0.05, 0.01, 0.80),
     # NB Trinn 1-funn (2026-05-15): h_c < 0.92 → BK-ustabil med K&M-verdier.

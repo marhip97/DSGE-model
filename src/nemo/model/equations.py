@@ -382,13 +382,13 @@ def build_matrices(p=None):
     G0[22, I_L_W]   =  1.0
     G0[22, I_R]     = -1.0
     G0[22, NB]      = -p.phi_c
-    G0[22, EPS_PHI_H] = -1.0   # LTV-sjokk påvirker spread
+    G0[22, EPS_PHI_H] = +1.0   # A4c-konsistens 2026-05-18 (PE): strammere LTV → høyere spread
  
     # E4. Utlånsrente, låntakere (NW) — høyere spread
     G0[23, I_L_NW]  =  1.0
     G0[23, I_R]     = -1.0
     G0[23, NB]      = -1.5 * p.phi_c   # høyere spread for låntakere
-    G0[23, EPS_PHI_H] = -1.0
+    G0[23, EPS_PHI_H] = +1.0   # A4c-konsistens 2026-05-18 (PE): strammere LTV → høyere spread
  
     # E5. Gjeld, sparere (ikke-bindende)
     # b_W: finansiell formueakkumulering sparere
