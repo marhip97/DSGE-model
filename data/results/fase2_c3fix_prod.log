@@ -1,0 +1,89 @@
+Fase 2 C3-fix — 18 frie parametre
+phi_I1=4.0 (fast), sigma_rp=0.006 (fast, K&M)
+psi_R prior: Beta(2,2) på (0.01, 0.92)
+psi_R startpunkt: 0.8423 (innenfor ny prior 0.92)
+
+Start lp = 3391.81
+  Logit-reparametrisering AKTIV for: ('h_c', 'psi_R')
+
+=================================================================
+  NEMO v3 — ADAPTIV MCMC v2 (sigma_A fast=0.006)
+  T_pre=75 kv  T_post=15 kv  N=18 param
+  Produksjon=200,000  Burn-in=20,000
+  Startscale=0.5000  PSRF-krav<1.05
+  Blokksampling: {h_c,psi_R,psi_P1} | {rho_A,rho_C,rho_O,rho_rp} | {rho_Ys,rho_H,psi_Y,sigma_Ys} | {sigma_C,sigma_O,sigma_i,sigma_P,sigma_H} | {phi_I2,phi_u}
+=================================================================
+
+  Startverdi log-posterior: 3384.71
+
+--- FASE 1: Adaptiv burn-in (20,000 trekk) ---
+  [   5000/20000] acc=0.221  lp=3392.6  scale=0.2372  gjenstår≈2.5min  [BURN-IN]
+  [  10000/20000] acc=0.248  lp=3390.9  scale=0.3857  gjenstår≈1.9min  [BURN-IN]
+  [  15000/20000] acc=0.244  lp=3392.2  scale=0.3080  gjenstår≈0.9min  [BURN-IN]
+  [  20000/20000] acc=0.250  lp=3394.2  scale=0.3571  gjenstår≈0.0min  [BURN-IN]
+  Ferdig. acc=0.250  scale=0.3571
+  Empirisk kovarians aktivert. Sterkeste korrelasjoner:
+    sigma_C    ↔ h_c       : r=-0.604
+
+--- FASE 2: Konvergensovervåkning ---
+
+  Sjekk runde 0: IKKE OK — PSRF=1.238, ESS=27
+  Problemer: ['rho_A', 'rho_C', 'rho_O', 'rho_Ys', 'rho_rp', 'rho_H']
+  Rekalibrering 1: scale→3.0000. Ekstra burn-in (10,000 trekk)...
+  [   5000/10000] acc=0.990  lp=3393.4  scale=0.8364  gjenstår≈5.1min  [REKALIB-1]
+  [  10000/10000] acc=1.111  lp=3392.3  scale=0.8096  gjenstår≈0.0min  [REKALIB-1]
+  Ekstra burn-in ferdig. acc=0.222
+
+  Sjekk runde 1: IKKE OK — PSRF=1.185, ESS=41
+  Problemer: ['rho_A', 'rho_C', 'rho_O', 'rho_Ys', 'rho_rp', 'rho_H']
+  Rekalibrering 2: scale→2.4288. Ekstra burn-in (10,000 trekk)...
+  [   5000/10000] acc=1.027  lp=3388.0  scale=0.9618  gjenstår≈5.0min  [REKALIB-2]
+  [  10000/10000] acc=1.097  lp=3398.2  scale=0.9310  gjenstår≈0.0min  [REKALIB-2]
+  Ekstra burn-in ferdig. acc=0.219
+
+  Sjekk runde 2: IKKE OK — PSRF=1.029, ESS=107
+  Problemer: ['rho_A', 'rho_C', 'rho_O', 'rho_rp', 'phi_I2', 'phi_u']
+  Rekalibrering 3: scale→2.7930. Ekstra burn-in (10,000 trekk)...
+  [   5000/10000] acc=1.017  lp=3392.1  scale=0.9733  gjenstår≈5.1min  [REKALIB-3]
+  [  10000/10000] acc=1.067  lp=3400.5  scale=0.7959  gjenstår≈0.0min  [REKALIB-3]
+  Ekstra burn-in ferdig. acc=0.213
+
+  Sjekk runde 3: IKKE OK — PSRF=1.117, ESS=60
+  Problemer: ['rho_A', 'rho_C', 'rho_O', 'rho_rp', 'rho_H', 'sigma_C']
+  Maks rekalibreringer nådd. Fortsetter.
+
+--- FASE 3: Produksjonskjøring (200,000 trekk) ---
+  Endelig scale: 0.7959
+  [   5000/200000] acc=1.389  lp=3395.1  scale=0.7959  gjenstår≈216.6min  [PROD]
+  [  10000/200000] acc=1.368  lp=3392.7  scale=0.7959  gjenstår≈209.5min  [PROD]
+  [  15000/200000] acc=1.391  lp=3394.0  scale=0.7959  gjenstår≈204.5min  [PROD]
+  [  20000/200000] acc=1.390  lp=3398.6  scale=0.7959  konv=PSRF=1.02 ESS=176  gjenstår≈199.1min
+  [  25000/200000] acc=1.392  lp=3394.7  scale=0.7959  gjenstår≈194.4min  [PROD]
+  [  30000/200000] acc=1.398  lp=3387.5  scale=0.7959  gjenstår≈189.5min  [PROD]
+  [  35000/200000] acc=1.380  lp=3396.4  scale=0.7959  gjenstår≈183.5min  [PROD]
+  [  40000/200000] acc=1.372  lp=3393.5  scale=0.7959  konv=PSRF=1.02 ESS=304  gjenstår≈177.9min
+  [  45000/200000] acc=1.373  lp=3396.5  scale=0.7959  gjenstår≈172.5min  [PROD]
+  [  50000/200000] acc=1.383  lp=3396.1  scale=0.7959  gjenstår≈167.1min  [PROD]
+  [  55000/200000] acc=1.387  lp=3400.2  scale=0.7959  gjenstår≈161.8min  [PROD]
+  [  60000/200000] acc=1.384  lp=3396.6  scale=0.7959  konv=PSRF=1.01 ESS=445  gjenstår≈156.2min
+  [  65000/200000] acc=1.381  lp=3394.8  scale=0.7959  gjenstår≈150.5min  [PROD]
+  [  70000/200000] acc=1.380  lp=3395.0  scale=0.7959  gjenstår≈145.0min  [PROD]
+  [  75000/200000] acc=1.379  lp=3392.8  scale=0.7959  gjenstår≈139.5min  [PROD]
+  [  80000/200000] acc=1.372  lp=3389.6  scale=0.7959  konv=PSRF=1.01 ESS=590  gjenstår≈133.7min
+  [  85000/200000] acc=1.368  lp=3390.1  scale=0.7959  gjenstår≈128.0min  [PROD]
+  [  90000/200000] acc=1.370  lp=3397.9  scale=0.7959  gjenstår≈122.5min  [PROD]
+  [  95000/200000] acc=1.371  lp=3393.7  scale=0.7959  gjenstår≈117.1min  [PROD]
+  [ 100000/200000] acc=1.373  lp=3397.1  scale=0.7959  konv=PSRF=1.00 ESS=740  gjenstår≈111.6min
+  [ 105000/200000] acc=1.369  lp=3398.8  scale=0.7959  gjenstår≈106.1min  [PROD]
+  [ 110000/200000] acc=1.368  lp=3395.1  scale=0.7959  gjenstår≈101.3min  [PROD]
+  [ 115000/200000] acc=1.370  lp=3400.1  scale=0.7959  gjenstår≈96.3min  [PROD]
+  [ 120000/200000] acc=1.370  lp=3393.2  scale=0.7959  konv=PSRF=1.00 ESS=924  gjenstår≈90.5min
+  [ 125000/200000] acc=1.369  lp=3396.4  scale=0.7959  gjenstår≈84.8min  [PROD]
+  [ 130000/200000] acc=1.368  lp=3392.2  scale=0.7959  gjenstår≈79.1min  [PROD]
+  [ 135000/200000] acc=1.371  lp=3388.2  scale=0.7959  gjenstår≈73.5min  [PROD]
+  [ 140000/200000] acc=1.373  lp=3396.2  scale=0.7959  konv=PSRF=1.00 ESS=1084  gjenstår≈67.9min
+  [ 145000/200000] acc=1.373  lp=3390.6  scale=0.7959  gjenstår≈62.3min  [PROD]
+  [ 150000/200000] acc=1.375  lp=3396.2  scale=0.7959  gjenstår≈56.6min  [PROD]
+  [ 155000/200000] acc=1.377  lp=3394.4  scale=0.7959  gjenstår≈50.9min  [PROD]
+  [ 160000/200000] acc=1.381  lp=3396.4  scale=0.7959  konv=PSRF=1.00 ESS=1215  gjenstår≈45.3min
+  [ 165000/200000] acc=1.382  lp=3389.2  scale=0.7959  gjenstår≈39.7min  [PROD]
