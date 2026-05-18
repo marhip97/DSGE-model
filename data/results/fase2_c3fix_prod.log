@@ -69,3 +69,8 @@ Start lp = 3391.81
   [  65000/200000] acc=1.381  lp=3394.8  scale=0.7959  gjenstår≈150.5min  [PROD]
   [  70000/200000] acc=1.380  lp=3395.0  scale=0.7959  gjenstår≈145.0min  [PROD]
   [  75000/200000] acc=1.379  lp=3392.8  scale=0.7959  gjenstår≈139.5min  [PROD]
+  [  80000/200000] acc=1.372  lp=3389.6  scale=0.7959  konv=PSRF=1.01 ESS=590  gjenstår≈133.7min
+  [  85000/200000] acc=1.368  lp=3390.1  scale=0.7959  gjenstår≈128.0min  [PROD]
+  [  90000/200000] acc=1.370  lp=3397.9  scale=0.7959  gjenstår≈122.5min  [PROD]
+  [  95000/200000] acc=1.371  lp=3393.7  scale=0.7959  gjenstår≈117.1min  [PROD]
+  [ 100000/200000] acc=1.373  lp=3397.1  scale=0.7959  konv=PSRF=1.00 ESS=740  gjenstår≈111.6min
