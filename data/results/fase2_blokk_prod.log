@@ -1,0 +1,136 @@
+Fase 2 blokksampling — 20 parametre
+Blokk 1: {h_c, psi_R, psi_P1}  Blokk 2: (øvrige 17 param)
+Krav: PSRF < 1.05, ESS/n > 0.02 per parameter
+
+Start lp = 3575.81
+  Logit-reparametrisering AKTIV for: ('h_c', 'psi_R')
+
+=================================================================
+  NEMO v3 — ADAPTIV MCMC v2 (sigma_A fast=0.006)
+  T_pre=75 kv  T_post=15 kv  N=20 param
+  Produksjon=200,000  Burn-in=20,000
+  Startscale=0.4000  PSRF-krav<1.05
+  Blokksampling: {h_c,psi_R,psi_P1} | {rho_A,rho_C,rho_O,rho_Ys,rho_rp,rho_H,sigma_C,sigma_O,sigma_Ys,sigma_rp,sigma_i,sigma_P,sigma_H,psi_Y,phi_I1,phi_I2,phi_u}
+=================================================================
+
+  Startverdi log-posterior: 3567.74
+
+--- FASE 1: Adaptiv burn-in (20,000 trekk) ---
+  [   5000/20000] acc=0.249  lp=3558.8  scale=0.4498  gjenstår≈4.8min  [BURN-IN]
+  [  10000/20000] acc=0.244  lp=3564.4  scale=0.3429  gjenstår≈3.2min  [BURN-IN]
+  [  15000/20000] acc=0.248  lp=3553.3  scale=0.3887  gjenstår≈1.6min  [BURN-IN]
+  [  20000/20000] acc=0.253  lp=3556.4  scale=0.5245  gjenstår≈0.0min  [BURN-IN]
+  Ferdig. acc=0.253  scale=0.5245
+  Empirisk kovarians aktivert. Sterkeste korrelasjoner:
+
+--- FASE 2: Konvergensovervåkning ---
+
+  Sjekk runde 0: IKKE OK — PSRF=1.894, ESS=21
+  Problemer: ['rho_A', 'rho_C', 'rho_O', 'rho_Ys', 'rho_rp', 'rho_H']
+  Rekalibrering 1: scale→3.0000. Ekstra burn-in (10,000 trekk)...
+  [   5000/10000] acc=0.377  lp=3556.6  scale=1.0454  gjenstår≈3.1min  [REKALIB-1]
+  [  10000/10000] acc=0.431  lp=3561.3  scale=0.9200  gjenstår≈0.0min  [REKALIB-1]
+  Ekstra burn-in ferdig. acc=0.216
+
+  Sjekk runde 1: IKKE OK — PSRF=1.270, ESS=22
+  Problemer: ['rho_A', 'rho_C', 'rho_O', 'rho_Ys', 'rho_rp', 'rho_H']
+  Rekalibrering 2: scale→2.7600. Ekstra burn-in (10,000 trekk)...
+  [   5000/10000] acc=0.393  lp=3563.0  scale=0.8464  gjenstår≈2.9min  [REKALIB-2]
+  [  10000/10000] acc=0.432  lp=3557.9  scale=0.9012  gjenstår≈0.0min  [REKALIB-2]
+  Ekstra burn-in ferdig. acc=0.216
+
+  Sjekk runde 2: IKKE OK — PSRF=1.119, ESS=43
+  Problemer: ['rho_A', 'rho_C', 'rho_O', 'rho_Ys', 'rho_rp', 'rho_H']
+  Rekalibrering 3: scale→2.7037. Ekstra burn-in (10,000 trekk)...
+  [   5000/10000] acc=0.427  lp=3566.0  scale=0.9422  gjenstår≈3.0min  [REKALIB-3]
+  [  10000/10000] acc=0.453  lp=3563.2  scale=0.8828  gjenstår≈0.0min  [REKALIB-3]
+  Ekstra burn-in ferdig. acc=0.226
+
+  Sjekk runde 3: IKKE OK — PSRF=1.151, ESS=37
+  Problemer: ['rho_A', 'rho_C', 'rho_O', 'rho_Ys', 'rho_rp', 'rho_H']
+  Maks rekalibreringer nådd. Fortsetter.
+
+--- FASE 3: Produksjonskjøring (200,000 trekk) ---
+  Endelig scale: 0.8828
+  [   5000/200000] acc=0.518  lp=3554.5  scale=0.8828  gjenstår≈121.3min  [PROD]
+  [  10000/200000] acc=0.516  lp=3554.2  scale=0.8828  gjenstår≈116.7min  [PROD]
+  [  15000/200000] acc=0.505  lp=3561.9  scale=0.8828  gjenstår≈115.0min  [PROD]
+  [  20000/200000] acc=0.495  lp=3564.5  scale=0.8828  konv=PSRF=1.12 ESS=32  gjenstår≈113.1min
+  [  25000/200000] acc=0.484  lp=3561.1  scale=0.8828  gjenstår≈109.7min  [PROD]
+  [  30000/200000] acc=0.481  lp=3563.7  scale=0.8828  gjenstår≈105.2min  [PROD]
+  [  35000/200000] acc=0.476  lp=3564.3  scale=0.8828  gjenstår≈100.9min  [PROD]
+  [  40000/200000] acc=0.479  lp=3561.6  scale=0.8828  konv=PSRF=1.06 ESS=69  gjenstår≈97.5min
+  [  45000/200000] acc=0.477  lp=3564.9  scale=0.8828  gjenstår≈94.0min  [PROD]
+  [  50000/200000] acc=0.473  lp=3561.8  scale=0.8828  gjenstår≈90.3min  [PROD]
+  [  55000/200000] acc=0.470  lp=3561.4  scale=0.8828  gjenstår≈86.6min  [PROD]
+  [  60000/200000] acc=0.471  lp=3557.6  scale=0.8828  konv=PSRF=1.05 ESS=108  gjenstår≈83.5min
+  [  65000/200000] acc=0.471  lp=3564.8  scale=0.8828  gjenstår≈80.5min  [PROD]
+  [  70000/200000] acc=0.471  lp=3563.6  scale=0.8828  gjenstår≈77.3min  [PROD]
+  [  75000/200000] acc=0.470  lp=3562.6  scale=0.8828  gjenstår≈74.2min  [PROD]
+  [  80000/200000] acc=0.466  lp=3554.7  scale=0.8828  konv=PSRF=1.06 ESS=146  gjenstår≈70.9min
+  [  85000/200000] acc=0.471  lp=3556.8  scale=0.8828  gjenstår≈68.2min  [PROD]
+  [  90000/200000] acc=0.470  lp=3564.2  scale=0.8828  gjenstår≈65.1min  [PROD]
+  [  95000/200000] acc=0.470  lp=3557.3  scale=0.8828  gjenstår≈62.0min  [PROD]
+  [ 100000/200000] acc=0.470  lp=3563.7  scale=0.8828  konv=PSRF=1.06 ESS=180  gjenstår≈59.1min
+  [ 105000/200000] acc=0.470  lp=3563.2  scale=0.8828  gjenstår≈56.0min  [PROD]
+  [ 110000/200000] acc=0.471  lp=3556.8  scale=0.8828  gjenstår≈53.1min  [PROD]
+  [ 115000/200000] acc=0.470  lp=3559.1  scale=0.8828  gjenstår≈50.1min  [PROD]
+  [ 120000/200000] acc=0.467  lp=3559.1  scale=0.8828  konv=PSRF=1.05 ESS=217  gjenstår≈47.0min
+  [ 125000/200000] acc=0.466  lp=3557.0  scale=0.8828  gjenstår≈44.0min  [PROD]
+  [ 130000/200000] acc=0.466  lp=3559.5  scale=0.8828  gjenstår≈41.1min  [PROD]
+  [ 135000/200000] acc=0.468  lp=3561.1  scale=0.8828  gjenstår≈38.2min  [PROD]
+  [ 140000/200000] acc=0.468  lp=3561.8  scale=0.8828  konv=PSRF=1.03 ESS=259  gjenstår≈35.2min
+  [ 145000/200000] acc=0.467  lp=3561.7  scale=0.8828  gjenstår≈32.3min  [PROD]
+  [ 150000/200000] acc=0.467  lp=3563.7  scale=0.8828  gjenstår≈29.3min  [PROD]
+  [ 155000/200000] acc=0.468  lp=3559.3  scale=0.8828  gjenstår≈26.4min  [PROD]
+  [ 160000/200000] acc=0.469  lp=3561.6  scale=0.8828  konv=PSRF=1.04 ESS=302  gjenstår≈23.5min
+  [ 165000/200000] acc=0.468  lp=3562.7  scale=0.8828  gjenstår≈20.5min  [PROD]
+  [ 170000/200000] acc=0.467  lp=3565.0  scale=0.8828  gjenstår≈17.5min  [PROD]
+  [ 175000/200000] acc=0.465  lp=3559.4  scale=0.8828  gjenstår≈14.6min  [PROD]
+  [ 180000/200000] acc=0.463  lp=3565.6  scale=0.8828  konv=PSRF=1.05 ESS=337  gjenstår≈11.6min
+  [ 185000/200000] acc=0.464  lp=3561.3  scale=0.8828  gjenstår≈8.7min  [PROD]
+  [ 190000/200000] acc=0.463  lp=3559.1  scale=0.8828  gjenstår≈5.8min  [PROD]
+  [ 195000/200000] acc=0.464  lp=3560.9  scale=0.8828  gjenstår≈2.9min  [PROD]
+  [ 200000/200000] acc=0.463  lp=3555.5  scale=0.8828  konv=PSRF=1.03 ESS=387  gjenstår≈0.0min
+
+  Produksjon ferdig. acc=0.232  Total tid: 141.0 min
+
+  ========================================================================
+  DIAGNOSTIKK — PRODUKSJONSKJØRING
+  sigma_A kalibrert fast til 0.006
+  Parameter        K&M     Mean     Std       [5%,95%]    ESS   PSRF
+  ────────────────────────────────────────────────────────────────────
+  rho_A         0.8040   0.0977  0.0645 [0.025,0.224]    591 1.004 
+  rho_C         0.7250   0.8552  0.1662 [0.502,0.999]    588 1.004 
+  rho_O         0.8740   0.3947  0.1031 [0.230,0.568]    732 1.001 
+  rho_Ys        0.7830   0.7882  0.0628 [0.684,0.890]    666 1.008 
+  rho_rp        0.7370   0.8195  0.1907 [0.406,0.998]    910 1.002 
+  rho_H         0.6940   0.9014  0.1169 [0.658,0.999]    387 1.017 
+  sigma_C       0.0300   0.0161  0.0024 [0.012,0.020]    555 1.003 
+  sigma_O       0.0790   0.0878  0.0074 [0.076,0.101]    720 1.003 
+  sigma_Ys      0.0110   0.0059  0.0007 [0.005,0.007]    700 1.006 
+  sigma_rp      0.0060   0.0164  0.0015 [0.014,0.019]    751 1.003 
+  sigma_i       0.0003   0.0003  0.0000 [0.000,0.000]   1329 1.005 
+  sigma_P       0.0030   0.0055  0.0005 [0.005,0.006]    939 1.003 
+  sigma_H       0.0500   0.1498  0.0123 [0.131,0.171]    660 1.004 
+  psi_R         0.6660   0.9611  0.0119 [0.940,0.979]  17013 1.001 
+  psi_P1        0.2920   0.2816  0.0865 [0.141,0.427]  17552 1.000 
+  psi_Y         0.2420   0.2348  0.0403 [0.170,0.301]    387 1.029 
+  h_c           0.9380   0.9869  0.0020 [0.984,0.990]   1452 1.002 
+  phi_I1        4.0000   0.5055  0.0047 [0.500,0.515]    501 1.008 
+  phi_I2        8.0000  10.9115  2.7899 [6.589,15.685]    722 1.000 
+  phi_u         0.2192   0.7208  0.0519 [0.635,0.806]    808 1.007 
+
+  Konvergens: 20/20 OK  max PSRF=1.029  min ESS=387
+  ========================================================================
+
+  Lagret: /home/user/DSGE-model/data/results/chain_fase2_blokk_prod.npy
+          /home/user/DSGE-model/data/results/chain_fase2_blokk_prod_lp.npy
+          /home/user/DSGE-model/data/results/chain_fase2_blokk_prod_meta.json
+          /home/user/DSGE-model/data/results/chain_fase2_blokk_prod_posterior.json
+
+Ferdig på 141.1 min
+Lagret: /home/user/DSGE-model/data/results/chain_fase2_blokk_prod_posterior.json
+
+Konvergens: PSRF<1.05 for 20/20  |  ESS/n>0.02 for 2/20
+Noen kriterier ikke nådd — sjekk diagnostikk

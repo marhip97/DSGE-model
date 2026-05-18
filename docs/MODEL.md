@@ -30,7 +30,11 @@ z_t = T z_{t-1} + R ε_t
 
 ---
 
-## Tilstandsvariabler (NZ = 48)
+## Tilstandsvariabler (NZ = 49, Alt. A 2026-05-15)
+
+Indeks 48 er `u_K` (kapitalutnyttelse) — lagt til ved Alt. A. Se equations.py
+docstring for komplett liste.
+
 
 ### Endogene variabler (indeks 0–36)
 

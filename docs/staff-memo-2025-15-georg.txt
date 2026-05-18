@@ -1,0 +1,593 @@
+                                    15 | 2025
+
+
+Staff memo
+
+Mapping Optimal Policy into a Rule in NEMO: GEORG
+
+
+
+
+                                   18.12.2025
+
+                                   Eirik Almlid
+                                   Ida Feiring Haltia
+                                   Ørjan Robstad
+Staff Memos present reports and documentation written by staff members and
+affiliates of Norges Bank, the central bank of Norway. Views and conclusions
+expressed in Staff Memos should not be taken to represent the views of
+Norges Bank.
+
+© 2025 Norges Bank
+The text may be quoted or referred to, provided that due acknowledgement is
+given to source.
+
+Staff Memo inneholder utredninger og dokumentasjon skrevet av Norges Banks
+ansatte og andre forfattere tilknyttet Norges Bank. Synspunkter og konklusjoner
+i arbeidene er ikke nødvendigvis representative for Norges Banks.
+
+© 2025 Norges Bank
+Det kan siteres fra eller henvises til dette arbeid, gitt at forfatter og Norges Bank
+oppgis som kilde.
+
+ISSN 1504-2596 (online)
+ISBN 978-82-8379-386-4 (online)
+
+
+
+
+Norges Bank                                Staff memo                                   1
+Mapping Optimal Policy into a Rule in NEMO:
+                                    GEORG
+
+                 Eirik Almlid, Ida Feiring Haltia, Ørjan Robstad
+                                      Norges Bank
+
+                                    December 2025
+
+
+                                        Abstract
+
+This paper documents GEORG, "Ganske Enkel Optimal ReGel", a policy rule designed to
+replicate the loss function based policy rate path in Norges Bank’s main macro model,
+NEMO. The rule is forward looking and uses a selection of macroeconomic indicators of
+inflation and output developments. Coefficients are estimated by impulse response matching
+(IRF matching), ie the parameters are set so that the model dynamics of using GEORG in
+NEMO closely match those of the standard loss function based optimal policy. We outline
+how the rule can be used to compute a model based policy rate path and how to decompose
+model based path changes into intuitive forecast revisions.
+1        Introduction
+Norges Bank’s monetary policy analysis relies on the structural DSGE model, NEMO, in which
+the policy rate is determined by minimizing a loss function that represents the central bank’s ob-
+jectives. Specifically, the central bank chooses the policy rate path that minimizes the expected
+discounted value of the loss over a given horizon subject to the model’s behavioral equations.
+Weights in the loss function capture the trade-off between output and inflation stabilization, and
+the resulting model-based policy rate path is considered optimal for the specified weights and
+model structure. However, the resulting path is only optimal for the specific model parameters
+and is therefore sensitive to model uncertainty.
+        Policy rules, linking the policy rate directly to a selection of macroeconomic variables, are
+more widely used to describe monetary policy behavior. The canonical example is the Taylor
+rule (Taylor, 1993), which describes how the nominal interest rate should respond systematically
+to deviations in inflation from its target and output from potential. Although not necessarily
+optimal, these rules offer a transparent description of monetary policy that can be easily com-
+municated. Extensions and variations of the Taylor rule have since been developed to better fit
+specific policy environments, incorporating elements such as exchange rate movements or policy
+rate smoothing to reflect real world policy behavior (Nakamura et al., 2025).
+        It is well established that effective monetary policy should be forward-looking (Svensson,
+2010; Batini and Haldane, 1999) as monetary policy affects the economy with a lag and its
+impact on GDP and inflation typically peaks after one to two years (Norges Bank, 2024). This
+dimension can be incorporated into monetary policy rules. Forward-looking rules introduce
+expectations explicitly, allowing the policy rate to respond to forecasts of inflation, output, and
+other relevant variables rather than contemporaneous values. In addition to forecasts, such rules
+can include indicators of inflation and output developments, which improves the responsiveness
+of policy to underlying tendencies of monetary policy target variables.
+        In forward-looking New Keynesian frameworks, optimal policy is determined by the expected
+path of key economic variables (Galí, 2008; Clarida et al., 1999; Woodford, 2002). Therefore,
+policy rules that incorporate forecasts and predictive indicators are likely better suited to esti-
+mate optimal policy than those relying solely on current observations. Along with the policy
+rate smoothing term, this implies that the policy rate responds more strongly to persistent,
+medium-term developments and less to short-lived fluctuations and data noise, a response pat-
+tern widely regarded as a desirable feature of sound monetary policy (Norges Bank monetary
+policy strategy, 2025).
+        To approximate NEMO’s optimal policy using an extended forward looking policy rule, we
+introduce GEORG, "Ganske Enkel Optimal ReGel",1 which aims to offer a more transparent
+complement to the current loss function approach used in NEMO. While the loss function implies
+that the interest policy rate responds to all variables in the model, GEORG relies directly on a
+selection of variables relevant to Norwegian monetary policy deliberation: inflation, output gap,
+unit labor cost, the krone exchange rate, foreign interest rates and the money market premium.
+The parameters associated with the variables in GEORG are obtained via using an impulse
+    1
+        This translates to "A fairly simple optimal rule" in English.
+
+
+
+
+                                                            1
+response function (IRF) matched to NEMO’s loss function benchmark.2 This approach ensures
+that NEMO with GEORG replicate the policy response and underlying dynamics of NEMO
+with the loss function. Targeting the optimal policy differentiates GEORG from conventional
+policy rules in the literature and from the Taylor type rule employed as a robustness check in
+the Monetary Policy Report. ((Lindalen and Maffei-Faccioli, 2025))
+      This Memo documents GEORG and the estimation of the policy rule coefficients. Based
+on the policy rate paths generated by NEMO with GEORG, we construct a reduced form
+decomposition analysis illustrating how changes to our macro forecasts have led to adjustments
+to NEMO’s policy path between reports. This is different from the methodology currently used
+in Norges Bank’s Monetary Policy Report in which changes to the contributions of exogenous
+shocks are the basis for the decomposition analysis. Determining a relationship between forecast
+revisions and exogenous shock decompositions requires deep knowledge of the model’s dynamics.
+However, this alternative approach relates the decomposition analysis to forecast revisions,
+which provides a clear mapping from observable forecast changes to the model-based policy
+rate path.
+      This Memo is organized as follows. Section 2 describes GEORG in more detail, Section
+3 illustrates the use of NEMO with GEORG in practice including policy rate forecasts and
+decomposition analyses and Section 4 concludes.
+
+
+
+
+  2
+      See Appendix B for a technical description of the estimation.
+
+
+                                                        2
+2        GEORG
+This section provides a detailed overview of the GEORG rule and explains how its components
+are defined and implemented within Norges Bank’s forecasting environment. Let rt denote the
+policy rate implied by the rule in quarter t, and let r̄t denote the steady-state nominal policy
+rate.3 The rule can be expressed as:
+
+                                 rt = r̄t + ωr rt−1 − r̄t + (1 − ωr ) Xt + Zt ,                            (1)
+                                                        
+
+
+where ωr ∈ [0, 1) captures the degree of interest policy rate smoothing and the tendency for
+gradualism in policy settings. Zt is a residual (monetary policy shock), with its persistence
+estimated to be consistent with the persistence of the monetary policy shock currently used in
+NEMO with the loss function approch.4 Formally the shock follows an autoregressive process:
+
+
+                                     Zt+1 = λZ Zt + εt+1 ,       |λZ | < 1.                                (2)
+
+        The composite term Xt collects the macro variables that enter the rule:
+                            h                                                      i
+                                                                              f
+                   Xt = Et ωπ π̂t+1 + ωy ŷt+1 + ωϕ ϕ̂t+1 + ωS Ŝt+1 + ωrf r̂t+1 + ωµ µ̂t .                (3)
+
+Where:
+
+        • π̂: Inflation (CPI-ATE) gap
+
+        • ŷ: Domestic output gap
+
+        • ϕ̂: Unit labor cost growth gap
+
+        • Ŝ: Exchange rate growth gap
+
+        • r̂ f : Foreign policy rate gap
+
+        • µ̂: Money market premium gap.
+
+All variables are defined as gaps (ˆ·), i.e. in deviation from their steady-state (¯·) levels.
+
+            π̂t+1 = πt+1 − π̄t+1 ,              ŷt+1 = yt+1 − ȳt+1 ,         ϕ̂t+1 = ϕt+1 − ϕ̄t+1 ,
+            Ŝt+1 = ∆8q St+1 − ∆S̄t+1 ,         r̂ f = rf − r¯f ,
+                                                 t+1       t+1    t+1             µ̂t = µt − µ̄t .
+
+        π̄ denotes the inflation target, while πt+1 refers to the one quarter ahead forecast of four-
+quarter growth rate in CPI-ATE. See Hagelund et al. (2018) for a detailed description of Norges
+Bank’s approach to estimating the output gap, ŷ, and potential output, ȳ. ϕt is the four-quarter
+growth in unit labor cost.5 To preserve a stable labor income share, steady-state domestic
+    3
+     All variables are at a quarterly frequency consistent with the NEMO model, which is a quarterly DSGE
+model used for monetary policy analysis at Norges Bank.
+   4
+     λZ is estimated to be 0.75.
+   5
+     Unit labor cost is calculated as annual wage growth (from table 3 in MPR 4/25) adjusted for the underlying
+trend in labor productivity growth (from table 2.1 in MPR 4/25), interpolated by cubic spline to quarterly
+numbers.
+
+
+                                                       3
+inflation is assumed to coincide with the growth rate of unit labor cost. Under this assumption,
+ϕ̄ directly reflects the steady state of domestic inflation6 . The nominal exchange rate enters
+the rule as eight-quarter growth, calculated as (xt − xt−8 )/xt−8 × 100, capturing the medium
+run movements in the exchange rate. The nominal I-44 index7 is treated as a random walk in
+the forecasting horizon, which implies a steady-state value of ∆S̄ = 0. The steady state policy
+rate r̄ for Norway is consistent with Norges Bank’s communicated neutral-rate interval.8 The
+foreign steady state policy rate (r¯f ) is estimated to be below r̄, consistent with Norges Bank’s
+assessment of a steady-state risk premium on Norwegian kroner.9 The money-market premium
+µt is defined as the spread between three-month NIBOR and the expected average policy rate
+over the same horizon, and reflects funding and liquidity premiums that vary with international
+market conditions and FX swap bases. µ̄ is the estimated steady-state money market premium.
+       The loss function aims to minimize deviations in inflation from target and fluctuations in the
+output gap, and to smooth policy rate changes over time. The selection of variables in GEORG
+aims to incorporate macroeconomic indicators of inflation and output in order to implement a
+forward-looking policy rule. As such, the right-hand side of GEORG should not be interpreted
+as stabilization targets for the contemporaneous policy rate rt , but rather as providing a signal
+of expected inflation and output, which rt aims to stabilize. Unit labor cost includes both
+wage and productivity developments. Wage costs represent a large share of marginal costs for
+domestic firms and can serve as an early indicator of future inflationary pressure. Higher wages,
+all else equal, will also increase purchasing power and are likely to boost household demand.
+An increase in productivity decreases the unit labor cost for a given wage level, mitigating
+inflationary pressure. By explicitly responding to deviations in unit labor cost growth from its
+steady-state level, monetary policy only responds to wage increases/decreases over and above
+changes in productivity.
+       In addition, the krone exchange rate contains useful information about the economic outlook,
+as it affects inflation and activity through import prices and net exports with a considerable
+transmission lag. Incorporating foreign policy rates provides information about international
+economic developments and global monetary and financial developments. In addition, we di-
+rectly include inflation and the output gap to capture all residual information regarding the
+economic and inflation outlook not captured by the other indicators. Examples include Norges
+Bank’s import price indicators (such as IPI and IPK, see for instance Brubakk et al. (2024) and
+Norges Bank (2004)), price markups, and labor market developments. These variables are not
+currently included in GEORG as they are not explicitly represented in NEMO. However, efforts
+are ongoing to integrate them into Norges Bank’s forthcoming model revision.
+       The set of coefficients in the rule, Ω = {ωr , ωπ , ωy , ωϕ , ωS , ωrf , ωµ }, is estimated using IRF
+matching, see Table 2. See Appendix B for more information about the estimation.
+   6
+      The steady-state of domestic inflation is assumed to be 2.4
+   7
+      The I-44 index (I44t ) is a nominal effective exchange-rate index; a higher value indicates a weaker krone.
+    8
+      The latest assessment of the interval was provided in MPR 2/2025, see also Almlid and Asshoff (2025). In
+NEMO, we need a point estimate of r̄, which is within Norges Bank’s published interval.
+    9
+      See Norges Bank (2025) Monetary Policy Report 2/25, box “Neutral rate and international interest differen-
+tials.”
+
+
+
+
+                                                       4
+                                        Table 1: Steady-state values
+
+                           Variable                         Steady-state value
+                           Policy rate (r̄)                        3.05%
+                           Inflation target (π̄)                    2.0%
+                           Domestic output (ȳ)            Potential output level
+                           Unit-labor-cost growth (ϕ̄)              2.4%
+                           Exchange rate change (S̄)                 0%
+                           Foreign policy rate (r¯f )              2.65%
+                           Money-market premium (µ̄)              0.25 pp
+
+
+                                      Table 2: Estimated coefficients Ω
+
+                                           Parameter     Estimate
+
+                                           ωr              0.74
+                                           ωπ              1.17
+                                           ωy              1.27
+                                           ωϕ              1.25
+                                           ωS              0.13
+                                           ωr f            0.25
+                                           ωµ             -1.00
+
+
+
+
+3         Use of GEORG in practice
+3.1         The model-based policy rate path
+This section compares the policy rate path implied by NEMO with GEORG with the loss
+function derived policy path. The objective is to assess how closely GEORG replicates the loss
+function-based policy rate in NEMO. For the Monetary Policy Report (MPR) 4/2025, the policy
+rate paths generated by GEORG and the loss function are nearly identical, and the resulting
+developments in the output gap, inflation and the exchange rate are similar in the two versions
+of NEMO.10 A similar pattern is observed for MPR 3/2025, MPR 2/2025 and MPR 1/2025.
+    10
+         Appendix A documents the model-based paths from MPR 3/2025, MPR 2/2025 and MPR 1/2025.
+
+
+
+
+                                                     5
+          Figure 1: Comparison of NEMO with the loss function and NEMO with GEORG
+
+
+    Another way of assessing the similarities between GEORG and the loss function is to examine
+the ex-post historical monetary policy shocks. The two series are highly correlated and evolve
+closely over time, indicating that the rule-based representation captures much of the same
+systematic behavior embedded in the loss function policy rate.11
+
+
+
+
+                                     Figure 2: Monetary policy shock
+
+
+3.2    Decomposition analysis
+In the MPR, shock decompositions of the model’s policy rate paths are used to identify the
+factors driving the change in the policy rate forecasts since the previous report. We can also
+produce a shock decomposition when using NEMO with GEORG. In addition, GEORG al-
+lows for a decomposition based on forecast revisions of the observable variables in the rule
+(or changes in their steady-state values). This endogenous decomposition analysis translates
+forecast revisions into changes in the policy rate contributions without relying on shock iden-
+tification. Although this endogenous decomposition is reduced form, it is transparent and can
+be replicated without detailed knowledge of the model’s structure.
+  11
+     The monetary policy shock in the loss function has no clear structural interpretation and the magnitude of
+the shock itself is not directly economically meaningful. The relevant comparison lies in the correlation of the
+two series, which shows that GEORG closely tracks the policy stance implied by the loss function.
+
+
+                                                       6
+      In the following, we construct endogenous decomposition analyses using GEORG based on
+forecast revisions to observable variables and steady-state values for the first three quarters of
+2025.
+
+
+      If we denote the GEORG policy rate path at time t as rt (θt ) with θt = {Ω̂, r̄t } the decom-
+position from period t − 1 to t is:
+
+
+                                ∆t,t−1 rt+s = Et [rt+s (θt+s )] − Et−1 [rt+s (θt+s )]
+
+By defining the change in the forecast of a variable X as:
+
+                                        ∆t,t−1 Xt+s = Et [Xt+s ] − Et−1 [Xt+s ]
+
+we can decompose the change in the GEORG policy rate path as changes in the forecasts and
+trend values between the two periods:
+
+
+
+   ∆t,t−1 rt+s = (1 − ωr )ωπ ∆t,t−1 π̂t+1+s + (1 − ωr )ωy ∆t,t−1 ŷt+1+s + (1 − ωr )ωϕ ∆t,t−1 ϕ̂t+1+s
+                   |               {z                }   |                   {z            }    |              {z          }
+                                Inflation                            Output gap                          Unit labor cost
+                                                                             f
+                   + (1 − ωr )ωs ∆t,t−1 ∆8q ŝt+1+s + (1 − ωr )ωrf ∆t,t−1 r̂t+1+s
+                                                            
+                       |                    {z               }       |                {z             }
+                                   Exchange rate                              Foreign policy rate
+
+                   + (1 − ωr )ωµ ∆t,t−1 µ̂t+s + ∆t,t−1 r̄t+s + ωr ∆t,t−1 (rt−1+s − r̄t ) .                                 (4)
+                       |            {z               }   |   {z          }    |            {z             }
+                           Money market premium              r̄                     Smoothing term
+
+
+      Even though the contributions are calculated mechanically using the rule’s coefficients, there
+are some elements that could benefit from further explanation.
+      The first is the absence of change in the residual (monetary policy shock), Zt . Zt appears
+in equation (1) but does not appear in equation (4) above. The decomposition analysis aims to
+illustrate how the model-based path has changed based on changes in the main drivers in the
+model, and we therefore ignore the residual term. This is also the case for the decompositions
+published in the Monetary Policy Report.
+      It can also be useful to go into more detail on how a shift in r̄ would enter the decomposition.
+An upward revision to the point estimate of r̄ in NEMO, all else equal, affects the policy path
+in GEORG through two channels. First, it raises the level term as seen in equation (1) and
+(4), which shifts the whole model-based path one-to-one. Second, it also enters the policy rate
+smoothing term ωr (rt−1 − r̄t ), which partly offsets the level effect. As a result, since ωr > 0,
+the policy rate from GEORG does not adjust one-to-one with the revision to r̄ in the short run.
+Figure 3 illustrates these two effects and the resulting net contribution in the decomposition
+due to a 25 basis points upward revision to r̄, all else equal.12
+ 12
+      Changes in the steady-state money market premium will enter GEORG in the same way as changes in r̄.
+
+
+
+
+                                                                 7
+                                  Figure 3: Effect of a change in r̄
+
+
+   The policy rate smoothing term will also affect how changes in forecasts over time enter the
+decomposition. If the inflation forecast is lifted by one percentage point over the entire forecast
+horizon, the size of the bars in the decomposition will gradually converge to the long-term
+coefficient of the variable. This is illustrated in figure 4.
+
+
+
+
+  Figure 4: Model-based path response to a 1pp increase in the output gap and inflation forecasts
+
+
+   Figure 5 show the decompositions based on NEMO with GEORG for MPR 4/25. In the fore-
+cast based decomposition, revisions to r̄ are typically grouped together with either the money
+market premium or the foreign interest rates, depending on the source of the revision. Revi-
+sions to r̄ attributed to international factors are assigned to the foreign interest rate bars, while
+revisions reflecting changes in the long run money market premium assumption are assigned to
+the money market premium bars. As already mentioned, the GEORG based decompositions
+use changes in forecasts, while the decomposition traditionally published in MPR is constructed
+
+                                                  8
+from changes in shock contributions. Overall, the aggregate change in the model-based policy
+rate path from NEMO with GEORG is broadly similar to the loss function approach used in the
+MPR. This is because the coefficients in GEORG are estimated to match the model dynamics of
+the loss function version of NEMO. Nonetheless, the shock decomposition and the endogenous
+decomposition based on NEMO with GEORG differ by definition as they are different objects.
+In the shock decomposition, exchange rate bars typically represent risk premium shocks and
+their full general equilibrium effects on the policy rate, including the delayed response of in-
+flation. By contrast, in the GEORG (reduced form) decomposition, exchange rate bars show
+only the role of revisions to the exchange rate forecasts and the delayed inflation responses
+are reported separately under inflation. The same distinction applies to prices and wages: the
+shock decomposition bundles price and wage markup shocks, while the GEORG decomposition
+reports the isolated contribution of changes in price and wage forecasts.
+
+
+
+
+          Figure 5: NEMO with GEORG. Decomposition based on changes in projections
+
+
+
+
+                                               9
+4    Conclusion
+This memo has documented GEORG, a fairly simple, transparent policy rule designed to ap-
+proximate the loss function policy rate path from Norges Bank’s core model, NEMO. GEORG
+provides a reduced form mapping of macroeconomic forecasts into an policy rate path. We show
+that GEORG closely reproduces the dynamics of the loss function approach and can serve as
+a practical and intuitive tool both for policy analysis and communication. The rule’s primary
+strength lies in its transparency: it allows both internal and external users to trace how changes
+in key forecasts affect the implied policy rate path in the model, providing a new endogenous
+decomposition.
+    Going forward, we expect GEORG to play a valuable role in Norges Bank’s analytical toolkit.
+We will continue to develop GEORG going forward, particularly in combination with the devel-
+opment of a new core model in Norges Bank. Improving the treatment of international impulses
+is a key priority. Further efforts will also explore complementary rules as cross-checks under
+alternative objectives. These may include rules that are robust across models or that implicitly
+vary the weight on inflation stabilization relative to employment. Finally, we plan to examine
+asymmetric reaction functions consistent with Norges Bank’s monetary policy strategy.
+
+
+
+
+                                               10
+A   Appendix: Additional IRFs and account charts
+
+
+
+
+                             11
+12
+Figure 6: IRF matching
+
+
+
+
+         13
+            Figure 7: Model-based policy rate paths from the monetary policy reports 2025
+
+
+B        Estimation of coefficients
+We estimate Ω = {ωr , ωπ , ωy , ωϕ , ωs , ωrf or , ωµ } such that the dynamic responses for GEORG
+match those for the benchmark optimal policy (loss function) in NEMO (Kravik and Mimir,
+2019). The impulse responses change as we vary the coefficients because economic agents are
+forward-looking and internalize the central bank’s reaction function. When the parameters in
+the rule change, the expected policy response changes as well, which in turn alters expectations
+and the propagation of shocks. By searching over alternative parameter values, we identify the
+set of coefficients that generates model dynamics most closely aligned with the optimal policy
+in NEMO.
+    Consider a set of shocks S and a vector of model variables V.13 Let IRF(1)
+                                                                           v,s (h) denote the h-
+step impulse response in model 1 (loss-function policy) and IRF(2)
+                                                               v,s (h; Ω) the response in model 2
+(GEORG). We minimize the weighted quadratic distance:
+
+                                       H
+                                                                                         2
+                    min J(Ω) =                     wv,s,h IRF(2)
+                                                             v,s (h; Ω) − IRFv,s (h) ,                       (5)
+                                     XXX                                    (1)
+                    Ω∈P
+                                     s∈S v∈V h=0
+
+where wv,s,h ≥ 0 are optional weights14 , h is the IRF horizon, and P is the parameter search
+region implied by our priors.
+    We use uniform priors for each parameter, which in practice define a search area for the
+optimizer. The starting value, lower bound and upper bound are given in Table 3.
+    15
+
+  13
+     We match the entire dynamic response of a rich set of variables, not only the policy rate. Both domestic and
+international shocks are used.
+  14
+     We weight the policy rate response relatively more.
+  15
+     Uniform priors are natural for IRF matching where identification primarily comes from dynamic fit rather
+than likelihood curvature. They also avoid unnecessarily weighting at one region and map directly to a search
+box in numerical optimization.
+
+
+
+
+                                                       14
+                                         Table 3: Uniform priors
+
+                                  Parameter      Start    Lower      Upper
+
+                                  ωr             0.70      0.00      0.99
+                                  ωπ             0.32      0.00      3.00
+                                  ωy             0.50      0.00      3.00
+                                  ωϕ             0.80      0.00      3.00
+                                  ωS             0.10      0.00      3.00
+                                  ωrf            0.26      0.25      3.00
+                                  ωµ             -1.00     -1.01     -0.99
+
+
+       We solve (5) using a population-based metaheuristic from the artificial bee colony (ABC)
+family.16 The algorithm iteratively evaluates a large number of candidate parameter sets Ω
+within the admissible search space P. Each candidate is assessed by its objective value J(Ω),
+and the population gradually converges toward regions with lower loss. The algorithm returns
+the parameter vector corresponding to the estimated mode of the objective function.
+       Table 4 records the estimated annualized coefficients Ω selected by the IRF-matching crite-
+rion.
+                                    Table 4: Estimated coefficients Ω
+
+                                         Parameter        Estimate
+
+                                         ωr                 0.74
+                                         ωπ                 1.17
+                                         ωy                 1.27
+                                         ωϕ                 1.25
+                                         ωS                 0.13
+                                         ωr f               0.25
+                                         ωµ                -1.00
+
+
+
+References
+Almlid, E. and Asshoff, S. (2025). Estimating the Neutral Real Rate of Interest in Norway.
+  Staff Memo 8/2025, Norges Bank.
+
+Batini, N. and Haldane, Andrew G. (1999). Forward-Looking Rules for Monetary Policy. In
+  Taylor, John B., editor, Monetary Policy Rules, pages 157–202. University of Chicago Press.
+  Accessed: 2025-11-07.
+
+Brubakk, L., Matsen, K. A., Mjølnerød, K., Ørjan Robstad, and Werenskiold, E. (2024). Chart-
+  ing the upstream: An indicator for imported input goods prices. Staff Memo 5/2024, Norges
+  Bank.
+  16
+   Bee search algorithms use employed, onlooker and scout phases to balance exploration and exploitation, see
+(Karaboga, 2005; Nozohour-leilabady and Sadeghi, 2016).
+
+
+                                                     15
+Clarida, Richard H., Galí, J., and Gertler, M. (1999). The Science of Monetary Policy: A New
+  Keynesian Perspective. Technical Report Working Paper 7147, National Bureau of Economic
+  Research.
+
+Galí, J. (2008). Monetary Policy, Inflation, and the Business Cycle: An Introduction to the
+  New Keynesian Framework. Princeton University Press.
+
+Hagelund, K., Hansen, F., and Robstad, Ø. (2018). Model Estimates of the Output Gap. Staff
+  Memo 4/2018, Norges Bank.
+
+Karaboga, D. (2005). An Idea Based on Honey Bee Swarm for Numerical Optimization. Tech-
+  nical report, Erciyes University.
+
+Kravik, E. M. and Mimir, Y. (2019). Navigating with NEMO. Staff Memo 5/2019, Norges
+  Bank.
+
+Lindalen, I. H. and Maffei-Faccioli, N. (2025). The Norwegian Taylor rule. Staff Memo 5/2025,
+  Norges Bank.
+
+Nakamura, E., Riblier, V., and Steinsson, J. (2025). Beyond the Taylor Rule. Technical Report
+  Working Paper 34200, National Bureau of Economic Research.
+
+Norges Bank (2004). Penger og Kreditt 2/2004. Penger og Kreditt, (2/2004).
+
+Norges Bank (2024). Norges Banks håndbok i pengepolitikk: Versjon 2.0. Technical Report
+  3/2024, Norges Bank.
+
+Norges Bank monetary policy strategy (2025). Norges Bank’s monetary policy strategy state-
+  ment. https://www.norges-bank.no/tema/pengepolitikk/pengepolitisk-strategi/.
+
+Nozohour-leilabady, B. and Sadeghi, H. (2016). On the Application of Artificial Bee Colony
+  (ABC) Algorithm for Solving Engineering Problems. International Journal of Industrial
+  Engineering Computations, 7(3):535–558.
+
+Svensson, L. E. (2010). Inflation Targeting. In Friedman, B. M. and Woodford, M., editors,
+  Handbook of Monetary Economics, Volume 3, chapter 22, pages 1237–1302. Elsevier.
+
+Taylor, J. B. (1993). Discretion versus Policy Rules in Practice. Carnegie-Rochester Conference
+  Series on Public Policy, 39:195–214.
+
+Woodford, M. (2002). Interest and Prices. Princeton University.
+
+
+
+
+                                              16
+

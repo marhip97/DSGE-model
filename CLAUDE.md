@@ -140,7 +140,7 @@ Endring krever PE-godkjenning (se eskaleringsliste).
 
 Se full liste i `AGENTER.md` § "Eskaleringsregler". Kortversjon:
 
-- Modellens dimensjon (NZ=48, NE=13)
+- Modellens dimensjon (NZ=49 etter Alt. A 2026-05-15, NE=13)
 - COVID-hull-periodene
 - Mappestruktur (`src/nemo/...`)
 - Ny variabel i observasjonssettet

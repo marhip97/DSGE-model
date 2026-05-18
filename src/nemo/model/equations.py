@@ -3,7 +3,7 @@
 NEMO FASE II — LIKNINGSSYSTEM
 Γ₀ z_t = Γ₁ z_{t-1} + Ψ ε_t + Π η_t
  
-Tilstandsvektor (NZ = 48):
+Tilstandsvektor (NZ = 49, Alt. A 2026-05-15):
   HUSHOLDNINGER OG KONSUM:
     0  pi        KPI-inflasjon
     1  c_W       Konsum, sparere (W = workers / optimizers)
@@ -65,7 +65,10 @@ Tilstandsvektor (NZ = 48):
     45 i_star     Utenlandsk rente
     46 eps_phi_h  LTV-sjokk husholdninger
     47 eps_prem   Pengemarkedspremie
- 
+
+  ALT. A (2026-05-15) — VARIABEL KAPITALUTNYTTELSE:
+    48 u_K        Kapitalutnyttelse (utilization rate), K&M §2.7
+
 Sjokk (NE = 13):
     0  E_A       TFP
     1  E_C       Konsumpreferanse
@@ -259,13 +262,13 @@ def build_matrices(p=None):
     # BLOKK C: PRODUKSJON OG KAPITAL
     # ════════════════════════════════════════════════════════════════════════
  
-    # C1. BNP (varemarkedsklarering) — Spor A5 delvis rettelse (2026-05-15)
+    # C1. BNP (varemarkedsklarering) — Spor A5 rettelse fullført (2026-05-18)
     # MY justert til 0.28 (fastlands-import, uten oljesektor).
-    # Q_H utelatt: boligpris ≠ boliginvestering (kontaminerer ved kostnadssjokk).
-    # Parametersum CY+IY+IHY+GY+XY-MY = 1.00 (se parameters.py).
+    # IHY inkludert i INV-koeffisienten siden modellen ikke har separat INV_H-variabel.
+    # Sjekk: CY+(IY+IHY)+GY+XY-MY = 0.50+0.30+0.25+0.23-0.28 = 1.00 ✓
     G0[9, Y]    =  1.0
     G0[9, C]    = -CY
-    G0[9, INV]  = -IY
+    G0[9, INV]  = -(IY + IHY)   # total investering = kapital + bolig
     G0[9, G]    = -GY
     G0[9, X]    = -XY
     G0[9, M]    =  MY
@@ -395,19 +398,23 @@ def build_matrices(p=None):
  
     # E6. Gjeld, låntakere (LTV-bindende)
     # b_NW = m_H · q_H · h_NW / (1 + i_L_NW)
+    # A4c-rettelse (2026-05-18): positivt LTV-sjokk = strammere LTV → mindre gjeld.
+    # Konsistent med renteoppgang i lign. 22-23 ved samme sjokk.
     G0[25, B_NW]    =  1.0
     G0[25, Q_H]     = -m_H
     G0[25, H_NW]    = -m_H
     G0[25, I_L_NW]  =  m_H
-    Psi[25, E_phi_h] = 1.0   # LTV-sjokk
+    Psi[25, E_phi_h] = -1.0   # strammere LTV → mindre gjeld (PE-godkjent 2026-05-18)
  
-    # E7. Bankkapital-akkumulering (netto kapital)
-    # nb = (1-δ_b)·nb_{t-1} + spread·lån - kapitalkrav
+    # E7. Bankkapital-akkumulering (Gerali et al. 2010)
+    # A4a-rettelse (2026-05-18, PE-godkjent): bytte til G1-akkumulering.
+    # nb_t = (1-δ_b)·nb_{t-1} + φ_o·(i_R_{t-1} + b_NW_{t-1})
+    # Tidligere bug: G0[26,NB] += phi_c ga G0[26,NB] = 11.0; ingen lagg-ledd.
+    # phi_c-leddet er fjernet her — det inngår i spread-likningene (21-23).
     G0[26, NB]     =  1.0
-    G0[26, I_R]    = -p.phi_o   # spread-inntekt
-    G0[26, B_NW]   = -p.phi_o
-    G0[26, NB]     +=  p.phi_c  # kapitaldekning-kostnad (allerede +1.0 over)
-    # Forenklet: nb ≈ spread·(b_W + b_NW) - φ_c·(nb - γ_b·aktiva)
+    G1[26, NB]     =  (1.0 - p.delta_b)   # akkumulering, δ_b = 0.0161
+    G1[26, I_R]    = -p.phi_o             # spread-inntekt fra forrige periode
+    G1[26, B_NW]   = -p.phi_o
  
     # ════════════════════════════════════════════════════════════════════════
     # BLOKK F: OFFENTLIG SEKTOR
@@ -675,11 +682,15 @@ def build_matrices_v3(p=None, theta_H: float = 0.05):
     G0[11, INV]   = -_delta
     G0[11, K_L]   = -(1.0 - _delta)             # 1-periodes lagg
 
-    # Ligning 12: investering (Tobin's Q med justeringskostnader)
+    # Ligning 12: investering (Tobin's Q med justeringskostnader, CEE 2005)
+    # CEE-FOC: q_K_t = φ_I1·(1+β)·inv_t − φ_I1·inv_{t-1} − β·φ_I1·E[inv_{t+1}]
+    # → inv_t = (1/(φ_I1·(1+β)))·q_K + (1/(1+β))·inv_{t-1} + (β/(1+β))·E[inv_{t+1}]
+    # Rettelse 2026-05-18 (PE-godkjent): manglende (1+β)-faktor på Q_K-koeff.
+    _beta = p.beta
     G0[12, :] = 0.0; G1[12, :] = 0.0; Psi[12, :] = 0.0; Pi[12, :] = 0.0
     G0[12, INV]   =  1.0
-    G0[12, Q_K]   = -1.0 / _phi_I1
-    G0[12, INV_L] = -(_phi_I1 / (_phi_I1 + _phi_I2))  # 1-periodes lagg
+    G0[12, Q_K]   = -1.0 / (_phi_I1 * (1.0 + _beta))   # CEE-korrekt
+    G0[12, INV_L] = -(_phi_I1 / (_phi_I1 + _phi_I2))   # 1-periodes lagg
     Pi[12, INV]   =  _phi_I2 / (_phi_I1 + _phi_I2)
     Psi[12, E_I]  =  1.0
 
