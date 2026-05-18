@@ -1,0 +1,20 @@
+Fase 2 postfix — 19 frie parametre
+phi_I1 = 4.0 (fast)
+Modell: A4a + A4c + CEE + A5 + LTV-fortegnsfix
+Prior psi_R: Beta(2,2) på (0.01, 0.85) — innstrammet
+psi_R startpunkt: 0.9637 → 0.74 (klampet for ny prior)
+
+Start lp = 3355.57
+  Logit-reparametrisering AKTIV for: ('h_c', 'psi_R')
+
+=================================================================
+  NEMO v3 — ADAPTIV MCMC v2 (sigma_A fast=0.006)
+  T_pre=75 kv  T_post=15 kv  N=19 param
+  Produksjon=200,000  Burn-in=20,000
+  Startscale=0.5000  PSRF-krav<1.05
+  Blokksampling: {h_c,psi_R,psi_P1} | {rho_A,rho_C,rho_O,rho_rp} | {rho_Ys,rho_H,psi_Y,sigma_Ys} | {sigma_C,sigma_O,sigma_rp,sigma_i,sigma_P,sigma_H} | {phi_I2,phi_u}
+=================================================================
+
+  Startverdi log-posterior: 3348.78
+
+--- FASE 1: Adaptiv burn-in (20,000 trekk) ---
