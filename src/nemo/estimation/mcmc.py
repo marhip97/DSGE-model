@@ -73,6 +73,35 @@ def build_Sv():
            'dh_obs':0.004,'db_obs':0.002}
     return np.diag([sme[n]**2 for n in OBS_NAMES])
 
+# Alt. 4 (PE-godkjent 2026-05-19): utelat RER fra observasjonssettet.
+# ds_obs absorberer sigma_rp-dominans; uten RER testes om sigma_rp faller mot K&M.
+OBS_NAMES_NO_RER = [n for n in OBS_NAMES if n != 'ds_obs']
+N_OBS_NO_RER = len(OBS_NAMES_NO_RER)  # 13
+
+def build_H_no_rer() -> np.ndarray:
+    """Observasjonsmatrise uten RER (ds_obs). PE-godkjent Alt. 4, 2026-05-19."""
+    H = np.zeros((N_OBS_NO_RER, NZ))
+    obs = OBS_NAMES_NO_RER
+    mapping = {
+        'dy_obs': (Y, 1.0), 'dc_obs': (C, 1.0), 'dinv_obs': (INV, 1.0),
+        'dx_obs': (X, 1.0), 'dm_obs': (M, 1.0), 'pi_obs': (PI, 4.0),
+        'dw_obs': (W, 1.0), 'i_R_obs': (I_R, 4.0), 'i_3m_obs': (I_R, 4.0),
+        'dpO_obs': (PO, 1.0), 'dyS_obs': (YS, 1.0),
+        'dh_obs': (Q_H, 1.0), 'db_obs': (B_NW, 1.0),
+    }
+    for i, nm in enumerate(obs):
+        col, scale = mapping[nm]
+        H[i, col] = scale
+    return H
+
+def build_Sv_no_rer() -> np.ndarray:
+    """Målefeil-kovarians uten RER. PE-godkjent Alt. 4, 2026-05-19."""
+    sme = {'dy_obs':0.005,'dc_obs':0.008,'dinv_obs':0.015,'dx_obs':0.010,
+           'dm_obs':0.012,'pi_obs':0.008,'dw_obs':0.004,'i_R_obs':0.0005,
+           'i_3m_obs':0.0005,'dpO_obs':0.050,'dyS_obs':0.006,
+           'dh_obs':0.004,'db_obs':0.002}
+    return np.diag([sme[n]**2 for n in OBS_NAMES_NO_RER])
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PARAMETERE OG PRIOR
