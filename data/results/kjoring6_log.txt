@@ -58,3 +58,4 @@ Start lp = 3296.20
   Endelig scale: 0.8295
   [   5000/200000] acc=1.282  lp=3317.3  scale=0.8295  gjenstår≈423.5min  [PROD]
   [  10000/200000] acc=1.236  lp=3317.7  scale=0.8295  gjenstår≈410.1min  [PROD]
+  [  15000/200000] acc=1.238  lp=3318.4  scale=0.8295  gjenstår≈394.0min  [PROD]
