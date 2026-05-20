@@ -55,3 +55,8 @@ Start lp = 3409.53
 
 --- FASE 3: Produksjonskjøring (200,000 trekk) ---
   Endelig scale: 0.9972
+  [   5000/200000] acc=1.056  lp=3425.5  scale=0.9972  gjenstår≈454.3min  [PROD]
+  [  10000/200000] acc=1.029  lp=3427.9  scale=0.9972  gjenstår≈442.1min  [PROD]
+  [  15000/200000] acc=1.012  lp=3431.9  scale=0.9972  gjenstår≈426.8min  [PROD]
+  [  20000/200000] acc=1.008  lp=3422.3  scale=0.9972  konv=PSRF=1.01 ESS=248  gjenstår≈408.9min
+  [  25000/200000] acc=1.012  lp=3428.8  scale=0.9972  gjenstår≈392.6min  [PROD]
