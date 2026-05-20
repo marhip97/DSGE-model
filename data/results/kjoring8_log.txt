@@ -1,0 +1,20 @@
+Fase 2 phi_O-fix — 18 frie parametre
+phi_I1=4.0 (fast), h_c=0.938 (fast, K&M)
+phi_O=0.15 i UIP (olje-valuta-kanal, PE-godkjent 2026-05-20)
+psi_R prior: Beta(2,2) på (0.01, 0.92)
+psi_R startpunkt: 0.8423
+
+Start lp = 3409.53
+  Logit-reparametrisering AKTIV for: ('psi_R',)
+
+=================================================================
+  NEMO v3 — ADAPTIV MCMC v2 (sigma_A fast=0.006)
+  T_pre=75 kv  T_post=15 kv  N=18 param
+  Produksjon=200,000  Burn-in=20,000
+  Startscale=0.5000  PSRF-krav<1.05
+  Blokksampling: {psi_R,psi_P1} | {rho_A,rho_C,rho_O,rho_rp} | {rho_Ys,rho_H,psi_Y,sigma_Ys} | {sigma_C,sigma_O,sigma_rp,sigma_i,sigma_P,sigma_H} | {phi_I2,phi_u}
+=================================================================
+
+  Startverdi log-posterior: 3406.89
+
+--- FASE 1: Adaptiv burn-in (20,000 trekk) ---
