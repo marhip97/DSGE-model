@@ -68,3 +68,4 @@ Start lp = 3404.26
   [  50000/200000] acc=1.107  lp=3419.3  scale=0.9443  gjenstår≈221.7min  [PROD]
   [  55000/200000] acc=1.109  lp=3419.4  scale=0.9443  gjenstår≈214.0min  [PROD]
   [  60000/200000] acc=1.113  lp=3420.4  scale=0.9443  konv=PSRF=1.00 ESS=570  gjenstår≈206.5min
+  [  65000/200000] acc=1.115  lp=3418.2  scale=0.9443  gjenstår≈199.1min  [PROD]
