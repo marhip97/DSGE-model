@@ -313,14 +313,17 @@ def build_matrices(p=None):
     # BLOKK D: VALUTA OG HANDEL
     # ════════════════════════════════════════════════════════════════════════
  
-    # D1. UIP med pengemarkedspremie (utvidet fra Fase I)
-    # E[rer_{t+1}] = rer + (i_D - π) - (i* - π*) + ε_rp + ε_prem
+    # D1. UIP med pengemarkedspremie og gjeldselastisk premie (K&M §3.4, Tabell 8)
+    # E[rer_{t+1}] = rer + (i_D - π) - (i* - π*) + ε_rp + ε_prem + φ_B·b_NW
+    # φ_B·b_NW: gjeldselastisk ankerfeste — demper valutakursvolatilitet og
+    # forhindrer at ε_rp absorberer all uforklart valutadynamikk (PE-godkjent 2026-05-19).
     G0[15, RER]       =  1.0
     G0[15, I_D]       =  1.0
     G0[15, PI]        = -1.0
     G0[15, I_STAR]    = -1.0
     G0[15, PI_STAR]   =  1.0
     G0[15, EPS_PREM]  = -1.0   # pengemarkedspremie som UIP-skift
+    G0[15, B_NW]      =  phi_B # gjeldselastisk premie — φ_B=0.0016 (K&M Tabell 8)
     Pi[15, RER]       =  1.0
     Psi[15, E_rp]     =  1.0
     Psi[15, E_prem]   =  1.0
