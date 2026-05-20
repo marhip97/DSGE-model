@@ -1,0 +1,35 @@
+Fase 2 kjøring 9 — 19 frie parametre
+phi_I1 fri igjen (PE-godkjent 2026-05-20), h_c=0.938 (fast)
+phi_B=0.0016, phi_O=0.15 i UIP
+Prior phi_I1: Normal(2.0, 2.0) på (0.1, 15.0)
+psi_R prior: Beta(2,2) på (0.01, 0.92)
+phi_I1 startpunkt: 0.50 (fase2v2-estimat)
+psi_R startpunkt: 0.9116
+
+Start lp = 3448.65
+  Logit-reparametrisering AKTIV for: ('psi_R',)
+
+=================================================================
+  NEMO v3 — ADAPTIV MCMC v2 (sigma_A fast=0.006)
+  T_pre=75 kv  T_post=15 kv  N=19 param
+  Produksjon=200,000  Burn-in=20,000
+  Startscale=0.5000  PSRF-krav<1.05
+  Blokksampling: {psi_R,psi_P1} | {rho_A,rho_C,rho_O,rho_rp} | {rho_Ys,rho_H,psi_Y,sigma_Ys} | {sigma_C,sigma_O,sigma_rp,sigma_i,sigma_P,sigma_H} | {phi_I1,phi_I2,phi_u}
+=================================================================
+
+  Startverdi log-posterior: 3443.86
+
+--- FASE 1: Adaptiv burn-in (20,000 trekk) ---
+  [   5000/20000] acc=0.192  lp=3490.5  scale=0.1349  gjenstår≈6.4min  [BURN-IN]
+  [  10000/20000] acc=0.212  lp=3493.1  scale=0.0782  gjenstår≈4.4min  [BURN-IN]
+  [  15000/20000] acc=0.235  lp=3494.3  scale=0.1374  gjenstår≈2.3min  [BURN-IN]
+  [  20000/20000] acc=0.238  lp=3489.3  scale=0.1288  gjenstår≈0.0min  [BURN-IN]
+  Ferdig. acc=0.238  scale=0.1288
+  Empirisk kovarians aktivert. Sterkeste korrelasjoner:
+    psi_P1     ↔ phi_I2    : r=+0.750
+
+--- FASE 2: Konvergensovervåkning ---
+
+  Sjekk runde 0: IKKE OK — PSRF=2.203, ESS=22
+  Problemer: ['rho_A', 'rho_C', 'rho_O', 'rho_Ys', 'rho_rp', 'rho_H']
+  Rekalibrering 1: scale→3.0000. Ekstra burn-in (10,000 trekk)...
