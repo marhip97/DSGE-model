@@ -91,7 +91,7 @@ chain, lp_vec, meta = adaptive_mcmc_with_monitoring(
     Y_pre=pre, Y_post=post, H=H, Sv=Sv,
     theta_init=theta_start, post_std_init=post_std,
     n_production=200000, burnin=20000,
-    adapt_every=500, check_every=20000,
+    adapt_every=500, check_every=5000,
     max_recalib=3,
     psrf_thr=1.05, ess_pct_thr=0.02,
     scale_init=0.5, seed=99, verbose=True,
