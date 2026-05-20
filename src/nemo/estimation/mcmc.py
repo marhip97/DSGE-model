@@ -389,9 +389,12 @@ def adaptive_mcmc_with_monitoring(
                     print(f"  [{i+1:7d}/{n_steps}] acc={acc/(i+1):.3f}  "
                           f"lp={lp_cur:.1f}  scale={scale:.4f}  "
                           f"konv={status}  gjenstår≈{rem/60:.1f}min")
-                # Løpende lagring
+                # Løpende lagring — flush til disk umiddelbart
                 np.save(f"{save_prefix}_partial.npy", ch[:i+1])
-            elif verbose and (i+1)%5000==0:
+            elif save_prefix and (i+1)%1000==0:
+                # Ekstra sikkerhet: lagre hvert 1000 trekk i produksjon
+                np.save(f"{save_prefix}_partial.npy", ch[:i+1])
+            if verbose and (i+1)%5000==0 and not (monitor and (i+1)%check_every==0):
                 rem=(time.time()-t0)/(i+1)*(n_steps-i-1)
                 print(f"  [{i+1:7d}/{n_steps}] acc={acc/(i+1):.3f}  "
                       f"lp={lp_cur:.1f}  scale={scale:.4f}  "
