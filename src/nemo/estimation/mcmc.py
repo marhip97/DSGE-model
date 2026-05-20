@@ -39,8 +39,9 @@ from nemo.model.parameters import Parameters
 
 # sigma_A kalibreres fast — svakt identifisert
 SIGMA_A_FIXED = 0.006
-# phi_I1 kalibreres fast — PE-godkjent 2026-05-17
-PHI_I1_FIXED  = 4.0
+# phi_I1 var fast (PE-godkjent 2026-05-17), men frigjort igjen (PE-godkjent 2026-05-20):
+# B5-benchmark viste at phi_I1=4.0 gir BNP-respons 0.4× NB; fase2v2 med phi_I1≈0.5 traff NB eksakt.
+PHI_I1_FIXED  = 4.0  # beholdt som konstant for bakoverkompatibilitet; ikke lenger brukt i log_posterior
 # sigma_rp: C3-fix (2026-05-18) rullet tilbake — fiksering forverret IRF fordi
 # psi_R kompenserte (steg til 0.911). sigma_rp estimeres fritt igjen.
 # h_c kalibreres fast — PE-godkjent 2026-05-18 (C2 Alt A): posterior treffer alltid
@@ -132,7 +133,9 @@ PARAM_PRIORS = {
     'psi_Y':   ('normal', 0.24, 0.05, 0.01, 0.80),
     # h_c er fjernet fra estimering — kalibreres fast til H_C_FIXED=0.938 (PE-godkjent 2026-05-18, C2 Alt A).
     # Posterior traff alltid 0.9995-grensen og drepte konsumkanalen. K&M-verdi gjenoppretter a3_W=0.032.
-    # phi_I1 er fjernet fra estimering — fiksert til PHI_I1_FIXED=4.0 (PE-godkjent 2026-05-17)
+    # phi_I1 frigjort igjen (PE-godkjent 2026-05-20, kjøring 9): fase2v2 estimerte ~0.5 og traff NB BNP -0.447
+    # vs -0.450. Med phi_I1=4.0 fast ble BNP-responsen 0.4× NB (for liten). K&M=4.0 passer ikke norske data.
+    'phi_I1':  ('normal', 2.0,  2.0, 0.1,  15.0),
     'phi_I2':  ('normal', 8.0,  4.0, 0.5,  40.0),
     # Fase 2v2 (2026-05-15): kapitalutnyttelseselastisitet (Alt. A, K&M Tabell 8)
     'phi_u':   ('normal', 0.22, 0.10, 0.01, 2.0),
@@ -219,8 +222,8 @@ def log_posterior(theta, H, Sv, Y_pre, Y_post):
         class Pt(Parameters): pass
         for i,n in enumerate(PARAM_NAMES): setattr(Pt,n,float(theta[i]))
         setattr(Pt,'sigma_A', SIGMA_A_FIXED)   # fast
-        setattr(Pt,'phi_I1',  PHI_I1_FIXED)   # fast — PE-godkjent 2026-05-17
         setattr(Pt,'h_c',     H_C_FIXED)       # fast — PE-godkjent 2026-05-18 (C2 Alt A)
+        # phi_I1 er nå fri igjen (PE-godkjent 2026-05-20)
         G0,G1,Psi,Pi=build_matrices_v3(Pt,theta_H=0.05)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
