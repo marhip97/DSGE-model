@@ -48,6 +48,14 @@ skal brukes til å analysere sjokk og optimale pengepolitiske responser.
 
 ## Fase 0.5 — Modellkvalitetssikring 🚧
 
+**Statusoppdatering 2026-05-20:** 8 MCMC-kjøringer gjennomført. Nøkkelfunn:
+- Modellfix A4a/A4c/CEE/A5/E3E4 implementert og bekreftet ✓
+- h_c=0.938 fast, sigma_A=0.006 fast, phi_B=0.0016 og phi_O=0.15 i UIP ✓
+- B5-analyse avdekket: **phi_I1=4.0 (fast, K&M) er årsak til for liten BNP-respons** (0.4× NB).
+  Fase2v2 med phi_I1 fri (~0.5) traff NB eksakt (-0.447 vs -0.450).
+- PE godkjente 2026-05-20: phi_I1 frigjøres igjen i **kjøring 9** (19 param).
+- sigma_rp: 0.017→0.014 med phi_O, men strukturelt problem gjenstår.
+
 **Mål:** Verifisere at nåværende modellspesifikasjon er korrekt og
 veldokumentert *før* vi reviderer estimeringen. Adressere kjente
 svakheter:

@@ -313,14 +313,21 @@ def build_matrices(p=None):
     # BLOKK D: VALUTA OG HANDEL
     # ════════════════════════════════════════════════════════════════════════
  
-    # D1. UIP med pengemarkedspremie (utvidet fra Fase I)
-    # E[rer_{t+1}] = rer + (i_D - π) - (i* - π*) + ε_rp + ε_prem
+    # D1. UIP med pengemarkedspremie, gjeldselastisk premie og olje-valuta-kanal
+    # E[rer_{t+1}] = rer + (i_D - π) - (i* - π*) + ε_rp + ε_prem + φ_B·b_NW - φ_O·po
+    # φ_B·b_NW: gjeldselastisk ankerfeste (K&M §3.4, Tabell 8, PE-godkjent 2026-05-19)
+    # φ_O·po: direkte olje→valutakurs-kanal (PE-godkjent 2026-05-20):
+    #   høy oljepris → NOK-appresiering (RER ned) — kalibrert fra hist. NOK/olje-korr ~0.7
+    #   Hypotese: ε_rp absorberer denne kanalen når den mangler → sigma_rp=0.017 vs K&M 0.006
+    phi_O = p.phi_O
     G0[15, RER]       =  1.0
     G0[15, I_D]       =  1.0
     G0[15, PI]        = -1.0
     G0[15, I_STAR]    = -1.0
     G0[15, PI_STAR]   =  1.0
     G0[15, EPS_PREM]  = -1.0   # pengemarkedspremie som UIP-skift
+    G0[15, B_NW]      =  phi_B # gjeldselastisk premie — φ_B=0.0016 (K&M Tabell 8)
+    G0[15, PO]        =  phi_O # olje-valuta-kanal — høy oljepris styrker NOK (RER ned)
     Pi[15, RER]       =  1.0
     Psi[15, E_rp]     =  1.0
     Psi[15, E_prem]   =  1.0

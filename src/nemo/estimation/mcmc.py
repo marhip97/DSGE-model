@@ -39,8 +39,9 @@ from nemo.model.parameters import Parameters
 
 # sigma_A kalibreres fast — svakt identifisert
 SIGMA_A_FIXED = 0.006
-# phi_I1 kalibreres fast — PE-godkjent 2026-05-17
-PHI_I1_FIXED  = 4.0
+# phi_I1 var fast (PE-godkjent 2026-05-17), men frigjort igjen (PE-godkjent 2026-05-20):
+# B5-benchmark viste at phi_I1=4.0 gir BNP-respons 0.4× NB; fase2v2 med phi_I1≈0.5 traff NB eksakt.
+PHI_I1_FIXED  = 4.0  # beholdt som konstant for bakoverkompatibilitet; ikke lenger brukt i log_posterior
 # sigma_rp: C3-fix (2026-05-18) rullet tilbake — fiksering forverret IRF fordi
 # psi_R kompenserte (steg til 0.911). sigma_rp estimeres fritt igjen.
 # h_c kalibreres fast — PE-godkjent 2026-05-18 (C2 Alt A): posterior treffer alltid
@@ -73,6 +74,35 @@ def build_Sv():
            'dh_obs':0.004,'db_obs':0.002}
     return np.diag([sme[n]**2 for n in OBS_NAMES])
 
+# Alt. 4 (PE-godkjent 2026-05-19): utelat RER fra observasjonssettet.
+# ds_obs absorberer sigma_rp-dominans; uten RER testes om sigma_rp faller mot K&M.
+OBS_NAMES_NO_RER = [n for n in OBS_NAMES if n != 'ds_obs']
+N_OBS_NO_RER = len(OBS_NAMES_NO_RER)  # 13
+
+def build_H_no_rer() -> np.ndarray:
+    """Observasjonsmatrise uten RER (ds_obs). PE-godkjent Alt. 4, 2026-05-19."""
+    H = np.zeros((N_OBS_NO_RER, NZ))
+    obs = OBS_NAMES_NO_RER
+    mapping = {
+        'dy_obs': (Y, 1.0), 'dc_obs': (C, 1.0), 'dinv_obs': (INV, 1.0),
+        'dx_obs': (X, 1.0), 'dm_obs': (M, 1.0), 'pi_obs': (PI, 4.0),
+        'dw_obs': (W, 1.0), 'i_R_obs': (I_R, 4.0), 'i_3m_obs': (I_R, 4.0),
+        'dpO_obs': (PO, 1.0), 'dyS_obs': (YS, 1.0),
+        'dh_obs': (Q_H, 1.0), 'db_obs': (B_NW, 1.0),
+    }
+    for i, nm in enumerate(obs):
+        col, scale = mapping[nm]
+        H[i, col] = scale
+    return H
+
+def build_Sv_no_rer() -> np.ndarray:
+    """Målefeil-kovarians uten RER. PE-godkjent Alt. 4, 2026-05-19."""
+    sme = {'dy_obs':0.005,'dc_obs':0.008,'dinv_obs':0.015,'dx_obs':0.010,
+           'dm_obs':0.012,'pi_obs':0.008,'dw_obs':0.004,'i_R_obs':0.0005,
+           'i_3m_obs':0.0005,'dpO_obs':0.050,'dyS_obs':0.006,
+           'dh_obs':0.004,'db_obs':0.002}
+    return np.diag([sme[n]**2 for n in OBS_NAMES_NO_RER])
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PARAMETERE OG PRIOR
@@ -103,7 +133,9 @@ PARAM_PRIORS = {
     'psi_Y':   ('normal', 0.24, 0.05, 0.01, 0.80),
     # h_c er fjernet fra estimering — kalibreres fast til H_C_FIXED=0.938 (PE-godkjent 2026-05-18, C2 Alt A).
     # Posterior traff alltid 0.9995-grensen og drepte konsumkanalen. K&M-verdi gjenoppretter a3_W=0.032.
-    # phi_I1 er fjernet fra estimering — fiksert til PHI_I1_FIXED=4.0 (PE-godkjent 2026-05-17)
+    # phi_I1 frigjort igjen (PE-godkjent 2026-05-20, kjøring 9): fase2v2 estimerte ~0.5 og traff NB BNP -0.447
+    # vs -0.450. Med phi_I1=4.0 fast ble BNP-responsen 0.4× NB (for liten). K&M=4.0 passer ikke norske data.
+    'phi_I1':  ('normal', 2.0,  2.0, 0.1,  15.0),
     'phi_I2':  ('normal', 8.0,  4.0, 0.5,  40.0),
     # Fase 2v2 (2026-05-15): kapitalutnyttelseselastisitet (Alt. A, K&M Tabell 8)
     'phi_u':   ('normal', 0.22, 0.10, 0.01, 2.0),
@@ -190,8 +222,8 @@ def log_posterior(theta, H, Sv, Y_pre, Y_post):
         class Pt(Parameters): pass
         for i,n in enumerate(PARAM_NAMES): setattr(Pt,n,float(theta[i]))
         setattr(Pt,'sigma_A', SIGMA_A_FIXED)   # fast
-        setattr(Pt,'phi_I1',  PHI_I1_FIXED)   # fast — PE-godkjent 2026-05-17
         setattr(Pt,'h_c',     H_C_FIXED)       # fast — PE-godkjent 2026-05-18 (C2 Alt A)
+        # phi_I1 er nå fri igjen (PE-godkjent 2026-05-20)
         G0,G1,Psi,Pi=build_matrices_v3(Pt,theta_H=0.05)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -357,9 +389,12 @@ def adaptive_mcmc_with_monitoring(
                     print(f"  [{i+1:7d}/{n_steps}] acc={acc/(i+1):.3f}  "
                           f"lp={lp_cur:.1f}  scale={scale:.4f}  "
                           f"konv={status}  gjenstår≈{rem/60:.1f}min")
-                # Løpende lagring
+                # Løpende lagring — flush til disk umiddelbart
                 np.save(f"{save_prefix}_partial.npy", ch[:i+1])
-            elif verbose and (i+1)%5000==0:
+            elif save_prefix and (i+1)%1000==0:
+                # Ekstra sikkerhet: lagre hvert 1000 trekk i produksjon
+                np.save(f"{save_prefix}_partial.npy", ch[:i+1])
+            if verbose and (i+1)%5000==0 and not (monitor and (i+1)%check_every==0):
                 rem=(time.time()-t0)/(i+1)*(n_steps-i-1)
                 print(f"  [{i+1:7d}/{n_steps}] acc={acc/(i+1):.3f}  "
                       f"lp={lp_cur:.1f}  scale={scale:.4f}  "
