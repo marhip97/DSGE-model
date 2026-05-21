@@ -161,3 +161,11 @@ Start lp = 3589.04
   Sjekk runde 0: IKKE OK — PSRF=2.472, ESS=3
   Problemer: ['rho_A', 'rho_C', 'rho_O', 'rho_Ys', 'rho_H', 'sigma_C']
   Rekalibrering 1: scale→3.0000. Ekstra burn-in (500 trekk)...
+  Ekstra burn-in ferdig. acc=0.059
+
+  Sjekk runde 1: IKKE OK — PSRF=2.468, ESS=4
+  Problemer: ['rho_A', 'rho_C', 'rho_O', 'rho_Ys', 'rho_rp', 'sigma_C']
+  Maks rekalibreringer nådd. Fortsetter.
+
+--- FASE 3: Produksjonskjøring (200,000 trekk) ---
+  Endelig scale: 1.8000
