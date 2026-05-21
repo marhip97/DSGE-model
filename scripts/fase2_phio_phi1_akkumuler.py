@@ -64,12 +64,18 @@ if PARTIAL_PATH.exists():
     n_existing = len(existing_chain)
     print(f"\nVARM START: {n_existing} eksisterende trekk funnet i partial-fil")
 
-    # Startverdi = siste trekk i kjeden (allerede i MCMC-rom inkl. logit psi_R)
+    # Startverdi = siste trekk i kjeden.
+    # Kjeden lagrer psi_R i logit-rom — konverter til begrenset rom for log_posterior.
     theta_start = existing_chain[-1].copy()
+    i_psi = PARAM_NAMES.index("psi_R")
+    theta_start[i_psi] = 0.01 + 0.91 / (1 + np.exp(-theta_start[i_psi]))
 
-    # Proposal-std fra siste 5000 trekk (eller alt som finnes)
+    # Proposal-std fra siste 5000 trekk
     n_cov = min(n_existing, 5000)
     post_std = np.maximum(existing_chain[-n_cov:].std(axis=0), 1e-4)
+    # psi_R std i begrenset rom
+    psi_R_bounded = 0.01 + 0.91 / (1 + np.exp(-existing_chain[-n_cov:, i_psi]))
+    post_std[i_psi] = max(float(psi_R_bounded.std()), 1e-4)
 
     burnin_n    = 500
     max_recalib = 0

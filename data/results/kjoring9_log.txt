@@ -70,3 +70,45 @@ p=3489.0  scale=1.0387  gjenstår≈497.3min  [PROD]
   [  40000/200000] acc=1.165  lp=3492.5  scale=1.0387  konv=PSRF=1.02 ESS=284  gjenstår≈452.8min
   [  45000/200000] acc=1.165  lp=3500.1  scale=1.0387  gjenstår≈445.7min  [PROD]
   [  50000/200000] acc=1.165  lp=3489.0  scale=1.0387  gjenstår≈431.1min  [PROD]
+Kjøring 9 akkumulerende — 19 frie parametre
+phi_I1 fri, h_c=0.938 (fast), phi_B=0.0016, phi_O=0.15
+
+VARM START: 16000 eksisterende trekk funnet i partial-fil
+  burnin=500, max_recalib=0, seed=971
+Start lp = -inf
+Traceback (most recent call last):
+  File "/home/user/DSGE-model/scripts/fase2_phio_phi1_akkumuler.py", line 109, in <module>
+    assert np.isfinite(lp), f"Startverdi ugyldig: lp={lp}"
+           ^^^^^^^^^^^^^^^
+AssertionError: Startverdi ugyldig: lp=-inf
+Kjøring 9 akkumulerende — 19 frie parametre
+phi_I1 fri, h_c=0.938 (fast), phi_B=0.0016, phi_O=0.15
+
+VARM START: 16000 eksisterende trekk funnet i partial-fil
+  burnin=500, max_recalib=0, seed=1172
+Start lp = 3495.28
+  Logit-reparametrisering AKTIV for: ('psi_R',)
+
+=================================================================
+  NEMO v3 — ADAPTIV MCMC v2 (sigma_A fast=0.006)
+  T_pre=75 kv  T_post=15 kv  N=19 param
+  Produksjon=200,000  Burn-in=500
+  Startscale=1.0000  PSRF-krav<1.1
+  Blokksampling: {psi_R,psi_P1} | {rho_A,rho_C,rho_O,rho_rp} | {rho_Ys,rho_H,psi_Y,sigma_Ys} | {sigma_C,sigma_O,sigma_rp,sigma_i,sigma_P,sigma_H} | {phi_I1,phi_I2,phi_u}
+=================================================================
+
+  Startverdi log-posterior: 3490.64
+
+--- FASE 1: Adaptiv burn-in (500 trekk) ---
+  Ferdig. acc=0.042  scale=0.6000
+  Empirisk kovarians aktivert. Sterkeste korrelasjoner:
+    sigma_C    ↔ sigma_H   : r=+0.825
+
+--- FASE 2: Konvergensovervåkning ---
+
+  Sjekk runde 0: IKKE OK — PSRF=2.552, ESS=4
+  Problemer: ['rho_A', 'rho_C', 'rho_O', 'rho_Ys', 'rho_rp', 'rho_H']
+  Maks rekalibreringer nådd. Fortsetter.
+
+--- FASE 3: Produksjonskjøring (200,000 trekk) ---
+  Endelig scale: 1.0000
