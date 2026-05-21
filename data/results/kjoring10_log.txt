@@ -171,3 +171,4 @@ Start lp = 3589.04
   Endelig scale: 1.8000
   [   5000/200000] acc=0.833  lp=3583.6  scale=1.8000  konv=OK  gjenstår≈268.0min
   [  10000/200000] acc=0.818  lp=3584.5  scale=1.8000  konv=OK  gjenstår≈260.8min
+  [  15000/200000] acc=0.832  lp=3582.8  scale=1.8000  konv=PSRF=1.01 ESS=132  gjenstår≈254.5min
