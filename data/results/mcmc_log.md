@@ -147,3 +147,39 @@ Neste steg: undersøk rente-persistens og rho_A=0.086 (potensielt MPK-problem).
 1. rho_A=0.086 — strukturproblem i Q_K-likning eller reelt norsk fenomen?
 2. Kjøre ytterligere akkumulering (30k–50k trekk) for ESS rho_rp > 1%?
 3. Endre normaliseringskonvensjon: BNP_q4-normalisering istedenfor rente-topp?
+
+---
+
+## Kjøring 10 — korrigert modell A4d + A_phi_L (2026-05-21)
+- **Parametre:** 19 (phi_I1 fri, h_c=0.938 fast, sigma_A=0.006 fast)
+- **Modellfix:** A4d (Q_K yk-koeff=1.0), A_phi_L (phi_L=1.50) — PE-godkjent 2026-05-21
+- **Fil:** chain_kj10_prod_posterior.json
+- **Trekk:** 178 000 (akkumulert over ~10 restarter via vaktløkke)
+- **Skript:** scripts/fase2_kj10_akkumuler.py
+- **PSRF_max:** 1.004, **PSRF<1.10:** 19/19 ✓
+- **ESS_min:** 1384 (rho_rp), **ESS/n>1%:** 18/19
+- **rho_rp ESS-note:** ESS/n=0.0078 — strukturelt lav (ACL≈140), bedres ikke med flere trekk. Krever HMC eller dedikert blokk i kj11.
+
+### Nøkkelresultater kjøring 10
+
+| Parameter | Kj10  | Kj9   | K&M   | Endring |
+|-----------|-------|-------|-------|---------|
+| rho_A     | **0.390** [0.21,0.57] | 0.086 | 0.950 | ↑ 4.5× — TFP-kanal åpnet |
+| phi_I1    | **0.105** [0.10,0.12] | 0.205 | 4.0   | ↓ halvert, nær kalibrert |
+| sigma_rp  | 0.014 [0.012,0.017]   | 0.013 | 0.006 | uendret |
+| psi_R     | 0.912 [0.900,0.919]   | 0.911 | 0.667 | stabil |
+| rho_rp    | 0.796 [0.34,1.00]     | 0.808 | 0.920 | bred posterior |
+| rho_C     | 0.810 [0.37,1.00]     | –     | 0.800 | nær K&M |
+| phi_u     | 0.027 [0.01,0.06]     | –     | 0.050 | rimelig |
+
+**rho_A=0.390:** A4d-rettelsen løftet rho_A fra 0.086 → 0.390 (4.5×), men ikke til K&M=0.95.
+Posteriorverdien er stabil og tolkbar — norske data støtter kortere TFP-persistens enn K&M.
+
+**phi_I1=0.105:** Nær K&M kalibrert (~0.10). phi_I1=4.0 i K&M kan reflektere langsiktig kalibrering
+ikke datadrevet estimering.
+
+### Anbefalinger for kjøring 11
+
+1. **Dedikert blokk for rho_rp** — skill ut fra AR-blokken for å bedre ESS/n
+2. **B5-benchmark oppdatering** med kj10-posterior (BNP-respons forventes forbedret vs kj9)
+3. **rho_A-diagnose** — er 0.39 vs K&M=0.95 et modell- eller dataproblem? Sjekk TFP-IRF.
