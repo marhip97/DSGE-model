@@ -1,0 +1,22 @@
+Kjøring 12 akkumulerende — 20 frie parametre
+Modellrettelser: A6 (sigma_A fri), A7 (psi_W=0.871 i mimicking rule)
+phi_I1 fri, h_c=0.938 (fast), phi_B=0.0016, phi_O=0.15
+
+KALD START: ingen partial-fil — start fra kj10-posterior
+  burnin=2000, max_recalib=2, seed=12
+  sigma_A startpunkt: 0.0100 std=0.0040
+  rho_A   startpunkt: 0.600
+Start lp = 3618.98
+  Logit-reparametrisering AKTIV for: ('psi_R',)
+
+=================================================================
+  NEMO v3 — ADAPTIV MCMC v2 (sigma_A fast=0.006)
+  T_pre=75 kv  T_post=15 kv  N=20 param
+  Produksjon=200,000  Burn-in=2,000
+  Startscale=0.5000  PSRF-krav<1.1
+  Blokksampling: {psi_R,psi_P1} | {rho_A,rho_C,rho_O} | {rho_rp} | {rho_Ys,rho_H,psi_Y,sigma_Ys} | {sigma_A,sigma_C,sigma_O,sigma_rp,sigma_i,sigma_P,sigma_H} | {phi_I1,phi_I2,phi_u}
+=================================================================
+
+  Startverdi log-posterior: 3614.21
+
+--- FASE 1: Adaptiv burn-in (2,000 trekk) ---

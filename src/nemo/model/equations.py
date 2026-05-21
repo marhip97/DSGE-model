@@ -643,12 +643,14 @@ def build_matrices_v3(p=None, theta_H: float = 0.05):
     psi_P1 = p.psi_P1
     psi_Y  = p.psi_Y
     psi_S  = p.psi_S
+    psi_W  = p.psi_W
 
     G0[20, :] = 0.0; G1[20, :] = 0.0; Psi[20, :] = 0.0
     G0[20, I_R]   =  1.0
     G0[20, Y]     = -(1.0 - psi_R) * psi_Y
     G0[20, RER]   = -(1.0 - psi_R) * psi_S
     G0[20, PI]    = -(1.0 - psi_R) * psi_P1   # samtid inflasjon
+    G0[20, PIW]   = -(1.0 - psi_R) * psi_W    # A7 (PE-godkjent 2026-05-21): lønnsinflasjon, K&M §2.13
     G0[20, I_R_L] = -psi_R                     # 1-periodes lagg via lagg-tilstand
     Psi[20, E_i]  =  1.0
 

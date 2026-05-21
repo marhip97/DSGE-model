@@ -117,7 +117,9 @@ PARAM_PRIORS = {
     'rho_Ys':  ('beta',     2.0,  0.5,  0.01, 0.9995),
     'rho_rp':  ('beta',     2.0,  0.5,  0.01, 0.9995),
     'rho_H':   ('beta',     2.0,  0.5,  0.01, 0.9995),
-    # sigma_A er fjernet
+    # PE-godkjent 2026-05-21 (A6): sigma_A fristilles. K&M Tabell 9 estimerer sigma_A.
+    # Bayesiansk faktor sigma_A=0.012 vs 0.006: ~10^27. rho_A=0.39 i kj10 er identifikasjonsartefakt.
+    'sigma_A':  ('normal', 0.010, 0.004, 0.002, 0.050),
     'sigma_C':  ('inv_gamma', 2.0, 0.0182, 1e-5, 0.5),
     'sigma_O':  ('inv_gamma', 2.0, 0.0475, 1e-5, 1.0),
     'sigma_Ys': ('inv_gamma', 2.0, 0.0067, 1e-5, 0.5),
@@ -178,11 +180,10 @@ def log_prior(theta):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def build_Q(theta):
-    # sigma_A er fast; sigma_rp estimeres fritt (C3-fix rullet tilbake 2026-05-18)
-    smap = {E_C:'sigma_C',E_P:'sigma_P',E_O:'sigma_O',
+    # A6 (PE-godkjent 2026-05-21): sigma_A fri. sigma_rp estimeres fritt (C3-fix rullet tilbake 2026-05-18)
+    smap = {E_A:'sigma_A',E_C:'sigma_C',E_P:'sigma_P',E_O:'sigma_O',
             E_Ys:'sigma_Ys',E_rp:'sigma_rp',E_i:'sigma_i',E_H:'sigma_H'}
     Q = np.zeros((NE,NE))
-    Q[E_A,E_A] = SIGMA_A_FIXED**2   # fast
     for idx,pn in smap.items():
         s = theta[PARAM_NAMES.index(pn)] if pn in PARAM_NAMES else getattr(Parameters,pn,0.01)
         Q[idx,idx] = s**2
@@ -221,7 +222,7 @@ def log_posterior(theta, H, Sv, Y_pre, Y_post):
     try:
         class Pt(Parameters): pass
         for i,n in enumerate(PARAM_NAMES): setattr(Pt,n,float(theta[i]))
-        setattr(Pt,'sigma_A', SIGMA_A_FIXED)   # fast
+        # A6 (PE-godkjent 2026-05-21): sigma_A er nå i PARAM_NAMES (fri)
         setattr(Pt,'h_c',     H_C_FIXED)       # fast — PE-godkjent 2026-05-18 (C2 Alt A)
         # phi_I1 er nå fri igjen (PE-godkjent 2026-05-20)
         G0,G1,Psi,Pi=build_matrices_v3(Pt,theta_H=0.05)
