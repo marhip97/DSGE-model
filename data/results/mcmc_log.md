@@ -106,9 +106,44 @@ Konklusjon: sigma_rp er den dominerende kilden til IRF-avvik. Se PE_eskalering_C
   fase2v2 (phi_I1 fri, BNP=-0.447≈NB) avslørte at phi_I1=4.0 (fast) er
   **hovedårsaken til for liten BNP-respons** (0.4×). PE godkjente å frigi phi_I1 i kjøring 9.
 
-## Kjøring 9 — phi_I1 fri + phi_B + phi_O (2026-05-20) [PLANLAGT]
+## Kjøring 9 — phi_I1 fri + phi_B + phi_O (2026-05-20/21)
 - **Parametre:** 19 (phi_I1 fri igjen, h_c=0.938 fast, sigma_A fast)
 - **Prior phi_I1:** Normal(2.0, 2.0) på (0.1, 15.0)
-- **Fil:** chain_fase2_phio_phi1_prod_posterior.json (ennå ikke kjørt)
-- **Hypotese:** phi_I1 vil estimeres til ~0.5 (som fase2v2), BNP-respons vil treffe NB
-- **Skript:** scripts/fase2_phio_phi1_production.py
+- **Fil:** chain_fase2_phio_phi1_prod_posterior.json
+- **Trekk:** 198 000 (akkumulert over 2 restarter: 16k + 182k)
+- **Skript:** scripts/fase2_phio_phi1_akkumuler.py (akkumulerende strategi)
+- **PSRF_max:** 1.005, **PSRF<1.10:** 19/19 ✓
+- **ESS_min:** 532 (rho_rp), **ESS/n>1%:** 17/19 (rho_rp og sigma_rp svake)
+
+### Nøkkelresultater kjøring 9
+
+| Parameter | Kj9 | Kj8 | K&M |
+|-----------|-----|-----|-----|
+| phi_I1    | **0.205** [0.181,0.231] | 4.0 (fast) | 4.0 |
+| sigma_rp  | 0.013 | 0.014 | 0.006 |
+| psi_R     | 0.911 | 0.912 | 0.667 |
+| rho_A     | 0.086 | 0.076 | 0.950 |
+| rho_rp    | 0.808 | 0.831 | 0.920 |
+
+**phi_I1=0.205**: Norske data forkaster K&M=4.0 sterkt. Liknende som fase2v2 (~0.5).
+**rho_A=0.086**: TFP-sjokk lite persistent — mulig konsekvens av Q_K-spesifikasjon (test_09 xfail).
+
+### B5-benchmark kjøring 9 (normalisert, posterior mean)
+
+| Variabel | Kj9    | Kj8    | NB Figur 1 | Kj9/NB |
+|----------|--------|--------|------------|--------|
+| BNP q1   | -1.598 | -0.261 | -0.450     | 3.55×  |
+| BNP q4   | -0.965 | -0.189 | -0.450     | 2.14×  |
+| BNP q8   | -0.375 | -0.071 | -0.450     | 0.83×  |
+| BNP q12  | -0.065 | +0.015 | -0.450     | 0.14×  |
+| RER q4   | -0.592 | -0.621 | -0.400     | 1.48×  |
+
+**Konklusjon:** phi_I1 fri gir stor forbedring i BNP-respons (fra 0.4× → 2.14× ved q4),
+men responsen er for stor tidlig (3.55× ved q1) og for lite persistent (0.14× ved q12).
+Normaliseringen til rente-topp q1 skaper artefakt — sjokket faller raskt.
+Neste steg: undersøk rente-persistens og rho_A=0.086 (potensielt MPK-problem).
+
+**Åpne spørsmål for PE:**
+1. rho_A=0.086 — strukturproblem i Q_K-likning eller reelt norsk fenomen?
+2. Kjøre ytterligere akkumulering (30k–50k trekk) for ESS rho_rp > 1%?
+3. Endre normaliseringskonvensjon: BNP_q4-normalisering istedenfor rente-topp?
