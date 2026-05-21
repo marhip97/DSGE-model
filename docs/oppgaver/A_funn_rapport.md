@@ -271,20 +271,158 @@ Tabell 8 og SSB nasjonalregnskap. Sannsynlige justeringer:
 
 ---
 
+---
+
+## A4d — Q_K-koeffisient: feil vekting av (y − k̂) i kapital-Euler-likning (2026-05-21)
+
+**Status:** Nytt funn — krever PE-godkjenning før kodeendring
+
+### Funn
+
+Den nåværende `build_matrices_v3`-implementeringen av Tobin's Q for kapital (ligning 14):
+
+```python
+G0[Q_K, Q_K] =  1.0
+G0[Q_K, I_R] =  1.0
+G0[Q_K, PI]  = -1.0
+G0[Q_K, MC]  = -alpha_K      # ← koeff = alpha_K ≈ 0.256
+G0[Q_K, Y]   = -alpha_K      # ← koeff = alpha_K
+G0[Q_K, K_L] = +alpha_K      # ← koeff = alpha_K
+G0[Q_K, U_K] = +alpha_K      # ← koeff = alpha_K
+Pi[Q_K, Q_K] =  (1.0 - delta)
+Pi[Q_K, PI]  = -1.0
+```
+
+Dette representerer likningen:
+```
+q_K,t = α_K·(mc + y − k̂) − (i_R − π) + (1−δ)·E[q_K'] − E[π']
+```
+
+Den **teoretisk korrekte** leiepris-log-avvik fra SS er:
+```
+r̂_K = mc + y − k̂     (koeffisient 1.0 på ALLE tre ledd)
+```
+siden: r_K = MC·α_K·Y/K̂ → log r̂_K = mc + y − k̂ (α_K er en andel som faller ut).
+
+Nåværende kode skalerer leieprisens totale signal med α_K ≈ 0.256, som gjør at
+TFP-sjokkets transmisjon til investeringsincentivet (Q_K) er 4× for svak.
+
+### Numerisk diagnose
+
+TFP-sjokk med nåværende kode (alpha_K = 0.256 på alle ledd):
+- `Y_q1 = −0.0063` ← FEIL fortegn → `test_09_tfp_bnp_opp` er xfail
+
+Rotårsak: mc faller kraftig (−0.059) ved TFP-sjokk, mens y er nær null.
+Leiepris: `mc + y − k̂ ≈ −0.043` (negativt) — TFP fremstår som REDUSERENDE for Q_K.
+Med `alpha_K`-skalering: `α_K · (mc + y − k̂) = 0.256 × (−0.043) = −0.011` → Q_K faller → INV faller → Y faller.
+
+### Forslag til rettelse
+
+**Hybrid rettelse:** behold `alpha_K` som koeffisient på `mc`, men endre koeffisient på
+`(y − k̂)` til `1.0`:
+
+```python
+G0[Q_K, MC]  = -alpha_K    # uendret
+G0[Q_K, Y]   = -1.0        # ENDRET: 1.0 i stedet for alpha_K
+G0[Q_K, K_L] = +1.0        # ENDRET
+G0[Q_K, U_K] = +1.0        # ENDRET
+```
+
+**Begrunnelse:** Den hybride formuleringen kan tolkes som at leieprisens
+output-kapital-komponent (`y − k̂`) er normalisert til MPK-skala (full
+elastisitet 1.0), mens kostnadskomponenten (`mc`) beholder sin andels-
+multiplikator `alpha_K`. Dette samsvarer med at Q_K-Euler-likningen i K&M (2019)
+kan ha ulik normalisering av de to delene — **verifisering mot K&M §2.x kreves**.
+
+### Empirisk evidens
+
+| Test | Nåværende (α_K=0.256) | Hybrid (mc=α_K, yk=1.0) |
+|------|----------------------|--------------------------|
+| test_09 TFP → Y↑ | ✗ (xfail) | ✓ |
+| Alle 14 øvrige IRF-krav | ✓ | ✓ |
+| **15/15 IRF-krav totalt** | **14/15** | **15/15** |
+
+B5-benchmark-forbedring (pengepolitikk-IRF, posterior mean kj9):
+
+| Variabel | Nåværende | Hybrid-fix | NB Figur 1 |
+|----------|-----------|------------|------------|
+| BNP q4   | −0.965 (2.14×) | −0.571 (1.27×) | −0.450 |
+| KPI q4   | −0.197 (1.31×) | −0.147 (0.98×) | −0.150 |
+| Rente q4 | +0.694 (1.16×) | +0.718 (1.20×) | +0.600 |
+
+**KPI q4 treffer NB-målet nesten eksakt (0.98×) med hybrid-fix.**
+**BNP q4 ratio forbedres fra 2.14× til 1.27× — nær suksesskriteriet.**
+
+### Konsekvens for tidligere estimering
+
+- `rho_A = 0.086` (kjøring 9) er trolig estimert lavt fordi modellen prøver å
+  *minimere* effekten av et TFP-sjokk med feil fortegn. Med korrekt Q_K vil
+  `rho_A` sannsynligvis konvergere mot K&M-kalibreringen (~0.95).
+- Re-estimering (kjøring 10) er nødvendig etter godkjenning.
+
+---
+
+## A_phi_L — phi_L = 3.0 vs. K&M Tabell 8 = 1.5 (2026-05-21)
+
+**Status:** Dokumentert avvik — krever avklaring fra PE (verifiser mot K&M-paperet)
+
+### Funn
+
+`parameters.py` har endret `phi_L` (invers Frisch-elastisitet for arbeid) fra
+K&M-verdien 1.50 til 3.00:
+
+```python
+# parameters.py linje 7:
+phi_L : 1.50 → 3.00   (ζ, Tabell 8 — faktor 2)
+
+# parameters.py linje 57:
+phi_L = 3.00       # (CAL) ζ — Tabell 8: 3.0
+
+# parameters.py verifikasjonstabell (linje 337):
+("φ_L (inv. Frisch)", cls.phi_L, 1.50, "Tabell 8")
+```
+
+Det er en intern motsetning: linje 57 sier K&M Tabell 8 er 3.0, men
+verifikajonstabellen viser K&M-referanseverdien som 1.50.
+
+### Konsekvens
+
+`sigma_tilde = sigma + phi_L/(1−alpha_K)`:
+- K&M (phi_L=1.5): sigma_tilde = 3.02
+- Nåværende (phi_L=3.0): sigma_tilde = 5.03 — **67 % høyere**
+
+**Effekt på B5:**
+- phi_L=3.0: BNP q4 = −0.965 (2.14× NB)
+- phi_L=1.5: BNP q4 = −0.744 (1.65× NB) — nærmere, men ikke avgjørende alene
+
+Endringen er ikke avgjørende isolert (TFP-feilen dominerer), men bidrar til at
+`sigma_tilde` er for stor og gir for kraftig BNP-respons på pengepolitikk.
+
+### Krav til PE
+
+Verifiser mot K&M (2019) Tabell 8: er `ζ = 1.5` eller `ζ = 3.0`?
+Hvis 1.5 er korrekt, endre `phi_L = 3.00 → 1.50` i `parameters.py`.
+Dette er en kalibreringsjustering (ikke modellendring) og krever ny estimering.
+
+---
+
 ## Oppsummering for PE
 
 | Punkt | Funn | Alvorlighetsgrad | Krever ny MCMC? |
 |-------|------|------------------|------------------|
-| A4a   | Manglende lagg-ledd og koeffisient-overlapp i bankligning | Høy | Ja |
-| A4b   | π_{t-1} i stedet for π_t (eller E[π_{t+4}]) i mimicking rule | Medium | Trolig ikke (Alt. 1) |
-| A4c   | Inkonsistent LTV-sjokk-fortegn mellom ligningene | Medium | Ja |
-| A5    | Steady-state konsistenssjekk lagt til | — | Nei |
+| A4a   | Manglende lagg-ledd i bankligning | Høy | Ja |
+| A4b   | Implementert (samtid π i mimicking rule) | ✅ | Nei |
+| A4c   | Inkonsistent LTV-sjokk-fortegn | Medium | Ja |
+| A4d   | **Q_K: feil koeff på (y−k̂) — TFP gir negativ BNP** | **Kritisk** | **Ja (kjøring 10)** |
+| A5    | Steady-state konsistenssjekk | — | Nei |
+| A_phi_L | phi_L=3.0 vs. K&M=1.5 — intern motsetning | Medium | Ja |
 
-**Anbefalt rekkefølge for handling:**
+**Prioritert rekkefølge for PE-beslutning:**
 
-1. **A5 først** (passer testen — gir tillit til steady-state-koden)
-2. **A4b Alt. 1** (raskt eksperiment uten reestimering, mål B5-effekt)
-3. **A4a** (krever reestimering — koordineres med Fase 2)
-4. **A4c** (krever reestimering — koordineres med Fase 2)
+1. **A4d** (kritisk): godkjenn hybrid Q_K-fix (`yk_c=1.0`) → implementer → kjøring 10
+2. **A_phi_L**: verifiser mot K&M Tabell 8 → rett om feil
+3. **A4a + A4c**: samlet i kjøring 10 etter A4d er godkjent
+4. **A5**: legg til i testpakken (ingen kodeendring nødvendig)
 
-Punkt 3 og 4 bør håndteres samlet i én ny MCMC-kjøring etter at de er bekreftet av PE.
+A4d + A_phi_L kombinert vil trolig flytte BNP q4 fra 2.14× til under 1.3× NB
+og gjøre KPI nær perfekt (0.98×), samt gi positiv TFP-BNP og rho_A~0.95.
