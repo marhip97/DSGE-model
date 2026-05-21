@@ -1,0 +1,21 @@
+Kjøring 11 akkumulerende — 19 frie parametre
+Endring: rho_rp i dedikert blokk (kj10 ESS/n=0.0078, ACL≈140)
+phi_I1 fri, h_c=0.938 (fast), phi_B=0.0016, phi_O=0.15
+
+KALD START: ingen partial-fil — start fra kj10-posterior
+  burnin=2000, max_recalib=2, seed=11
+  rho_rp startpunkt: 0.796 std=0.433
+Start lp = 3594.59
+  Logit-reparametrisering AKTIV for: ('psi_R',)
+
+=================================================================
+  NEMO v3 — ADAPTIV MCMC v2 (sigma_A fast=0.006)
+  T_pre=75 kv  T_post=15 kv  N=19 param
+  Produksjon=200,000  Burn-in=2,000
+  Startscale=0.5000  PSRF-krav<1.1
+  Blokksampling: {psi_R,psi_P1} | {rho_A,rho_C,rho_O} | {rho_rp} | {rho_Ys,rho_H,psi_Y,sigma_Ys} | {sigma_C,sigma_O,sigma_rp,sigma_i,sigma_P,sigma_H} | {phi_I1,phi_I2,phi_u}
+=================================================================
+
+  Startverdi log-posterior: 3589.81
+
+--- FASE 1: Adaptiv burn-in (2,000 trekk) ---
