@@ -419,10 +419,120 @@ Dette er en kalibreringsjustering (ikke modellendring) og krever ny estimering.
 
 **Prioritert rekkefølge for PE-beslutning:**
 
-1. **A4d** (kritisk): godkjenn hybrid Q_K-fix (`yk_c=1.0`) → implementer → kjøring 10
-2. **A_phi_L**: verifiser mot K&M Tabell 8 → rett om feil
-3. **A4a + A4c**: samlet i kjøring 10 etter A4d er godkjent
+1. **A4d** (kritisk): godkjenn hybrid Q_K-fix (`yk_c=1.0`) → implementer → kjøring 10 ✅ PE-godkjent 2026-05-21
+2. **A_phi_L**: verifiser mot K&M Tabell 8 → rett om feil ✅ PE-godkjent 2026-05-21
+3. **A4a + A4c**: samlet i kjøring 10 etter A4d er godkjent — **Gjenstår**
 4. **A5**: legg til i testpakken (ingen kodeendring nødvendig)
 
-A4d + A_phi_L kombinert vil trolig flytte BNP q4 fra 2.14× til under 1.3× NB
-og gjøre KPI nær perfekt (0.98×), samt gi positiv TFP-BNP og rho_A~0.95.
+A4d + A_phi_L kombinert flyttet BNP q4 fra 2.14× til ~0.86× NB (kj10).
+KPI fremdeles 6× for svak — se ny diagnose A6 og A7 nedenfor.
+
+---
+
+## A6 — sigma_A fast=0.006 gir svak rho_A-identifikasjon (2026-05-21)
+
+### Funn
+
+`parameters.py` linje 285: `sigma_A = 0.00598` kalibrert fast.
+
+Spor C4 og kj10-analyse (2026-05-21) bekrefter:
+- Kalman-filter-log-posterior stiger monotont fra sigma_A=0.006 → 0.015 (Δlp ≈ +76, BF ≈ 10²⁷)
+- K&M (2019) Tabell 9 viser at sigma_A er **estimert** i K&M, ikke kalibrert
+- Med sigma_A for lav minimerer MCMC TFP-bidraget → posterior rho_A = 0.390 (vs K&M 0.950)
+- rho_A = 0.390 gir halvtid 2 kvartaler (K&M: 13 kv) — urealistisk rask TFP-tilbakevending
+
+### Konkret kodelinjer
+
+```python
+# parameters.py linje 285
+sigma_A = 0.00598   # (CAL) TFP-sjokk std — kalibrert fast, K&M verdi
+```
+
+```python
+# mcmc.py linje 41
+SIGMA_A_FIXED = 0.006  # sigma_A kalibreres fast — svakt identifisert
+```
+
+### Anbefaling
+
+Fristille sigma_A med prior N(0.010, 0.004), grenser [0.002, 0.050].
+- K&M Tabell 9: sigma_A estimert i originalpaper
+- Forventet effekt: rho_A → ~0.80 (K&M), halvtid ~8 kv
+
+**Krever PE-godkjenning:** Prior-endring + N_PARAMS øker med 1 (20 frie parametre).
+
+---
+
+## A7 — psi_W-ledd mangler i mimicking rule (2026-05-21)
+
+### Funn
+
+K&M §2.13 mimicking rule:
+```
+i_R = psi_R*i_{t-1} + (1-psi_R)*[psi_P1*E[pi_{t+4}] + psi_Y*y + psi_S*rer + psi_W*piW] + eps_i
+```
+
+K&M Tabell 8: psi_W = 0.8705 — lønnsinflasjon er sentralt ledd.
+
+Implementering i `build_matrices_v3` (linje 643–653):
+```python
+G0[20, I_R]   =  1.0
+G0[20, PI]    = -(1-psi_R)*psi_P1   # bare prisinflasjon
+G0[20, Y]     = -(1-psi_R)*psi_Y
+G0[20, RER]   = -(1-psi_R)*psi_S
+# psi_W-ledd mangler helt
+```
+
+### Effekt på KPI-respons
+
+Med kj10-parametere (psi_R=0.911, psi_P1=0.133):
+- Effektiv inflasjonskoeffisient: (1-0.911)×0.133 = 0.0118
+- K&M full: (1-0.666)×(0.292 + 0.871×W/PI-ratio) ≈ 0.40
+- Manglende psi_W-ledd bidrar til svakere inflasjonsdynamikk og KPI-respons
+
+### Anbefaling
+
+Legg til `G0[20, PIW] = -(1.0 - psi_R) * p.psi_W` i `build_matrices_v3`.
+- K&M §2.13, Tabell 8: psi_W = 0.8705
+- Forventet effekt: sterkere inflasjonskabling, mulig bedring i KPI-respons
+
+**Krever PE-godkjenning:** Endrer modellspesifikasjon.
+
+---
+
+## A8 — KPI 6× svak: kompensatorisk likevekt (2026-05-21)
+
+### Funn (rotårsak-analyse)
+
+KPI q4 = -2.4% (kj10) vs NB = -15.0% er ikke en enkelt kodefeil, men en **kompensatorisk likevekt**:
+
+1. sigma_rp = 0.014 (2.3× K&M) dominerer RER-variansen (88 % av FEVD)
+2. MCMC gir psi_R → 0.91 for at rentebanen skal "leve" i data uten å kjempe mot sigma_rp
+3. Høy psi_R → (1-psi_R) = 0.089 → svak total policy-kraft
+4. Svak policy-kraft → svak KPI-respons
+
+kappa_P = 0.0075 (phi_PQ=669) er korrekt fra K&M Tabell 8 — ikke en feil.
+
+### Konklusjon
+
+KPI-svakheten er en modelleringsbegrensning som ikke kan løses uten:
+- **Alt. A**: Løse sigma_rp-problemet (C3-eskalering, Spor A7 psi_W)
+- **Alt. B**: Ny UIP-spesifikasjon med dynamisk demping
+
+Se `PE_eskalering_fase05_sluttdiagnose.md` for full eskalering.
+
+---
+
+## Oppdatert PE-oppsummering (2026-05-21)
+
+| Punkt | Funn | Status | Krever PE |
+|-------|------|--------|-----------|
+| A4a   | Manglende lagg-ledd i bankligning | **Gjenstår** | Ja |
+| A4b   | Samtid π i mimicking rule | ✅ Implementert | — |
+| A4c   | Inkonsistent LTV-sjokk-fortegn | **Gjenstår** | Ja |
+| A4d   | Q_K koeff fikset (yk_c=1.0) | ✅ PE-godkjent 2026-05-21 | — |
+| A5    | Steady-state konsistenssjekk | I testpakken | — |
+| A_phi_L | phi_L=1.50 (K&M Tabell 8) | ✅ PE-godkjent 2026-05-21 | — |
+| **A6** | **sigma_A fri — rho_A identifikasjon** | **Ny — krever PE** | **Ja** |
+| **A7** | **psi_W-ledd i mimicking rule** | **Ny — krever PE** | **Ja** |
+| A8    | KPI 6× svak — kompensatorisk likevekt | Diagnostisert, se C3/A7 | — |
