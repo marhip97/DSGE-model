@@ -105,17 +105,8 @@ def test_08_kostnad_bnp_ned(krav_data):
 
 # ── TFP-sjokk ────────────────────────────────────────────────────────────────
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "KJENT MODELLFEIL (Spor A): TFP-sjokk gir negativ BNP-respons i alle 20 kvartaler. "
-        "Bygger opp positivt etter t=11, men kumulativt < 0. "
-        "Sannsynlig årsak: manglende kanal eller koeffisientfeil i produksjonsfunksjonen. "
-        "Må utredes i Spor A (likningstransparens) og Spor C4 (sigma_A identifikasjon)."
-    ),
-)
 def test_09_tfp_bnp_opp(krav_data):
-    """Krav 9: TFP → BNP opp."""
+    """Krav 9: TFP → BNP opp. (A4d-rettelse, PE-godkjent 2026-05-21)"""
     T, R = krav_data
     cum = _cum(T, R, E_A, 0.007)
     assert cum[Y] > 0, f"Y kumulativ = {cum[Y]:.4f}"

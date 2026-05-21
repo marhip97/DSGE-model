@@ -709,17 +709,18 @@ def build_matrices_v3(p=None, theta_H: float = 0.05):
     G0[MC, A]    =  (1.0 + p.phi_L / (1.0 - _alpha_K))
     G0[MC, K_L]  =  _alpha_K / (1.0 - _alpha_K)  # 1-periodes lagg (K_L_t = K_{t-1})
 
-    # Ligning 14: Tobin's Q  q_K_t + i_R_t − π_t − α_K·(mc_t + y_t − k̂_t) − β(1-δ)·E[q_K_{t+1}] = 0
-    # v2-fix brukte G1[Q_K, K_L] = −α_K → K_{t-2}; rettelse: G0[Q_K, K_L] = +α_K
-    # Alt. A: r_K avhenger av effektiv kapital k̂_t = K_L_t + U_K_t, så U_K-term legges til
+    # Ligning 14: Tobin's Q (A4d-rettelse, PE-godkjent 2026-05-21)
+    # r̂_K = mc + y − k̂  (leiepris log-avvik fra SS, koeff=1.0 på y-k̂-ledd)
+    # Hybrid: MC beholder α_K, mens (y−k̂) bruker 1.0 — ref. A_funn_rapport.md §A4d.
+    # Effekt: TFP-sjokk gir positiv BNP (test_09 bestått), KPI q4 ≈ 0.98× NB.
     G0[Q_K, :] = 0.0; G1[Q_K, :] = 0.0; Pi[Q_K, :] = 0.0
     G0[Q_K, Q_K] =  1.0
     G0[Q_K, I_R] =  1.0
     G0[Q_K, PI]  = -1.0
-    G0[Q_K, MC]  = -_alpha_K
-    G0[Q_K, Y]   = -_alpha_K
-    G0[Q_K, K_L] = +_alpha_K                      # 1-periodes lagg (K_L_t = K_{t-1})
-    G0[Q_K, U_K] = +_alpha_K                      # Alt. A: effektiv kapital
+    G0[Q_K, MC]  = -_alpha_K                      # kostnadskomponent: α_K·mc
+    G0[Q_K, Y]   = -1.0                           # A4d: output-koeff = 1.0 (ikke α_K)
+    G0[Q_K, K_L] = +1.0                           # A4d: kapital-koeff = 1.0
+    G0[Q_K, U_K] = +1.0                           # A4d: utnyttelse-koeff = 1.0
     Pi[Q_K, Q_K] =  (1.0 - _delta)
     Pi[Q_K, PI]  = -1.0
 
