@@ -176,3 +176,4 @@ Start lp = 3589.04
   [  25000/200000] acc=0.830  lp=3588.0  scale=1.8000  konv=OK  gjenstår≈239.7min
   [  30000/200000] acc=0.833  lp=3585.8  scale=1.8000  konv=OK  gjenstår≈233.2min
   [  35000/200000] acc=0.835  lp=3583.0  scale=1.8000  konv=OK  gjenstår≈229.8min
+  [  40000/200000] acc=0.835  lp=3580.6  scale=1.8000  konv=OK  gjenstår≈225.1min
