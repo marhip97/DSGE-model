@@ -28,3 +28,8 @@ Start lp = 3594.59
   Sjekk runde 0: IKKE OK — PSRF=1.988, ESS=4
   Problemer: ['rho_A', 'rho_C', 'rho_O', 'rho_Ys', 'rho_rp', 'rho_H']
   Rekalibrering 1: scale→3.0000. Ekstra burn-in (1,000 trekk)...
+  Ekstra burn-in ferdig. acc=0.080
+
+  Sjekk runde 1: IKKE OK — PSRF=1.421, ESS=8
+  Problemer: ['rho_A', 'rho_Ys', 'rho_rp', 'rho_H', 'sigma_C', 'sigma_O']
+  Rekalibrering 2: scale→4.0500. Ekstra burn-in (1,000 trekk)...
