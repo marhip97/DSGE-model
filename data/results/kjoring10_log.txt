@@ -100,3 +100,35 @@ Start lp = 3587.04
 
 --- FASE 3: Produksjonskjøring (200,000 trekk) ---
   Endelig scale: 1.0000
+Kjøring 10 akkumulerende — 19 frie parametre
+Modellrettelser: A4d (Q_K yk-koeff=1.0), phi_L=1.50 (K&M Tabell 8)
+phi_I1 fri, h_c=0.938 (fast), phi_B=0.0016, phi_O=0.15
+
+VARM START: 10000 eksisterende trekk funnet
+  burnin=500, max_recalib=0, seed=2452
+Start lp = 3593.05
+  Logit-reparametrisering AKTIV for: ('psi_R',)
+
+=================================================================
+  NEMO v3 — ADAPTIV MCMC v2 (sigma_A fast=0.006)
+  T_pre=75 kv  T_post=15 kv  N=19 param
+  Produksjon=200,000  Burn-in=500
+  Startscale=1.0000  PSRF-krav<1.1
+  Blokksampling: {psi_R,psi_P1} | {rho_A,rho_C,rho_O,rho_rp} | {rho_Ys,rho_H,psi_Y,sigma_Ys} | {sigma_C,sigma_O,sigma_rp,sigma_i,sigma_P,sigma_H} | {phi_I1,phi_I2,phi_u}
+=================================================================
+
+  Startverdi log-posterior: 3587.98
+
+--- FASE 1: Adaptiv burn-in (500 trekk) ---
+  Ferdig. acc=0.018  scale=0.6000
+  Empirisk kovarians aktivert. Sterkeste korrelasjoner:
+    psi_Y      ↔ phi_I2    : r=-0.953
+
+--- FASE 2: Konvergensovervåkning ---
+
+  Sjekk runde 0: IKKE OK — PSRF=4.327, ESS=3
+  Problemer: ['rho_A', 'rho_C', 'rho_O', 'rho_Ys', 'rho_rp', 'rho_H']
+  Maks rekalibreringer nådd. Fortsetter.
+
+--- FASE 3: Produksjonskjøring (200,000 trekk) ---
+  Endelig scale: 1.0000
