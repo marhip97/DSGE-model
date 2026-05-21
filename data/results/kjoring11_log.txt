@@ -44,3 +44,4 @@ Start lp = 3594.59
   [   5000/200000] acc=1.196  lp=3580.6  scale=1.4580  konv=PSRF=1.04 ESS=39  gjenstår≈447.1min
   [  10000/200000] acc=1.192  lp=3583.0  scale=1.4580  konv=PSRF=1.02 ESS=73  gjenstår≈434.7min
   [  15000/200000] acc=1.188  lp=3584.7  scale=1.4580  konv=PSRF=1.03 ESS=110  gjenstår≈423.3min
+  [  20000/200000] acc=1.174  lp=3586.0  scale=1.4580  konv=PSRF=1.02 ESS=159  gjenstår≈411.6min
