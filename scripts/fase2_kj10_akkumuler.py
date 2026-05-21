@@ -76,8 +76,9 @@ if PARTIAL_PATH.exists():
     psi_R_bounded = 0.01 + 0.91 / (1 + np.exp(-existing_chain[-n_cov:, i_psi]))
     post_std[i_psi] = max(float(psi_R_bounded.std()), 1e-4)
 
-    burnin_n    = 500
-    max_recalib = 0
+    # Tillat rekalibrering ved liten kjede (< 10k trekk) — bedrer mixing tidlig
+    max_recalib = 1 if n_existing < 10000 else 0
+    burnin_n    = 1000 if n_existing < 10000 else 500
     seed        = int(time.time()) % 10000
     print(f"  burnin={burnin_n}, max_recalib={max_recalib}, seed={seed}")
 else:
