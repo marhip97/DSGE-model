@@ -20,3 +20,11 @@ Start lp = 3618.98
   Startverdi log-posterior: 3614.21
 
 --- FASE 1: Adaptiv burn-in (2,000 trekk) ---
+  Ferdig. acc=0.255  scale=0.5250
+  Empirisk kovarians aktivert. Sterkeste korrelasjoner:
+
+--- FASE 2: Konvergensovervåkning ---
+
+  Sjekk runde 0: IKKE OK — PSRF=2.638, ESS=4
+  Problemer: ['rho_A', 'rho_C', 'rho_O', 'rho_Ys', 'rho_H', 'sigma_C']
+  Rekalibrering 1: scale→3.0000. Ekstra burn-in (1,000 trekk)...
