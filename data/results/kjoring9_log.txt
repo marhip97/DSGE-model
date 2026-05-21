@@ -119,3 +119,18 @@ Start lp = 3495.28
   [  25000/200000] acc=2.084  lp=3499.9  scale=1.0000  konv=PSRF=1.04 ESS=58  gjenstår≈236.0min
   [  30000/200000] acc=2.086  lp=3500.9  scale=1.0000  konv=PSRF=1.02 ESS=66  gjenstår≈230.0min
   [  35000/200000] acc=2.089  lp=3485.5  scale=1.0000  konv=PSRF=1.03 ESS=80  gjenstår≈223.2min
+  [  40000/200000] acc=2.086  lp=3492.2  scale=1.0000  konv=PSRF=1.02 ESS=91  gjenstår≈217.1min
+  [  45000/200000] acc=2.084  lp=3491.9  scale=1.0000  konv=PSRF=1.03 ESS=104  gjenstår≈210.1min
+  [  50000/200000] acc=2.086  lp=3488.9  scale=1.0000  konv=PSRF=1.03 ESS=118  gjenstår≈203.7min
+  [  55000/200000] acc=2.086  lp=3487.3  scale=1.0000  konv=PSRF=1.01 ESS=129  gjenstår≈196.8min
+  [  60000/200000] acc=2.087  lp=3492.9  scale=1.0000  konv=PSRF=1.01 ESS=144  gjenstår≈189.9min
+  [  65000/200000] acc=2.084  lp=3495.4  scale=1.0000  konv=PSRF=1.02 ESS=159  gjenstår≈182.7min
+  [  70000/200000] acc=2.087  lp=3489.4  scale=1.0000  konv=PSRF=1.01 ESS=174  gjenstår≈175.7min
+  [  75000/200000] acc=2.088  lp=3486.5  scale=1.0000  konv=PSRF=1.01 ESS=188  gjenstår≈168.8min
+  [  80000/200000] acc=2.091  lp=3496.3  scale=1.0000  konv=PSRF=1.01 ESS=201  gjenstår≈161.8min
+  [  85000/200000] acc=2.086  lp=3495.5  scale=1.0000  konv=PSRF=1.01 ESS=213  gjenstår≈154.7min
+  [  90000/200000] acc=2.088  lp=3496.0  scale=1.0000  konv=PSRF=1.01 ESS=230  gjenstår≈147.9min
+  [  95000/200000] acc=2.089  lp=3492.4  scale=1.0000  konv=PSRF=1.01 ESS=244  gjenstår≈141.1min
+  [ 100000/200000] acc=2.090  lp=3497.8  scale=1.0000  konv=PSRF=1.01 ESS=264  gjenstår≈134.3min
+  [ 105000/200000] acc=2.090  lp=3487.5  scale=1.0000  konv=PSRF=1.01 ESS=275  gjenstår≈127.5min
+  [ 110000/200000] acc=2.090  lp=3489.2  scale=1.0000  konv=PSRF=1.01 ESS=285  gjenstår≈120.7min
