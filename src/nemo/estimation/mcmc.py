@@ -150,7 +150,7 @@ PARAM_NAMES_V3_FULL = ['rho_A','rho_C','rho_O','rho_Ys','rho_rp','rho_H',
                         'sigma_i','sigma_P','sigma_H','psi_R','psi_P1','psi_Y','h_c']
 
 KM = {'rho_A':0.804,'rho_C':0.725,'rho_O':0.874,'rho_Ys':0.783,
-      'rho_rp':0.737,'rho_H':0.694,'sigma_C':0.030,
+      'rho_rp':0.737,'rho_H':0.694,'sigma_A':0.006,'sigma_C':0.030,
       'sigma_O':0.079,'sigma_Ys':0.011,'sigma_rp':0.006,'sigma_i':0.0003,
       'sigma_P':0.003,'sigma_H':0.050,'psi_R':0.666,'psi_P1':0.292,
       'psi_Y':0.242,'h_c':0.938,'phi_I1':4.0,'phi_I2':8.0,'phi_u':0.2192}
