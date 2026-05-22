@@ -83,9 +83,29 @@ else:
     n_existing     = 0
     print(f"\nKALD START: ingen partial-fil — start fra kj12-posterior")
 
-    prev_path = ROT / "data" / "results" / "chain_kj12_prod_posterior.json"
-    with open(prev_path) as f:
-        prev_summ = json.load(f)["summary"]
+    prev_path_json    = ROT / "data" / "results" / "chain_kj12_prod_posterior.json"
+    prev_path_partial = ROT / "data" / "results" / "chain_kj12_temp_partial.npy"
+
+    if prev_path_json.exists():
+        with open(prev_path_json) as f:
+            prev_summ = json.load(f)["summary"]
+        print(f"  Bruker kj12 posterior JSON")
+    elif prev_path_partial.exists():
+        # Bygg summary fra siste 20% av kj12-partial
+        ch12 = np.load(prev_path_partial)
+        i_psi = PARAM_NAMES.index("psi_R")
+        tail = ch12[int(0.8 * len(ch12)):]
+        tail_out = tail.copy()
+        tail_out[:, i_psi] = 0.01 + 0.91 / (1 + np.exp(-tail[:, i_psi]))
+        prev_summ = {n: {"mean": float(tail_out[:, i].mean()),
+                         "std":  float(tail_out[:, i].std())}
+                     for i, n in enumerate(PARAM_NAMES)}
+        print(f"  Bruker kj12 partial ({len(ch12)} trekk), siste 20% som prior")
+    else:
+        prev_path_kj10 = ROT / "data" / "results" / "chain_kj10_prod_posterior.json"
+        with open(prev_path_kj10) as f:
+            prev_summ = json.load(f)["summary"]
+        print(f"  Fallback til kj10 posterior")
 
     theta_start = np.zeros(N_PARAMS)
     post_std    = np.zeros(N_PARAMS)
