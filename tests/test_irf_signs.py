@@ -105,17 +105,8 @@ def test_08_kostnad_bnp_ned(krav_data):
 
 # ── TFP-sjokk ────────────────────────────────────────────────────────────────
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "KJENT MODELLFEIL (Spor A): TFP-sjokk gir negativ BNP-respons i alle 20 kvartaler. "
-        "Bygger opp positivt etter t=11, men kumulativt < 0. "
-        "Sannsynlig årsak: manglende kanal eller koeffisientfeil i produksjonsfunksjonen. "
-        "Må utredes i Spor A (likningstransparens) og Spor C4 (sigma_A identifikasjon)."
-    ),
-)
 def test_09_tfp_bnp_opp(krav_data):
-    """Krav 9: TFP → BNP opp."""
+    """Krav 9: TFP → BNP opp. (A4d-rettelse, PE-godkjent 2026-05-21)"""
     T, R = krav_data
     cum = _cum(T, R, E_A, 0.007)
     assert cum[Y] > 0, f"Y kumulativ = {cum[Y]:.4f}"
@@ -164,16 +155,6 @@ def test_14_bolig_boligpris_opp(krav_data):
 
 # ── LTV-sjokk ────────────────────────────────────────────────────────────────
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "KJENT MODELLFEIL (Spor A4c): LTV-sjokk gir positiv C_NW fra t=2. "
-        "t=1 er korrekt negativ, men kollateral-oppgangseffekten via q_H dominerer. "
-        "Mulig feil: EPS_PHI_H-fortegn i utlånsrente-likning (G0[22,EPS_PHI_H]=-1.0 "
-        "og G0[23,EPS_PHI_H]=-1.0 senker renter ved positivt sjokk, øker kreditt). "
-        "Krever review av LTV-sjokk-konvensjon mot K&M (2019) seksjon 2.2 / Gerali et al. 2010."
-    ),
-)
 def test_15_ltv_laantakerkonsum_ned(krav_data):
     """Krav 15: LTV-sjokk → låntakerkonsum (c_NW) ned (strammet belåningsgrense)."""
     T, R = krav_data

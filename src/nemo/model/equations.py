@@ -313,14 +313,21 @@ def build_matrices(p=None):
     # BLOKK D: VALUTA OG HANDEL
     # ════════════════════════════════════════════════════════════════════════
  
-    # D1. UIP med pengemarkedspremie (utvidet fra Fase I)
-    # E[rer_{t+1}] = rer + (i_D - π) - (i* - π*) + ε_rp + ε_prem
+    # D1. UIP med pengemarkedspremie, gjeldselastisk premie og olje-valuta-kanal
+    # E[rer_{t+1}] = rer + (i_D - π) - (i* - π*) + ε_rp + ε_prem + φ_B·b_NW - φ_O·po
+    # φ_B·b_NW: gjeldselastisk ankerfeste (K&M §3.4, Tabell 8, PE-godkjent 2026-05-19)
+    # φ_O·po: direkte olje→valutakurs-kanal (PE-godkjent 2026-05-20):
+    #   høy oljepris → NOK-appresiering (RER ned) — kalibrert fra hist. NOK/olje-korr ~0.7
+    #   Hypotese: ε_rp absorberer denne kanalen når den mangler → sigma_rp=0.017 vs K&M 0.006
+    phi_O = p.phi_O
     G0[15, RER]       =  1.0
     G0[15, I_D]       =  1.0
     G0[15, PI]        = -1.0
     G0[15, I_STAR]    = -1.0
     G0[15, PI_STAR]   =  1.0
     G0[15, EPS_PREM]  = -1.0   # pengemarkedspremie som UIP-skift
+    G0[15, B_NW]      =  phi_B # gjeldselastisk premie — φ_B=0.0016 (K&M Tabell 8)
+    G0[15, PO]        =  phi_O # olje-valuta-kanal — høy oljepris styrker NOK (RER ned)
     Pi[15, RER]       =  1.0
     Psi[15, E_rp]     =  1.0
     Psi[15, E_prem]   =  1.0
@@ -382,13 +389,13 @@ def build_matrices(p=None):
     G0[22, I_L_W]   =  1.0
     G0[22, I_R]     = -1.0
     G0[22, NB]      = -p.phi_c
-    G0[22, EPS_PHI_H] = -1.0   # LTV-sjokk påvirker spread
+    G0[22, EPS_PHI_H] = +1.0   # A4c-konsistens 2026-05-18 (PE): strammere LTV → høyere spread
  
     # E4. Utlånsrente, låntakere (NW) — høyere spread
     G0[23, I_L_NW]  =  1.0
     G0[23, I_R]     = -1.0
     G0[23, NB]      = -1.5 * p.phi_c   # høyere spread for låntakere
-    G0[23, EPS_PHI_H] = -1.0
+    G0[23, EPS_PHI_H] = +1.0   # A4c-konsistens 2026-05-18 (PE): strammere LTV → høyere spread
  
     # E5. Gjeld, sparere (ikke-bindende)
     # b_W: finansiell formueakkumulering sparere
@@ -636,12 +643,14 @@ def build_matrices_v3(p=None, theta_H: float = 0.05):
     psi_P1 = p.psi_P1
     psi_Y  = p.psi_Y
     psi_S  = p.psi_S
+    psi_W  = p.psi_W
 
     G0[20, :] = 0.0; G1[20, :] = 0.0; Psi[20, :] = 0.0
     G0[20, I_R]   =  1.0
     G0[20, Y]     = -(1.0 - psi_R) * psi_Y
     G0[20, RER]   = -(1.0 - psi_R) * psi_S
     G0[20, PI]    = -(1.0 - psi_R) * psi_P1   # samtid inflasjon
+    G0[20, PIW]   = -(1.0 - psi_R) * psi_W    # A7 (PE-godkjent 2026-05-21): lønnsinflasjon, K&M §2.13
     G0[20, I_R_L] = -psi_R                     # 1-periodes lagg via lagg-tilstand
     Psi[20, E_i]  =  1.0
 
@@ -702,17 +711,18 @@ def build_matrices_v3(p=None, theta_H: float = 0.05):
     G0[MC, A]    =  (1.0 + p.phi_L / (1.0 - _alpha_K))
     G0[MC, K_L]  =  _alpha_K / (1.0 - _alpha_K)  # 1-periodes lagg (K_L_t = K_{t-1})
 
-    # Ligning 14: Tobin's Q  q_K_t + i_R_t − π_t − α_K·(mc_t + y_t − k̂_t) − β(1-δ)·E[q_K_{t+1}] = 0
-    # v2-fix brukte G1[Q_K, K_L] = −α_K → K_{t-2}; rettelse: G0[Q_K, K_L] = +α_K
-    # Alt. A: r_K avhenger av effektiv kapital k̂_t = K_L_t + U_K_t, så U_K-term legges til
+    # Ligning 14: Tobin's Q (A4d-rettelse, PE-godkjent 2026-05-21)
+    # r̂_K = mc + y − k̂  (leiepris log-avvik fra SS, koeff=1.0 på y-k̂-ledd)
+    # Hybrid: MC beholder α_K, mens (y−k̂) bruker 1.0 — ref. A_funn_rapport.md §A4d.
+    # Effekt: TFP-sjokk gir positiv BNP (test_09 bestått), KPI q4 ≈ 0.98× NB.
     G0[Q_K, :] = 0.0; G1[Q_K, :] = 0.0; Pi[Q_K, :] = 0.0
     G0[Q_K, Q_K] =  1.0
     G0[Q_K, I_R] =  1.0
     G0[Q_K, PI]  = -1.0
-    G0[Q_K, MC]  = -_alpha_K
-    G0[Q_K, Y]   = -_alpha_K
-    G0[Q_K, K_L] = +_alpha_K                      # 1-periodes lagg (K_L_t = K_{t-1})
-    G0[Q_K, U_K] = +_alpha_K                      # Alt. A: effektiv kapital
+    G0[Q_K, MC]  = -_alpha_K                      # kostnadskomponent: α_K·mc
+    G0[Q_K, Y]   = -1.0                           # A4d: output-koeff = 1.0 (ikke α_K)
+    G0[Q_K, K_L] = +1.0                           # A4d: kapital-koeff = 1.0
+    G0[Q_K, U_K] = +1.0                           # A4d: utnyttelse-koeff = 1.0
     Pi[Q_K, Q_K] =  (1.0 - _delta)
     Pi[Q_K, PI]  = -1.0
 

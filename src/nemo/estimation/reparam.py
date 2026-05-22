@@ -1,10 +1,13 @@
 """
-[STAT] Logit-reparametrisering for h_c og psi_R (Fase 2, C5 §2).
+[STAT] Logit-reparametrisering for psi_R (Fase 2, C5 §2).
 
-h_c og psi_R treffer øvre priorbegrensning. Likelihood har sannsynligvis en
+psi_R treffer øvre priorbegrensning. Likelihood har sannsynligvis en
 rygg som fortsetter inn i ikke-tillatt område. Logit-transformasjon flytter
 grensene til ±∞ og avdekker om posterior er genuint konsentrert ved grensen
 eller en numerisk artefakt.
+
+h_c er fjernet fra reparametrisering — kalibreres fast til H_C_FIXED=0.938
+(PE-godkjent 2026-05-18, C2 Alt A).
 
 Transformasjon:
     Naturlig rom: x ∈ (lb, ub)
@@ -28,7 +31,8 @@ import numpy as np
 from nemo.estimation.mcmc import PARAM_NAMES, PARAM_PRIORS
 
 # Parametre som transformeres til ubegrenset rom
-REPARAM_PARAMS: tuple[str, ...] = ("h_c", "psi_R")
+# h_c fjernet 2026-05-18 — kalibreres fast til H_C_FIXED=0.938 (PE-godkjent, C2 Alt A)
+REPARAM_PARAMS: tuple[str, ...] = ("psi_R",)
 
 
 def _bounds(name: str) -> tuple[float, float]:

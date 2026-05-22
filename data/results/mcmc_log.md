@@ -1,0 +1,185 @@
+# MCMC-kjøringslogg — NEMO Fase 0.5/2
+
+Loggføres per AGENTER.md-krav: alle MCMC-kjøringer skal dokumenteres her.
+
+---
+
+## Kjøring 1 — chain_fase2_reparam_prod (2026-05)
+- **Parametre:** 20 (inkl. phi_I1 fri)
+- **Trekk:** 200k × 2 kjeder
+- **PSRF_max:** 1.002, **ESS_min:** 2861 (1.79%)
+- **Funn:** phi_I1 estimert til ~0.5 (vs K&M=4.0), h_c=0.988, psi_R=0.960
+
+## Kjøring 2 — chain_fase2_phi1fix_prod (2026-05-17)
+- **Parametre:** 19 (phi_I1 fast=4.0, PE-godkjent)
+- **Trekk:** 160k
+- **PSRF_max:** 1.002, **ESS_min:** 2861 (1.79%)
+- **Funn:** psi_R=0.964 (treffer prior-grense 0.990), sigma_rp=0.017
+
+## Kjøring 3 — chain_fase2_postfix_prod (2026-05-18)
+- **Parametre:** 19 (phi_I1 fast=4.0)
+- **Trekk:** 140k etter burn-in (prosess avbrutt ved 175k/200k, salvaged)
+- **PSRF_max:** 1.012, **ESS_min:** 724 (0.5%) — AR-blokk tregeste
+- **ESS/n>2%:** 13/19
+- **Modellfix:** A4a (bank), A4c (LTV-gjeld), CEE (Q_K), A5 (BNP-balanse), LTV-fortegn E3/E4
+- **Prior-endring:** psi_R Beta(4,2)/(0.30,0.990) → Beta(2,2)/(0.01,0.85) (PE-godkjent)
+
+### Postfix nøkkelresultater
+
+| Parameter | Kjøring 3 | Kjøring 2 | K&M |
+|-----------|-----------|-----------|-----|
+| psi_R     | 0.842 **†** | 0.964 | 0.667 |
+| h_c       | 0.988 **†** | 0.988 | 0.938 |
+| psi_P1    | 0.108     | 0.279 | 0.292 |
+| psi_Y     | 0.141     | 0.255 | 0.240 |
+| phi_I2    | 4.73      | 0.936 | 8.000 |
+| sigma_rp  | 0.017 **‡** | 0.017 | 0.006 |
+
+**†** Treffer prior-grense  
+**‡** Uendret på tvers av alle kjøringer — se C3-eskalering
+
+### B5-benchmark (pengepolitikkssjokk +1pp, kv4)
+
+| Variabel | Kjøring 3 | NB Memo 3/2024 | Ratio |
+|----------|-----------|----------------|-------|
+| BNP      | −2.85%    | −0.45%         | 6.3×  |
+| KPI      | −0.44%    | −0.15%         | 2.9×  |
+| RER      | −11.6%    | −0.40%         | 29×   |
+| Boligpris| −34.9%    | −0.80%         | 44×   |
+
+Med K&M sigma_rp=0.006: BNP-ratio = 1.8×, KPI-ratio = 1.0×.
+Konklusjon: sigma_rp er den dominerende kilden til IRF-avvik. Se PE_eskalering_C3.md.
+
+### Anbefalinger for neste kjøring
+
+1. Fiks sigma_rp=0.006 (som sigma_A) — krever PE-godkjenning
+2. Vurder psi_R prior-utvidelse til (0.01, 0.92) — data trykker mot 0.85-grensen
+
+---
+
+## Kjøring 4 — sigma_rp fast (C3-eksperiment, 2026-05-18)
+- **Parametre:** 18 (sigma_rp fast=0.006, phi_I1 fast=4.0, h_c fri → traff 0.988)
+- **Trekk:** ~100k (salvaged)
+- **Funn:** sigma_rp=0.006*, psi_R steg til 0.911 (kompensasjon). BNP-ratio 8.5×.
+- **Konklusjon:** Fiksering av sigma_rp løser ikke IRF — psi_R kompenserer.
+
+## Kjøring 5 — h_c fast (C2 Alt A, 2026-05-18)
+- **Parametre:** 18 (h_c=0.938 fast, phi_I1=4.0 fast, sigma_rp fri)
+- **Fil:** chain_fase2_hcfix_prod_posterior.json
+- **Trekk:** 60k (salvaged, container-grense)
+- **PSRF_max:** 1.00, **ESS_min:** ~500
+- **Funn:** sigma_rp=0.017, psi_R=0.912. BNP-ratio 10.2×.
+- **Konklusjon:** h_c-fiksering endret ikke sigma_rp — kompensatorisk likevekt bekreftet.
+
+## Kjøring 6 — RER utelatt (Alt. 4, 2026-05-19)
+- **Parametre:** 18 (13 obs, ds_obs utelatt), h_c=0.938 fast, phi_I1=4.0 fast
+- **Fil:** chain_fase2_norer_prod_posterior.json
+- **Trekk:** 80k (salvaged)
+- **PSRF_max:** 1.00
+- **Funn:** sigma_rp STEG til 0.020 (opp fra 0.017). psi_R=0.912.
+- **Konklusjon:** sigma_rp er ikke datadrevet via RER — det er strukturelt.
+
+## Kjøring 7 — φ_B i UIP (Alt. 2, 2026-05-19)
+- **Parametre:** 18 (phi_B=0.0016 i UIP-ligning), h_c=0.938 fast, phi_I1=4.0 fast
+- **Fil:** chain_fase2_phib_prod_posterior.json
+- **Trekk:** 120k (salvaged)
+- **PSRF_max:** 1.00, **ESS_min:** ~800
+- **Funn:** sigma_rp=0.017 (uendret), psi_R=0.912. lp forbedret 3404→3424.
+- **Konklusjon:** φ_B bedrer modellfit men løser ikke sigma_rp-problemet.
+
+## Kjøring 8 — φ_O i UIP (olje-valuta-kanal, 2026-05-20)
+- **Parametre:** 18 (phi_O=0.15 og phi_B=0.0016 i UIP), h_c=0.938 fast, phi_I1=4.0 fast
+- **Fil:** chain_fase2_phio_prod_posterior.json
+- **Trekk:** 60k (salvaged, container-grense)
+- **PSRF_max:** 1.004, **ESS_min:** 703, **ESS/n>2%:** 14/18
+- **Funn:** sigma_rp=0.014 (↓ fra 0.017), psi_R=0.912. Delvis effekt.
+- **B5-benchmark (normalisert, posterior mean):**
+
+| Variabel | Kj8 | NB Figur 1 | Ratio |
+|----------|-----|------------|-------|
+| BNP q4   | -0.189 | -0.450 | 0.4× |
+| RER q4   | -0.621 | -0.400 | 1.6× |
+| KPI q4   | -0.025 | -0.150 | 0.2× |
+| Rente q4 | +0.743 | +0.600 | 1.2× |
+
+- **Konklusjon:** phi_O gir delvis sigma_rp-effekt men løser ikke B5. Sammenligning med
+  fase2v2 (phi_I1 fri, BNP=-0.447≈NB) avslørte at phi_I1=4.0 (fast) er
+  **hovedårsaken til for liten BNP-respons** (0.4×). PE godkjente å frigi phi_I1 i kjøring 9.
+
+## Kjøring 9 — phi_I1 fri + phi_B + phi_O (2026-05-20/21)
+- **Parametre:** 19 (phi_I1 fri igjen, h_c=0.938 fast, sigma_A fast)
+- **Prior phi_I1:** Normal(2.0, 2.0) på (0.1, 15.0)
+- **Fil:** chain_fase2_phio_phi1_prod_posterior.json
+- **Trekk:** 198 000 (akkumulert over 2 restarter: 16k + 182k)
+- **Skript:** scripts/fase2_phio_phi1_akkumuler.py (akkumulerende strategi)
+- **PSRF_max:** 1.005, **PSRF<1.10:** 19/19 ✓
+- **ESS_min:** 532 (rho_rp), **ESS/n>1%:** 17/19 (rho_rp og sigma_rp svake)
+
+### Nøkkelresultater kjøring 9
+
+| Parameter | Kj9 | Kj8 | K&M |
+|-----------|-----|-----|-----|
+| phi_I1    | **0.205** [0.181,0.231] | 4.0 (fast) | 4.0 |
+| sigma_rp  | 0.013 | 0.014 | 0.006 |
+| psi_R     | 0.911 | 0.912 | 0.667 |
+| rho_A     | 0.086 | 0.076 | 0.950 |
+| rho_rp    | 0.808 | 0.831 | 0.920 |
+
+**phi_I1=0.205**: Norske data forkaster K&M=4.0 sterkt. Liknende som fase2v2 (~0.5).
+**rho_A=0.086**: TFP-sjokk lite persistent — mulig konsekvens av Q_K-spesifikasjon (test_09 xfail).
+
+### B5-benchmark kjøring 9 (normalisert, posterior mean)
+
+| Variabel | Kj9    | Kj8    | NB Figur 1 | Kj9/NB |
+|----------|--------|--------|------------|--------|
+| BNP q1   | -1.598 | -0.261 | -0.450     | 3.55×  |
+| BNP q4   | -0.965 | -0.189 | -0.450     | 2.14×  |
+| BNP q8   | -0.375 | -0.071 | -0.450     | 0.83×  |
+| BNP q12  | -0.065 | +0.015 | -0.450     | 0.14×  |
+| RER q4   | -0.592 | -0.621 | -0.400     | 1.48×  |
+
+**Konklusjon:** phi_I1 fri gir stor forbedring i BNP-respons (fra 0.4× → 2.14× ved q4),
+men responsen er for stor tidlig (3.55× ved q1) og for lite persistent (0.14× ved q12).
+Normaliseringen til rente-topp q1 skaper artefakt — sjokket faller raskt.
+Neste steg: undersøk rente-persistens og rho_A=0.086 (potensielt MPK-problem).
+
+**Åpne spørsmål for PE:**
+1. rho_A=0.086 — strukturproblem i Q_K-likning eller reelt norsk fenomen?
+2. Kjøre ytterligere akkumulering (30k–50k trekk) for ESS rho_rp > 1%?
+3. Endre normaliseringskonvensjon: BNP_q4-normalisering istedenfor rente-topp?
+
+---
+
+## Kjøring 10 — korrigert modell A4d + A_phi_L (2026-05-21)
+- **Parametre:** 19 (phi_I1 fri, h_c=0.938 fast, sigma_A=0.006 fast)
+- **Modellfix:** A4d (Q_K yk-koeff=1.0), A_phi_L (phi_L=1.50) — PE-godkjent 2026-05-21
+- **Fil:** chain_kj10_prod_posterior.json
+- **Trekk:** 178 000 (akkumulert over ~10 restarter via vaktløkke)
+- **Skript:** scripts/fase2_kj10_akkumuler.py
+- **PSRF_max:** 1.004, **PSRF<1.10:** 19/19 ✓
+- **ESS_min:** 1384 (rho_rp), **ESS/n>1%:** 18/19
+- **rho_rp ESS-note:** ESS/n=0.0078 — strukturelt lav (ACL≈140), bedres ikke med flere trekk. Krever HMC eller dedikert blokk i kj11.
+
+### Nøkkelresultater kjøring 10
+
+| Parameter | Kj10  | Kj9   | K&M   | Endring |
+|-----------|-------|-------|-------|---------|
+| rho_A     | **0.390** [0.21,0.57] | 0.086 | 0.950 | ↑ 4.5× — TFP-kanal åpnet |
+| phi_I1    | **0.105** [0.10,0.12] | 0.205 | 4.0   | ↓ halvert, nær kalibrert |
+| sigma_rp  | 0.014 [0.012,0.017]   | 0.013 | 0.006 | uendret |
+| psi_R     | 0.912 [0.900,0.919]   | 0.911 | 0.667 | stabil |
+| rho_rp    | 0.796 [0.34,1.00]     | 0.808 | 0.920 | bred posterior |
+| rho_C     | 0.810 [0.37,1.00]     | –     | 0.800 | nær K&M |
+| phi_u     | 0.027 [0.01,0.06]     | –     | 0.050 | rimelig |
+
+**rho_A=0.390:** A4d-rettelsen løftet rho_A fra 0.086 → 0.390 (4.5×), men ikke til K&M=0.95.
+Posteriorverdien er stabil og tolkbar — norske data støtter kortere TFP-persistens enn K&M.
+
+**phi_I1=0.105:** Nær K&M kalibrert (~0.10). phi_I1=4.0 i K&M kan reflektere langsiktig kalibrering
+ikke datadrevet estimering.
+
+### Anbefalinger for kjøring 11
+
+1. **Dedikert blokk for rho_rp** — skill ut fra AR-blokken for å bedre ESS/n
+2. **B5-benchmark oppdatering** med kj10-posterior (BNP-respons forventes forbedret vs kj9)
+3. **rho_A-diagnose** — er 0.39 vs K&M=0.95 et modell- eller dataproblem? Sjekk TFP-IRF.
