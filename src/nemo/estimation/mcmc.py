@@ -30,7 +30,7 @@ from scipy.special import betaln, gammaln
 
 from nemo.model.equations import (
     build_matrices_v3, NZ, NE,
-    Y, C, INV, X, M, PI, W, I_R, RER, PO, YS,
+    Y, C, INV, X, M, PI, W, I_R, RER, S, PO, YS,
     Q_H, B_NW, C_NW, I_D, I_L_NW, L, MC,
     E_A, E_C, E_P, E_O, E_Ys, E_rp, E_i, E_H, E_phi_h
 )
@@ -63,7 +63,7 @@ OBS_NAMES = [
 def build_H():
     H = np.zeros((N_OBS, NZ))
     H[0,Y]=1.0; H[1,C]=1.0; H[2,INV]=1.0; H[3,X]=1.0; H[4,M]=1.0
-    H[5,PI]=4.0; H[6,W]=1.0; H[7,I_R]=4.0; H[8,I_R]=4.0; H[9,RER]=1.0
+    H[5,PI]=4.0; H[6,W]=1.0; H[7,I_R]=4.0; H[8,I_R]=4.0; H[9,S]=1.0   # A12.1: ds_obs→S(19) ikke RER(15)
     H[10,PO]=1.0; H[11,YS]=1.0; H[12,Q_H]=1.0; H[13,B_NW]=1.0
     return H
 
