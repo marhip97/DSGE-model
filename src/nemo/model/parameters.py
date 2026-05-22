@@ -140,6 +140,9 @@ class Parameters:
     # Gjeldsavhengig risikopremie
     phi_B    = 0.0016     # (CAL) φ_B — Tabell 8 (lavere enn Fase I χ=0.001)
 
+    # Importpriskanal i NK Phillips-kurve (A14.9 — PE-godkjent 2026-05-22)
+    kappa_M  = 0.03       # (CAL) κ_M — importprisinflasjon-koeff. i Phillips
+
     # Olje-valuta-kanal i UIP (PE-godkjent 2026-05-20)
     # Kalibrert fra historisk NOK/olje-korrelasjon ~0.7:
     # +10% oljepris → ~1.5% NOK-appresiering → phi_O ≈ 0.15

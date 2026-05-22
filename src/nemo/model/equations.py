@@ -166,7 +166,7 @@ def build_matrices(p=None):
     omega  = p.omega_NW        # andel låntakere
     m_H    = p.m_H             # LTV
     gamma_G = p.gamma_G
-    kappa_M = 0.03             # importpriskanal (beholdes fra Fase I)
+    kappa_M = p.kappa_M        # importpriskanal (A14.9: fra parameters.py)
  
     # Avledede størrelser
     a1_W = h_c / (1 + h_c)
