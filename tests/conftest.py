@@ -21,7 +21,17 @@ from nemo.solver.blanchard_kahn import solve as bk_solve
 
 @pytest.fixture(scope="session")
 def kalibrert_modell():
-    """Returnerer (T, R, diag) for kalibrert v3-modell uten advarsler."""
+    """Returnerer (T, R, diag) for kalibrert v3-modell."""
+    G0, G1, Psi, Pi = build_matrices_v3(Parameters)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        T, R, diag = bk_solve(G0, G1, Psi, Pi, verbose=False)
+    return T, R, diag
+
+
+@pytest.fixture(scope="session")
+def kalibrert_modell_v3():
+    """Returnerer (T, R, diag) for v3-modell (bakoverkompatibel fixture)."""
     G0, G1, Psi, Pi = build_matrices_v3(Parameters)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -32,7 +42,7 @@ def kalibrert_modell():
 @pytest.fixture(scope="session")
 def syntetisk_obs(kalibrert_modell):
     """
-    Genererer 80 kvartalers syntetiske observasjoner fra kalibrert modell.
+    Genererer 80 kvartalers syntetiske observasjoner fra kalibrert v3-modell.
     Brukes i Kalman-filter-tester.
 
     Returnerer (Y_pre, Y_post) der Y_post er 20 perioder etter en COVID-gap
@@ -50,7 +60,7 @@ def syntetisk_obs(kalibrert_modell):
     n_post = 20
     n_total = n_pre + n_post
 
-    # Simuler tilstandsbane
+    # Simuler tilstandsbane (NZ=49 dimensjoner)
     z = np.zeros(NZ)
     states = []
     for _ in range(n_total):

@@ -755,18 +755,18 @@ def build_matrices_v3(p=None, theta_H: float = 0.05):
 
 def build_matrices_v4(p=None, theta_H: float = 0.05):
     """
-    NEMO Fase II v4 — EKSPERIMENTELL (A9, ikke i produksjon).
+    NEMO Fase II v4 — RE-korrekt (A9+A9b, PE-godkjent 2026-05-22).
 
-    Forsøk på å implementere fremoverskuende RE via hjelpetilstander (NZ: 49→56).
-    Gir n_unstable=5 ≠ rank(Pi)=7 → BK IKKE oppfylt → ustabil Schur-løsning.
+    Implementerer fremoverskuende RE via 7 hjelpetilstander (NZ: 49→56).
+    n_unstable=7 = rank(Pi)=7 → BK oppfylt → Schur-projeksjon → stabil løsning.
 
-    Årsak: NEMO-modellen er DETERMINERT (n_unstable=0 i v3 via direkte metode).
-    I en determinert modell er direkte inversjon T=G0⁻¹G1 den KORREKTE unike
-    RE-løsningen (ekvivalent med Schur når alle eigenvalider er stabile).
-    UIP-konsistenslikning gir unit root (λ=1.0), ikke λ>1.001, så n_unstable
-    forblir under rank(Pi)=7 uavhengig av andre fikser.
+    Nøkkelendringer fra v3:
+      A9:  7 hjelpetilstander PI_E..RER_E for E_t[X_{t+1}] i strukturelle likninger.
+           Konsistenslikninger: G0[k,X]=1, G1[k,X_E]=1, Pi[k,X]=1.
+      A9b: psi_UIP=0.02 i UIP-likning — bryter enhetsroten (λ=1.0→1.02).
+           Tolkes som valutarisikopremie/ufullkommen kapitalbevegelighet (C3-kanal).
 
-    Bruk build_matrices_v3 i stedet — det er den produksjonsklare versjonen.
+    Produksjonsklar — brukes i estimering fra kj14.
 
     Referanse: K&M (2019), Sims (2002) "Solving Linear Rational Expectations Models"
 
@@ -838,7 +838,13 @@ def build_matrices_v4(p=None, theta_H: float = 0.05):
     G0[14, PI_E]  +=  1.0
 
     # Ligning 15 (UIP): E_t[rer_{t+1}]
+    # A9b (PE-godkjent 2026-05-22): psi_UIP=0.02 bryter enhetsroten fra ren UIP.
+    # Ren UIP (koeff=1.0) gir companion eigenverdi λ=1.0 (enhetsrot) → BK ikke oppfylt.
+    # Med psi_UIP: (1+ψ)·rer_t = E_t[rer_{t+1}] + ... → eigenverdi 1+ψ≈1.02 > 1.001.
+    # Tolkning: 2% valutarisikopremie/ufullkommen kapitalbevegelighet (C3-kanal).
+    psi_UIP = 0.02
     G0[15, RER_E] = -1.0
+    G0[15, RER]  += psi_UIP
 
     # ── Konsistenslikninger (rader 49–55): X_t = X_E_{t-1} + η_{X,t} ─────────
     # Sims (2002): G0[k,X]=1, G1[k,X_E]=1, Pi[k,X]=1

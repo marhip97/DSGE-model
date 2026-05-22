@@ -39,7 +39,9 @@ def solve(G0, G1, Psi, Pi=None, verbose=True):
     with np.errstate(divide='ignore', invalid='ignore'):
         lams = np.where(np.abs(av) < 1e-13, np.inf, np.abs(bv / av))
 
-    n_unstable = int(np.sum(lams > 1.001))
+    # Terskel: > 1.0 (ikke 1.001) for å fange enhetsrøtter fra RE-likninger
+    # (UIP psi_UIP ≈ 1.02, CEE-investering ≈ 1.0003 — begge genuine ustabile RE-moder)
+    n_unstable = int(np.sum(lams > 1.0))
     n_stable   = NZ - n_unstable
 
     diag = {
