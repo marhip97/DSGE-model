@@ -81,17 +81,35 @@ def solve(G0, G1, Psi, Pi=None, verbose=True):
         T = G0inv @ G1
         R = G0inv @ Psi
     else:
-        # Schur-projeksjon (stabil blokk)
+        # Sims (2002) gensys — fullstendig løsning med M-matrise (eta-impakt).
+        # Referanse: Sims (2002) "Solving Linear Rational Expectations Models",
+        # Computational Economics 20(1-2), s. 1-20.
+        #
+        # Teori: stabilitetsbetingelse Q2*(Psi*ε + Pi*η) = 0 for alle ε
+        # → Q2*Pi*η = -Q2*Psi*ε → η = M*ε der M = -(Q2*Pi)^† * Q2 * Psi
+        # Full impaktmatrise: R = Z1 * A11^{-1} * Q1 * (Psi + Pi*M)
         diag['method'] = 'Schur'
         A11 = AA[:n_stable, :n_stable]
         B11 = BB[:n_stable, :n_stable]
         Q1  = Qmat[:n_stable, :]
+        Q2  = Qmat[n_stable:, :]
+
+        # M-matrise: minimumsnorm-løsning Q2*Pi*M = -Q2*Psi (pseudoinvers)
+        Q2Pi  = Q2 @ Pi
+        Q2Psi = Q2 @ Psi
+        M, _, _, _ = np.linalg.lstsq(Q2Pi, -Q2Psi, rcond=None)
+
+        # Overgangsmatrise (uendret fra klassisk Schur)
         G1s = np.linalg.solve(A11, B11)
-        Rs  = np.linalg.solve(A11, Q1 @ Psi)
         T_hat = np.zeros((NZ, NZ), dtype=complex)
         T_hat[:n_stable, :n_stable] = G1s
+
+        # Full impaktmatrise inkl. forventningsjustering Pi*M
+        full_Psi = Psi + Pi @ M
+        Rs  = np.linalg.solve(A11, Q1 @ full_Psi)
         R_hat = np.zeros((NZ, NE), dtype=complex)
         R_hat[:n_stable, :] = Rs
+
         Zinv = np.linalg.inv(Zmat)
         T = np.real(Zmat @ T_hat @ Zinv)
         R = np.real(Zmat @ R_hat)

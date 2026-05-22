@@ -108,7 +108,11 @@ A=37; EPS_C=38; EPS_H=39; EPS_G=40
 YS=41; EPS_RP=42; PI_STAR=43; I_STAR=44
 EPS_PHI_H=45; EPS_PREM=46; EPS_I_ADJ=47  # siste plass: investeringssjokk
 U_K=48  # Alt. A: kapitalutnyttelse (utilization rate)
- 
+
+# A9 (PE-godkjent 2026-05-22): 7 hjelpetilstander for RE-forventninger (NZ 49→56)
+PI_E=49; C_W_E=50; Q_H_E=51; PIW_E=52; INV_E=53; Q_K_E=54; RER_E=55
+NZ_V4 = 56
+
 # ── Sjokk-indekser ───────────────────────────────────────────────────────────
 E_A=0; E_C=1; E_H=2; E_G=3; E_O=4; E_Ys=5; E_rp=6
 E_i=7; E_P=8; E_phi_h=9; E_prem=10; E_I=11; E_piS=12
@@ -123,6 +127,8 @@ VAR_NAMES = [
     'a','eps_C','eps_H','eps_G',
     'yS','eps_rp','pi_star','i_star','eps_phi_h','eps_prem','eps_I_adj',
     'u_K',  # Alt. A: kapitalutnyttelse
+    # A9: hjelpetilstander for RE-forventninger
+    'pi_E','c_W_E','q_H_E','piW_E','inv_E','q_K_E','rer_E',
 ]
  
 SHOCK_NAMES = [
@@ -700,8 +706,8 @@ def build_matrices_v3(p=None, theta_H: float = 0.05):
     G0[12, :] = 0.0; G1[12, :] = 0.0; Psi[12, :] = 0.0; Pi[12, :] = 0.0
     G0[12, INV]   =  1.0
     G0[12, Q_K]   = -1.0 / (_phi_I1 * (1.0 + _beta))   # CEE-korrekt
-    G0[12, INV_L] = -(_phi_I1 / (_phi_I1 + _phi_I2))   # 1-periodes lagg
-    Pi[12, INV]   =  _phi_I2 / (_phi_I1 + _phi_I2)
+    G0[12, INV_L] = -(1.0 / (1.0 + _beta))              # CEE: 1/(1+β) bakover → røtter {1, 1/β}
+    Pi[12, INV]   =  _beta / (1.0 + _beta)              # CEE: β/(1+β) fremover
     G0[12, EPS_I_ADJ] = -1.0   # A11.1: koble AR(1)-state EPS_I_ADJ
 
     # Ligning 13: marginal kostnad  mc_t = σ̃·y_t − (1+φ_L/(1-α))·a_t − α/(1-α)·k_{t-1}
@@ -743,5 +749,111 @@ def build_matrices_v3(p=None, theta_H: float = 0.05):
     # Modifisere L-ligning (10) og MC-ligning (13) til å bruke k̂ = K_L + U_K
     G0[10, U_K] = _alpha_K / (1.0 - _alpha_K)  # produksjonsfunksjon: l avh. av k̂
     G0[MC, U_K] = _alpha_K / (1.0 - _alpha_K)  # mc avh. av k̂
+
+    return G0, G1, Psi, Pi
+
+
+def build_matrices_v4(p=None, theta_H: float = 0.05):
+    """
+    NEMO Fase II v4 — EKSPERIMENTELL (A9, ikke i produksjon).
+
+    Forsøk på å implementere fremoverskuende RE via hjelpetilstander (NZ: 49→56).
+    Gir n_unstable=5 ≠ rank(Pi)=7 → BK IKKE oppfylt → ustabil Schur-løsning.
+
+    Årsak: NEMO-modellen er DETERMINERT (n_unstable=0 i v3 via direkte metode).
+    I en determinert modell er direkte inversjon T=G0⁻¹G1 den KORREKTE unike
+    RE-løsningen (ekvivalent med Schur når alle eigenvalider er stabile).
+    UIP-konsistenslikning gir unit root (λ=1.0), ikke λ>1.001, så n_unstable
+    forblir under rank(Pi)=7 uavhengig av andre fikser.
+
+    Bruk build_matrices_v3 i stedet — det er den produksjonsklare versjonen.
+
+    Referanse: K&M (2019), Sims (2002) "Solving Linear Rational Expectations Models"
+
+    Parametere
+    ----------
+    p        : Parameters-klasse
+    theta_H  : Skaleringsfaktor for boligpreferansesjokk (default 0.05)
+
+    Returnerer
+    ----------
+    G0, G1, Psi, Pi : (NZ_V4×NZ_V4), (NZ_V4×NZ_V4), (NZ_V4×NE), (NZ_V4×NZ_V4)
+    """
+    if p is None:
+        p = Parameters
+
+    # Hent v3-matriser (49×49) og utvid til 56×56
+    G0_49, G1_49, Psi_49, Pi_49 = build_matrices_v3(p, theta_H)
+
+    G0  = np.zeros((NZ_V4, NZ_V4))
+    G1  = np.zeros((NZ_V4, NZ_V4))
+    Psi = np.zeros((NZ_V4, NE))
+    Pi  = np.zeros((NZ_V4, NZ_V4))
+
+    # Kopier v3-matriser inn i øvre venstre blokk
+    # NB: Pi_49 kopieres IKKE — alle Pi[eq,X]=c-ledd erstattes av G0[eq,X_E]=-c
+    G0[:NZ, :NZ] = G0_49
+    G1[:NZ, :NZ] = G1_49
+    Psi[:NZ, :]  = Psi_49
+
+    # Avledede parametere (gjenberegnes for konsistens med p)
+    beta      = p.beta
+    delta     = p.delta
+    h_c       = p.h_c
+    m_H       = p.m_H
+    phi_I1    = p.phi_I1
+    phi_I2    = p.phi_I2
+    a2_W      = 1.0 / (1.0 + h_c)
+    a3_W      = (1.0 - h_c) / (p.sigma * (1.0 + h_c))
+    b_sa      = getattr(p, 'b_sa',      0.6393)
+    lambda_sa = getattr(p, 'lambda_sa', 0.9495)
+    w_fwd     = 1.0 - b_sa * lambda_sa
+
+    # ── Modifiser strukturelle likninger ──────────────────────────────────────
+    # Konvensjon: Pi_49[eq, X] = c  ↔  +c·E_t[X_{t+1}] på RHS
+    # Flytt til LHS: G0[eq, X_E] = −c  (X_E ≡ E_t[X_{t+1}])
+
+    # Ligning 0 (NK Phillips): β·E_t[π_{t+1}]
+    G0[0, PI_E]  = -beta
+
+    # Ligning 1 (Euler sparere): a2_W·E_t[c_W_{t+1}] − a3_W·E_t[π_{t+1}]
+    G0[1, C_W_E] = -a2_W
+    G0[1, PI_E] +=  a3_W       # += fordi PI_E opptrer i flere likninger
+
+    # Ligning 2 (Euler låntakere): (m_H/β)·E_t[q_H_{t+1}]
+    G0[2, Q_H_E] = -m_H / beta
+
+    # Ligning 4 (Lønnsinflasjon): β·E_t[π_W_{t+1}]
+    G0[4, PIW_E] = -beta
+
+    # Ligning 6 (Boligpris v3): w_fwd·E_t[q_H_{t+1}] − E_t[π_{t+1}]
+    G0[6, Q_H_E] += -w_fwd     # += fordi Q_H_E opptrer i to likninger
+    G0[6, PI_E]  +=  1.0
+
+    # Ligning 12 (Investering, CEE): β/(1+β)·E_t[inv_{t+1}]
+    G0[12, INV_E] = -(beta / (1.0 + beta))
+
+    # Ligning 14 (Tobin's Q): (1−δ)·E_t[q_K_{t+1}] − E_t[π_{t+1}]
+    G0[14, Q_K_E]  = -(1.0 - delta)
+    G0[14, PI_E]  +=  1.0
+
+    # Ligning 15 (UIP): E_t[rer_{t+1}]
+    G0[15, RER_E] = -1.0
+
+    # ── Konsistenslikninger (rader 49–55): X_t = X_E_{t-1} + η_{X,t} ─────────
+    # Sims (2002): G0[k,X]=1, G1[k,X_E]=1, Pi[k,X]=1
+    # Tolkning: X_t er lik forrige periodes forventning + forventningsfeil
+    for (k, X_orig, X_aux) in [
+        (PI_E,  PI,  PI_E),
+        (C_W_E, C_W, C_W_E),
+        (Q_H_E, Q_H, Q_H_E),
+        (PIW_E, PIW, PIW_E),
+        (INV_E, INV, INV_E),
+        (Q_K_E, Q_K, Q_K_E),
+        (RER_E, RER, RER_E),
+    ]:
+        G0[k, X_orig] = 1.0
+        G1[k, X_aux]  = 1.0
+        Pi[k, X_orig] = 1.0
 
     return G0, G1, Psi, Pi
