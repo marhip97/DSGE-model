@@ -230,7 +230,7 @@ def build_matrices(p=None):
     G0[2, W]     = -(1.0 - m_H)           # reallønnskanal
     G0[2, L]     = -(1.0 - m_H)           # sysselsettingskanal
     Pi[2, Q_H]   =  m_H / beta            # E[q_H_{t+1}]: kollateralverdi
-    Psi[2, E_C]  =  a2_W                  # delt preferansesjokk
+    G0[2, EPS_C] = -a2_W    # A11.1: koble AR(1)-state EPS_C (delt preferansesjokk)
  
     # B3. Aggregert konsum: c = (1-ω)·c_W + ω·c_NW
     G0[3, C]    =  1.0
@@ -429,9 +429,10 @@ def build_matrices(p=None):
     # ════════════════════════════════════════════════════════════════════════
  
     # F1. Offentlig konsum (fiskalregel med lagg + AR(1)-sjokk)
-    G0[27, G]    =  1.0
-    G1[27, PO]   =  gamma_G
-    Psi[27, E_G] =  1.0   # offentlig forbrukssjokk
+    # A11.1 (PE-godkjent 2026-05-21): koble AR(1)-state EPS_G (var dead state)
+    G0[27, G]     =  1.0
+    G1[27, PO]    =  gamma_G
+    G0[27, EPS_G] = -1.0   # A11.1: AR(1)-persistens via EPS_G-state
  
     # F2. Oljepris AR(1)
     G0[28, PO]    =  1.0
@@ -581,8 +582,8 @@ def build_matrices_v3(p=None, theta_H: float = 0.05):
     G1[1, C_W]  =  a1_W
     Pi[1, C_W]  =  a2_W
     Pi[1, PI]   = -a3_W
-    Psi[1, E_C] =  a2_W
- 
+    G0[1, EPS_C] = -a2_W    # A11.1 (PE-godkjent 2026-05-21): koble AR(1)-state EPS_C
+
     # Oppdater låntaker-likning (ligning 2) med korrekt h_c
     G0[2, :] = 0.0; G1[2, :] = 0.0; Pi[2, :] = 0.0; Psi[2, :] = 0.0
     G0[2, C_NW]  =  1.0
@@ -617,7 +618,7 @@ def build_matrices_v3(p=None, theta_H: float = 0.05):
     G1[6, Q_H]    =  w_back       # bakseende: q_H_{t-1} (via lagg-identitet)
     Pi[6, Q_H]    =  w_fwd        # fremoverskuende: E[q_H_{t+1}]
     Pi[6, PI]     = -1.0          # E[π_{t+1}]
-    Psi[6, E_H]   =  theta_H      # skalert boligsjokk
+    G0[6, EPS_H]  = -theta_H      # A11.1: koble AR(1)-state EPS_H (skalert boligsjokk)
  
     # ── 3. Boligakkumulering v3 (stabilisert) ────────────────────────────────
     # Ligning 7: h_W = (1-δ_H)·h_W_{t-1} + δ_H·q_H
@@ -701,7 +702,7 @@ def build_matrices_v3(p=None, theta_H: float = 0.05):
     G0[12, Q_K]   = -1.0 / (_phi_I1 * (1.0 + _beta))   # CEE-korrekt
     G0[12, INV_L] = -(_phi_I1 / (_phi_I1 + _phi_I2))   # 1-periodes lagg
     Pi[12, INV]   =  _phi_I2 / (_phi_I1 + _phi_I2)
-    Psi[12, E_I]  =  1.0
+    G0[12, EPS_I_ADJ] = -1.0   # A11.1: koble AR(1)-state EPS_I_ADJ
 
     # Ligning 13: marginal kostnad  mc_t = σ̃·y_t − (1+φ_L/(1-α))·a_t − α/(1-α)·k_{t-1}
     # (v2-fix brukte G1[MC, K_L] = −α/(1-α) → K_{t-2}; rettelse: G0[MC, K_L] = +α/(1-α))
