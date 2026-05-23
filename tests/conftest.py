@@ -16,16 +16,22 @@ from nemo.model.equations import (
     build_matrices_v3,
 )
 from nemo.model.parameters import Parameters
-from nemo.solver.blanchard_kahn import solve as bk_solve
+from nemo.solver.blanchard_kahn import solve_klein
 
 
 @pytest.fixture(scope="session")
 def kalibrert_modell():
-    """Returnerer (T, R, diag) for kalibrert v3-modell."""
+    """
+    Returnerer (T, R, diag) for kalibrert v3-modell via Klein (2000) løser.
+
+    Med K&M-kalibrering (mimicking rule) er modellen indeterminert i Klein-forstand
+    (n_explosive=5 ≠ rank(Pi)=7). solve_klein faller tilbake til MSV-likevekten
+    (direkte løsning), som er identisk med Sims direkte inversjon.
+    """
     G0, G1, Psi, Pi = build_matrices_v3(Parameters)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        T, R, diag = bk_solve(G0, G1, Psi, Pi, verbose=False)
+        T, R, diag = solve_klein(G0, G1, Psi, Pi, verbose=False)
     return T, R, diag
 
 
@@ -35,7 +41,7 @@ def kalibrert_modell_v3():
     G0, G1, Psi, Pi = build_matrices_v3(Parameters)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        T, R, diag = bk_solve(G0, G1, Psi, Pi, verbose=False)
+        T, R, diag = solve_klein(G0, G1, Psi, Pi, verbose=False)
     return T, R, diag
 
 
