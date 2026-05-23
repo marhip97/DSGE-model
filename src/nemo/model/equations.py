@@ -544,24 +544,34 @@ def build_matrices_v2(p=None):
     return G0, G1, Psi, Pi
  
  
-def build_matrices_v3(p=None, theta_H: float = 0.05):
+def build_matrices_v3(
+    p=None,
+    theta_H: float = 0.05,
+    psi_UIP: float = 0.0,
+    fwd_housing_weight: float | None = None,
+):
     """
     NEMO Fase II v3 — Fullt estimeringsklart likningssystem.
- 
+
     Bygger på build_matrices_v2 og legger til:
       1. Boligpreferanse-kalibrering via theta_H (skalering av E_H-sjokket)
       2. Stabil boligprislikning med mean-reversion (Gelain et al. 2018)
       3. Bakseende forventningsdannelse for boligpriser (b_sa, lambda_sa)
       4. Korrekt h_c-oppdatering fra estimerte parametere
       5. Mimicking rule med estimert psi_R, psi_P1, psi_Y
- 
+
     Parametere
     ----------
-    p        : Parameters-klasse (eller underklasse med oppdaterte estimater)
-    theta_H  : Skaleringsfaktor for boligpreferansesjokket (default 0.05)
-               Brukes til å kontrollere boligsektorens relative volatilitet
-               under estimering. Posterior mean ≈ 0.05 i K&M (2019).
- 
+    p                  : Parameters-klasse (eller underklasse med oppdaterte estimater)
+    theta_H            : Skaleringsfaktor for boligpreferansesjokket (default 0.05)
+    psi_UIP            : Valutarisikopremie i UIP-likning (default 0.0 = ren UIP).
+                         PE-godkjent verdi: 0.02 (A9b, 2026-05-22).
+                         Setter G0[15, RER] = 1.0 + psi_UIP (bryter enhetsroten λ=1→1+ψ).
+    fwd_housing_weight : Fremoverskuende vekt for boligprisforventning Pi[6, Q_H].
+                         None (default) = bruk K&M-kalibrering (w_fwd ≈ 0.393).
+                         0.0 = fullt bakseende boligprisforventninger (BK-kandidat).
+                         Verdier i [0, 1] interpolerer mellom de to ytterpunktene.
+
     Returnerer
     ----------
     G0, G1, Psi, Pi : (NZ×NZ), (NZ×NZ), (NZ×NE), (NZ×NZ)
@@ -618,17 +628,23 @@ def build_matrices_v3(p=None, theta_H: float = 0.05):
     #   Fremoverskuende: 1 - b_sa × lambda_sa ≈ 0.393
     b_sa      = getattr(p, 'b_sa',      0.6393)
     lambda_sa = getattr(p, 'lambda_sa', 0.9495)
- 
-    w_back = b_sa * lambda_sa                   # bakseende vekt
-    w_fwd  = 1.0 - w_back                       # fremoverskuende vekt
- 
+
+    w_back     = b_sa * lambda_sa                   # bakseende vekt (K&M ≈ 0.607)
+    w_fwd_kalm = 1.0 - w_back                       # K&M fremoverskuende vekt (≈ 0.393)
+    # Alt D: fwd_housing_weight kontrollerer Pi[6,Q_H] og Pi[6,PI].
+    # fwd_housing_weight=0.0: begge Pi[6,*]=0 (alle fremoverskuende boligledd fjernes).
+    # G1[6,Q_H] beholdes alltid = w_back (K&M-kalibrert, endres ikke).
+    w_fwd_eff = w_fwd_kalm if fwd_housing_weight is None else float(fwd_housing_weight)
+    # Skaleringsfaktor for Pi[6,PI]: følger samme innstramming som Q_H-vekten
+    pi_scale  = (w_fwd_eff / w_fwd_kalm) if w_fwd_kalm > 0 else 0.0
+
     G0[6, :] = 0.0; G1[6, :] = 0.0; Pi[6, :] = 0.0; Psi[6, :] = 0.0
     G0[6, Q_H]    =  1.0
     G0[6, I_D]    =  1.0
     G0[6, PI]     = -1.0
-    G1[6, Q_H]    =  w_back       # bakseende: q_H_{t-1} (via lagg-identitet)
-    Pi[6, Q_H]    =  w_fwd        # fremoverskuende: E[q_H_{t+1}]
-    Pi[6, PI]     = -1.0          # E[π_{t+1}]
+    G1[6, Q_H]    =  w_back       # bakseende vekt (K&M, beholdes alltid)
+    Pi[6, Q_H]    =  w_fwd_eff    # fremoverskuende Q_H (0.0 = fjernet)
+    Pi[6, PI]     = -pi_scale     # E[π_{t+1}]: skaleres proporsjonalt med fwd_vekt
     G0[6, EPS_H]  = -theta_H      # A11.1: koble AR(1)-state EPS_H (skalert boligsjokk)
  
     # ── 3. Boligakkumulering v3 (stabilisert) ────────────────────────────────
@@ -754,6 +770,12 @@ def build_matrices_v3(p=None, theta_H: float = 0.05):
     # Modifisere L-ligning (10) og MC-ligning (13) til å bruke k̂ = K_L + U_K
     G0[10, U_K] = _alpha_K / (1.0 - _alpha_K)  # produksjonsfunksjon: l avh. av k̂
     G0[MC, U_K] = _alpha_K / (1.0 - _alpha_K)  # mc avh. av k̂
+
+    # ── 7. Alt D: psi_UIP — valutarisikopremie i UIP-likning ─────────────────
+    # G0[15, RER] = 1.0 + psi_UIP bryter enhetsroten λ=1.0 → 1.0+ψ > 1.
+    # PE-godkjent verdi: 0.02 (A9b, 2026-05-22). Default 0.0 = ren UIP (v3 standard).
+    if psi_UIP != 0.0:
+        G0[15, RER] = 1.0 + psi_UIP
 
     return G0, G1, Psi, Pi
 
