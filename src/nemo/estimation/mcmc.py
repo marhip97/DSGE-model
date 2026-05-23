@@ -530,7 +530,15 @@ def adaptive_mcmc_with_monitoring(
 if __name__ == "__main__":
 
     print("Laster data...")
-    obs_df=pd.read_csv("data/processed/nemo_data_faktisk_v2.csv",index_col=0,parse_dates=True)
+    # Foretrekker pipeline-generert fil; faller tilbake til v2 hvis ikke tilgjengelig
+    _data_fil = (
+        "data/processed/nemo_data.csv"
+        if os.path.exists("data/processed/nemo_data.csv")
+        else "data/processed/nemo_data_faktisk_v2.csv"
+    )
+    print(f"  Datafil: {_data_fil}")
+    obs_df=pd.read_csv(_data_fil,index_col=0,parse_dates=True)
+    # COVID-hull: ekskluder 2020Q1–2021Q4 (PE-godkjent, Alt A 2026-05-23)
     pre =obs_df[obs_df.index<="2019-12-31"][OBS_NAMES].values
     post=obs_df[obs_df.index>="2022-01-01"][OBS_NAMES].values
     print(f"  Pre={len(pre)} kv  Post={len(post)} kv")
