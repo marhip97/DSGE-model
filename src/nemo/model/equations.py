@@ -113,6 +113,11 @@ U_K=48  # Alt. A: kapitalutnyttelse (utilization rate)
 PI_E=49; C_W_E=50; Q_H_E=51; PIW_E=52; INV_E=53; Q_K_E=54; RER_E=55
 NZ_V4 = 56
 
+# Alt B (PE-godkjent 2026-05-23): 4-periodes inflasjonsforventningskjede (NZ 49→53)
+# Taylor-regel reagerer på E_t[π_{t+4}] — NB NEMO-konvensjon (inflasjonsmål 4Q frem)
+PI_E1=49; PI_E2=50; PI_E3=51; PI_E4=52
+NZ_PI4 = 53
+
 # ── Sjokk-indekser ───────────────────────────────────────────────────────────
 E_A=0; E_C=1; E_H=2; E_G=3; E_O=4; E_Ys=5; E_rp=6
 E_i=7; E_P=8; E_phi_h=9; E_prem=10; E_I=11; E_piS=12
@@ -861,5 +866,78 @@ def build_matrices_v4(p=None, theta_H: float = 0.05):
         G0[k, X_orig] = 1.0
         G1[k, X_aux]  = 1.0
         Pi[k, X_orig] = 1.0
+
+    return G0, G1, Psi, Pi
+
+
+def build_matrices_pi4chain(p=None, theta_H: float = 0.05):
+    """
+    NEMO Alt B — fremoverskuende Taylor med 4-periodes inflasjonsforventningskjede.
+
+    **DIAGNOSTISK FUNKSJON — ikke produksjonsklar (se ADVARSEL nedenfor).**
+
+    Taylor-regelen reagerer på E_t[π_{t+4}] i stedet for samtid π_t (A4b).
+    NZ: 49→53. Fire nye tilstander:
+      PI_E1 = E_t[π_{t+1}],  PI_E2 = E_t[π_{t+2}]
+      PI_E3 = E_t[π_{t+3}],  PI_E4 = E_t[π_{t+4}]  ← Taylor
+
+    Kjede (Sims 2002):
+      PI_E1: π_t    = PI_E1_{t-1} + η_{π,t}
+      PI_E2: PI_E1_t = PI_E2_{t-1} + η_{PI_E1,t}
+      PI_E3: PI_E2_t = PI_E3_{t-1} + η_{PI_E2,t}
+      PI_E4: PI_E3_t = PI_E4_{t-1} + η_{PI_E3,t}
+
+    ADVARSEL — matematisk infeasibel med K&M-kalibrering:
+      - rank(Pi) = 10 (7 fra v3 + 3 nye kolonner PI_E1/PI_E2/PI_E3)
+      - Klein n_explosive = 6  →  BK-gap ≠ 10 (verre enn v3s 5≠7)
+      - MSV-fallback ustabil: max|eig(T)| = 4.26  (v3 MSV: 0.998 ✓)
+      - Årsak: fjerning av G0[20,PI] (samtid inflasjon) uten erstatning
+        bryter den stabiliserende feedback-sløyfen i NK-Phillips/Taylor.
+    Bruk build_matrices_v3 for produksjon.
+
+    Parametere
+    ----------
+    p        : Parameters-klasse (bruker kalibrerte verdier hvis None)
+    theta_H  : Boligpris-forventningsparameter (videresendt til build_matrices_v3)
+
+    Returnerer
+    ----------
+    G0, G1, Psi, Pi : (NZ_PI4×NZ_PI4) matriser
+    """
+    from nemo.model.parameters import Parameters as _DefaultP
+    if p is None:
+        p = _DefaultP
+
+    G0_49, G1_49, Psi_49, Pi_49 = build_matrices_v3(p, theta_H)
+
+    G0  = np.zeros((NZ_PI4, NZ_PI4))
+    G1  = np.zeros((NZ_PI4, NZ_PI4))
+    Psi = np.zeros((NZ_PI4, NE))
+    Pi  = np.zeros((NZ_PI4, NZ_PI4))
+
+    G0[:NZ, :NZ] = G0_49
+    G1[:NZ, :NZ] = G1_49
+    Psi[:NZ, :]  = Psi_49
+    Pi[:NZ, :NZ] = Pi_49
+
+    psi_R  = p.psi_R
+    psi_P1 = p.psi_P1
+
+    # Taylor-regel: bytt samtid π → E_t[π_{t+4}]
+    G0[20, PI]    = 0.0
+    G0[20, PI_E4] = -(1.0 - psi_R) * psi_P1
+
+    # ── Konsistenslikninger: PI_E1..PI_E4 ────────────────────────────────────
+    # Tolkning: X_t = E_{t-1}[X_t] + η_{X,t}
+    #   G0[row, X]=1, G1[row, X_E]=1, Pi[row, X]=1
+    for (row, X_now, X_lag) in [
+        (PI_E1, PI,    PI_E1),   # π_t    = PI_E1_{t-1} + η_{π,t}
+        (PI_E2, PI_E1, PI_E2),   # PI_E1_t = PI_E2_{t-1} + η_{PI_E1,t}
+        (PI_E3, PI_E2, PI_E3),   # PI_E2_t = PI_E3_{t-1} + η_{PI_E2,t}
+        (PI_E4, PI_E3, PI_E4),   # PI_E3_t = PI_E4_{t-1} + η_{PI_E3,t}
+    ]:
+        G0[row, X_now] = 1.0
+        G1[row, X_lag] = 1.0
+        Pi[row, X_now] = 1.0
 
     return G0, G1, Psi, Pi
