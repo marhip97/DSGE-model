@@ -44,4 +44,6 @@ docs/references/*.pdf
 * (3).*
 * (4).*
 * (5).*
-data/results/fase2_postfix_prod.log
+# MCMC-kjørelogger (midlertidige, ikke versjonskontrollert)
+data/results/*.log
+data/results/*.txt
