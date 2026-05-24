@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -131,30 +132,41 @@ def hent_ssb_tabell(
     url = f"{SSB_BASE_URL}/{table_id}"
     logger.info("Henter SSB-tabell %s fra API: %s", table_id, url)
 
-    try:
-        resp = requests.post(url, json=query, timeout=60)
-        resp.raise_for_status()
-        data = resp.json()
+    siste_exc: Exception | None = None
+    for forsok in range(1, 4):   # 3 forsøk med eksponentiell backoff (2s, 4s)
+        try:
+            resp = requests.post(url, json=query, timeout=60)
+            resp.raise_for_status()
+            data = resp.json()
 
-        # Cache rådata
-        with open(cache_fil, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False)
-        logger.info("Cachet SSB-tabell %s → %s", table_id, cache_fil)
-        return data
+            with open(cache_fil, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False)
+            logger.info("Cachet SSB-tabell %s → %s", table_id, cache_fil)
+            return data
 
-    except Exception as exc:
-        logger.warning(
-            "SSB API-kall feilet for tabell %s: %s. Prøver cache-fallback.",
-            table_id, exc
-        )
-        fallback = _find_latest_cache(table_id)
-        if fallback is not None:
-            logger.info("Bruker cache-fallback: %s", fallback)
-            with open(fallback, encoding="utf-8") as f:
-                return json.load(f)
-        raise RuntimeError(
-            f"SSB API feilet og ingen cache finnes for tabell {table_id}."
-        ) from exc
+        except Exception as exc:
+            siste_exc = exc
+            if forsok < 3:
+                vent = 2 ** forsok   # 2s, 4s
+                logger.warning(
+                    "SSB API-kall feilet (forsøk %d/3) for tabell %s: %s. Venter %ds.",
+                    forsok, table_id, exc, vent
+                )
+                time.sleep(vent)
+            else:
+                logger.warning(
+                    "SSB API-kall feilet (forsøk 3/3) for tabell %s: %s. Prøver cache-fallback.",
+                    table_id, exc
+                )
+
+    fallback = _find_latest_cache(table_id)
+    if fallback is not None:
+        logger.info("Bruker cache-fallback: %s", fallback)
+        with open(fallback, encoding="utf-8") as f:
+            return json.load(f)
+    raise RuntimeError(
+        f"SSB API feilet (3 forsøk) og ingen cache finnes for tabell {table_id}."
+    ) from siste_exc
 
 
 def _parse_json_stat2(data: dict, contents_code: str) -> pd.Series:
