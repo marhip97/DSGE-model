@@ -109,6 +109,34 @@ def build_Sv_no_rer() -> np.ndarray:
            'dh_obs':0.004,'db_obs':0.002}
     return np.diag([sme[n]**2 for n in OBS_NAMES_NO_RER])
 
+# Test A (kj15, PE-godkjent 2026-05-24): fjern i_3m_obs for å eliminere dobbelvekting av I_R.
+# H[7,I_R]=4 (i_R_obs) OG H[8,I_R]=4 (i_3m_obs) → I_R over-identifisert → psi_R≈0.95 → psi_P1 lav.
+OBS_NAMES_NO_I3M = [n for n in OBS_NAMES if n != 'i_3m_obs']  # 13 obs
+N_OBS_NO_I3M = len(OBS_NAMES_NO_I3M)
+
+def build_H_no_i3m() -> np.ndarray:
+    """Observasjonsmatrise uten i_3m_obs — fjerner dobbelvekting av I_R. Test A (kj15)."""
+    H = np.zeros((N_OBS_NO_I3M, NZ))
+    mapping = {
+        'dy_obs': (Y, 1.0), 'dc_obs': (C, 1.0), 'dinv_obs': (INV, 1.0),
+        'dx_obs': (X, 1.0), 'dm_obs': (M, 1.0), 'pi_obs': (PI, 4.0),
+        'dw_obs': (W, 1.0), 'i_R_obs': (I_R, 4.0), 'ds_obs': (S, 1.0),
+        'dpO_obs': (PO, 1.0), 'dyS_obs': (YS, 1.0),
+        'dh_obs': (Q_H, 1.0), 'db_obs': (B_NW, 1.0),
+    }
+    for i, nm in enumerate(OBS_NAMES_NO_I3M):
+        col, scale = mapping[nm]
+        H[i, col] = scale
+    return H
+
+def build_Sv_no_i3m() -> np.ndarray:
+    """Målefeil-kovarians uten i_3m_obs (13×13 diagonal). Test A (kj15)."""
+    sme = {'dy_obs':0.005,'dc_obs':0.008,'dinv_obs':0.015,'dx_obs':0.010,
+           'dm_obs':0.012,'pi_obs':0.008,'dw_obs':0.004,'i_R_obs':0.0005,
+           'ds_obs':0.010,'dpO_obs':0.050,'dyS_obs':0.006,
+           'dh_obs':0.004,'db_obs':0.002}
+    return np.diag([sme[n]**2 for n in OBS_NAMES_NO_I3M])
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PARAMETERE OG PRIOR
@@ -151,11 +179,8 @@ PARAM_PRIORS = {
     'phi_u':   ('normal', 0.22, 0.10, 0.01, 2.0),
     # phi_PQ kj13: svakt identifisert [104,1089] → KPI 0.21× NB. Ikke estimer på nytt.
     # 'phi_PQ':  ('normal', 669.0, 300.0, 50.0, 2000.0),  # DEAKTIVERT etter kj13
-    # kappa_M: importpriskanal i NK Phillips-kurve (PE-godkjent 2026-05-24, Steg B).
-    # K&M: κ_M=0.03. G0[0,RER]=G0[0,PI_STAR]=-kappa_M. RER-respons ~1.8× NB i kj12-kj13.
-    # Høyere κ_M → sterkere RER→KPI-kanal → kan bedre KPI-amplituden uten psi_P1-endring.
-    # Normal(0.03, 0.03, [0.005, 0.20]): sentrert ved K&M, bred nok til å la data tale.
-    'kappa_M': ('normal', 0.03, 0.03, 0.005, 0.20),
+    # kappa_M kj14: data vil ha LAVERE kappa_M (0.0175 < K&M=0.030) → KPI 0.13× NB. Ikke estimer på nytt.
+    # 'kappa_M': ('normal', 0.03, 0.03, 0.005, 0.20),   # DEAKTIVERT etter kj14
 }
 PARAM_NAMES = list(PARAM_PRIORS.keys())
 N_PARAMS    = len(PARAM_NAMES)
@@ -246,6 +271,7 @@ def log_posterior(theta, H, Sv, Y_pre, Y_post):
         for i,n in enumerate(PARAM_NAMES): setattr(Pt,n,float(theta[i]))
         setattr(Pt,'h_c',      H_C_FIXED)       # fast — PE-godkjent 2026-05-18 (C2 Alt A)
         setattr(Pt,'sigma_rp', SIGMA_RP_FIXED)  # fast — PE-godkjent 2026-05-24 (kj10)
+        setattr(Pt,'kappa_M',  KM['kappa_M'])   # fast K&M=0.030 — kj14 viste estimering forverrer KPI
         G0,G1,Psi,Pi=build_matrices_v3(Pt,theta_H=0.05)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
