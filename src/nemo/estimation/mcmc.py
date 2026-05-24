@@ -46,6 +46,10 @@ PHI_I1_FIXED  = 4.0  # beholdt som konstant for bakoverkompatibilitet; ikke leng
 # sigma_rp=0.016 i kj9 (2.7× K&M) presset psi_R→0.911, effektiv KPI-koeff = 0.012 (for lav).
 # C3-eksperiment viste psi_P1→0.248 og KPI-ratio≈1× da sigma_rp=0.006.
 SIGMA_RP_FIXED = 0.006
+# psi_R: fikseres til K&M-verdi (kjøring 11, PE-godkjent 2026-05-24).
+# psi_R=0.911 i kj10 treffer priorbegrensningen (0.92) og holder effektiv
+# KPI-koeff = (1-0.911)×0.167 = 0.015. K&M=0.667 frigjør psi_P1 til å stige.
+PSI_R_FIXED = 0.667
 # h_c kalibreres fast — PE-godkjent 2026-05-18 (C2 Alt A): posterior treffer alltid
 # 0.9995-grensen og dreper konsumkanalen (a3_W→0.006). K&M-verdi 0.938 gir
 # a3_W=0.032 og BNP-ratio 1.8× vs NB Memo 3/2024 (mot 6-8× med h_c estimert).
@@ -129,10 +133,8 @@ PARAM_PRIORS = {
     'sigma_i':  ('inv_gamma', 2.0, 0.0002, 1e-5, 0.1),
     'sigma_P':  ('inv_gamma', 2.0, 0.0027, 1e-5, 0.5),
     'sigma_H':  ('inv_gamma', 2.0, 0.0500, 1e-5, 1.0),
-    # PE-godkjent 2026-05-18 (C3): utvidet fra (0.01, 0.85) til (0.01, 0.92).
-    # Posterior psi_R=0.842 traff prior-grensen 0.85 i kjøring 3 — data trykker høyere.
-    # 0.92 gir data rom uten å tillate patologiske verdier > GEORG ω_r=0.74 + 2σ.
-    'psi_R':   ('beta',   2.0, 2.0,  0.01, 0.92),
+    # psi_R fjernet fra estimering — kalibreres fast til PSI_R_FIXED=0.667 (PE-godkjent 2026-05-24).
+    # psi_R=0.911 i kj10 traff priorbegrensning (0.92) → effektiv KPI-koeff=0.015. K&M-verdi frigjør psi_P1.
     'psi_P1':  ('normal', 0.29, 0.10, 0.05, 1.50),
     'psi_Y':   ('normal', 0.24, 0.05, 0.01, 0.80),
     # h_c er fjernet fra estimering — kalibreres fast til H_C_FIXED=0.938 (PE-godkjent 2026-05-18, C2 Alt A).
@@ -232,7 +234,7 @@ def log_posterior(theta, H, Sv, Y_pre, Y_post):
         for i,n in enumerate(PARAM_NAMES): setattr(Pt,n,float(theta[i]))
         setattr(Pt,'h_c',      H_C_FIXED)       # fast — PE-godkjent 2026-05-18 (C2 Alt A)
         setattr(Pt,'sigma_rp', SIGMA_RP_FIXED)  # fast — PE-godkjent 2026-05-24 (kj10)
-        # phi_I1 er nå fri igjen (PE-godkjent 2026-05-20)
+        setattr(Pt,'psi_R',    PSI_R_FIXED)     # fast — PE-godkjent 2026-05-24 (kj11)
         G0,G1,Psi,Pi=build_matrices_v3(Pt,theta_H=0.05)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")

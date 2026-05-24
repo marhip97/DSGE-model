@@ -31,8 +31,9 @@ import numpy as np
 from nemo.estimation.mcmc import PARAM_NAMES, PARAM_PRIORS
 
 # Parametre som transformeres til ubegrenset rom
-# h_c fjernet 2026-05-18 — kalibreres fast til H_C_FIXED=0.938 (PE-godkjent, C2 Alt A)
-REPARAM_PARAMS: tuple[str, ...] = ("psi_R",)
+# h_c fjernet 2026-05-18 — fast til H_C_FIXED=0.938 (PE-godkjent, C2 Alt A)
+# psi_R fjernet 2026-05-24 — fast til PSI_R_FIXED=0.667 (PE-godkjent, kj11)
+REPARAM_PARAMS: tuple[str, ...] = ()
 
 
 def _bounds(name: str) -> tuple[float, float]:
