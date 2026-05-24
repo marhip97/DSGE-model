@@ -133,10 +133,14 @@ PARAM_PRIORS = {
     'sigma_i':  ('inv_gamma', 2.0, 0.0002, 1e-5, 0.1),
     'sigma_P':  ('inv_gamma', 2.0, 0.0027, 1e-5, 0.5),
     'sigma_H':  ('inv_gamma', 2.0, 0.0500, 1e-5, 1.0),
-    # psi_R fjernet fra estimering — kalibreres fast til PSI_R_FIXED=0.667 (PE-godkjent 2026-05-24).
-    # psi_R=0.911 i kj10 traff priorbegrensning (0.92) → effektiv KPI-koeff=0.015. K&M-verdi frigjør psi_P1.
+    # psi_R: kj11 viste likelihood-fall på 97 log-enheter med K&M=0.667 → data vil ha høy renteglatting.
+    # Restores til estimering med utvidet øvre grense 0.990 (fra 0.92) — data trenger rom over 0.91.
+    'psi_R':   ('beta',   2.0, 2.0,  0.01, 0.990),
     'psi_P1':  ('normal', 0.29, 0.10, 0.05, 1.50),
     'psi_Y':   ('normal', 0.24, 0.05, 0.01, 0.80),
+    # gamma_p: Calvo-prisindeksasjon i hybrid NK Phillips-kurve (PE-godkjent 2026-05-24).
+    # K&M Tabell 8: γ_p ≈ 0.35. Beta(3,3) sentrert ~0.5, tillater [0, 0.95].
+    'gamma_p': ('beta',   3.0, 3.0,  0.0,  0.95),
     # h_c er fjernet fra estimering — kalibreres fast til H_C_FIXED=0.938 (PE-godkjent 2026-05-18, C2 Alt A).
     # Posterior traff alltid 0.9995-grensen og drepte konsumkanalen. K&M-verdi gjenoppretter a3_W=0.032.
     # phi_I1 frigjort igjen (PE-godkjent 2026-05-20, kjøring 9): fase2v2 estimerte ~0.5 og traff NB BNP -0.447
@@ -157,7 +161,7 @@ KM = {'rho_A':0.804,'rho_C':0.725,'rho_O':0.874,'rho_Ys':0.783,
       'rho_rp':0.737,'rho_H':0.694,'sigma_A':0.006,'sigma_C':0.030,
       'sigma_O':0.079,'sigma_Ys':0.011,'sigma_rp':0.006,'sigma_i':0.0003,
       'sigma_P':0.003,'sigma_H':0.050,'psi_R':0.666,'psi_P1':0.292,
-      'psi_Y':0.242,'h_c':0.938,'phi_I1':4.0,'phi_I2':8.0,'phi_u':0.2192}
+      'psi_Y':0.242,'h_c':0.938,'gamma_p':0.35,'phi_I1':4.0,'phi_I2':8.0,'phi_u':0.2192}
 
 def log_prior(theta):
     lp = 0.0
@@ -234,7 +238,6 @@ def log_posterior(theta, H, Sv, Y_pre, Y_post):
         for i,n in enumerate(PARAM_NAMES): setattr(Pt,n,float(theta[i]))
         setattr(Pt,'h_c',      H_C_FIXED)       # fast — PE-godkjent 2026-05-18 (C2 Alt A)
         setattr(Pt,'sigma_rp', SIGMA_RP_FIXED)  # fast — PE-godkjent 2026-05-24 (kj10)
-        setattr(Pt,'psi_R',    PSI_R_FIXED)     # fast — PE-godkjent 2026-05-24 (kj11)
         G0,G1,Psi,Pi=build_matrices_v3(Pt,theta_H=0.05)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")

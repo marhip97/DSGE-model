@@ -142,6 +142,7 @@ class Parameters:
 
     # Importpriskanal i NK Phillips-kurve (A14.9 — PE-godkjent 2026-05-22)
     kappa_M  = 0.03       # (CAL) κ_M — importprisinflasjon-koeff. i Phillips
+    gamma_p  = 0.0        # (CAL) γ_p — Calvo-prisindeksasjon; 0=rent fremoverskuende; estimeres i kj12
 
 
     # Olje-valuta-kanal i UIP (PE-godkjent 2026-05-20)

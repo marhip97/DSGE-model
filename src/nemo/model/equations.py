@@ -777,6 +777,20 @@ def build_matrices_v3(
     if psi_UIP != 0.0:
         G0[15, RER] = 1.0 + psi_UIP
 
+    # ── 8. Hybrid NK Phillips-kurve: γ_p (Calvo-prisindeksasjon) ─────────────
+    # PE-godkjent 2026-05-24. Basis: K&M Tabell 8 γ_p ≈ 0.35.
+    # Hybrid form: π_t = [γ_p/(1+β·γ_p)]·π_{t-1} + [β/(1+β·γ_p)]·E[π_{t+1}]
+    #                   + [κ_P/(1+β·γ_p)]·mc_t + [κ_M/(1+β·γ_p)]·(rer_t + π*_t) + ε_P
+    # G1[0, PI_L] = γ_p/denom (bakseende ledd), Pi[0, PI] = β/denom (skalert ned)
+    _gamma_p = getattr(p, 'gamma_p', 0.0)
+    if _gamma_p != 0.0:
+        _denom = 1.0 + beta * _gamma_p
+        G0[0, MC]      = G0[0, MC]      / _denom   # -kP → -kP/denom
+        G0[0, RER]     = G0[0, RER]     / _denom   # -κ_M → -κ_M/denom
+        G0[0, PI_STAR] = G0[0, PI_STAR] / _denom   # -κ_M → -κ_M/denom
+        G1[0, PI_L]    = _gamma_p / _denom          # ny: bakseende inflasjonsledd
+        Pi[0, PI]      = beta / _denom              # β → β/denom
+
     return G0, G1, Psi, Pi
 
 
