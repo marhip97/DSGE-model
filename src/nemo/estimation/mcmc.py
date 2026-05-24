@@ -30,7 +30,7 @@ from scipy.special import betaln, gammaln
 
 from nemo.model.equations import (
     build_matrices_v3, NZ, NE,
-    Y, C, INV, X, M, PI, W, I_R, RER, PO, YS,
+    Y, C, INV, X, M, PI, W, I_R, RER, S, PO, YS,
     Q_H, B_NW, C_NW, I_D, I_L_NW, L, MC,
     E_A, E_C, E_P, E_O, E_Ys, E_rp, E_i, E_H, E_phi_h
 )
@@ -42,8 +42,10 @@ SIGMA_A_FIXED = 0.006
 # phi_I1 var fast (PE-godkjent 2026-05-17), men frigjort igjen (PE-godkjent 2026-05-20):
 # B5-benchmark viste at phi_I1=4.0 gir BNP-respons 0.4× NB; fase2v2 med phi_I1≈0.5 traff NB eksakt.
 PHI_I1_FIXED  = 4.0  # beholdt som konstant for bakoverkompatibilitet; ikke lenger brukt i log_posterior
-# sigma_rp: C3-fix (2026-05-18) rullet tilbake — fiksering forverret IRF fordi
-# psi_R kompenserte (steg til 0.911). sigma_rp estimeres fritt igjen.
+# sigma_rp: fikseres til K&M-verdi (kjøring 10, PE-godkjent 2026-05-24).
+# sigma_rp=0.016 i kj9 (2.7× K&M) presset psi_R→0.911, effektiv KPI-koeff = 0.012 (for lav).
+# C3-eksperiment viste psi_P1→0.248 og KPI-ratio≈1× da sigma_rp=0.006.
+SIGMA_RP_FIXED = 0.006
 # h_c kalibreres fast — PE-godkjent 2026-05-18 (C2 Alt A): posterior treffer alltid
 # 0.9995-grensen og dreper konsumkanalen (a3_W→0.006). K&M-verdi 0.938 gir
 # a3_W=0.032 og BNP-ratio 1.8× vs NB Memo 3/2024 (mot 6-8× med h_c estimert).
@@ -63,7 +65,7 @@ OBS_NAMES = [
 def build_H():
     H = np.zeros((N_OBS, NZ))
     H[0,Y]=1.0; H[1,C]=1.0; H[2,INV]=1.0; H[3,X]=1.0; H[4,M]=1.0
-    H[5,PI]=4.0; H[6,W]=1.0; H[7,I_R]=4.0; H[8,I_R]=4.0; H[9,RER]=1.0
+    H[5,PI]=4.0; H[6,W]=1.0; H[7,I_R]=4.0; H[8,I_R]=4.0; H[9,S]=1.0   # A12.1: ds_obs→S(19) ikke RER(15)
     H[10,PO]=1.0; H[11,YS]=1.0; H[12,Q_H]=1.0; H[13,B_NW]=1.0
     return H
 
@@ -123,7 +125,7 @@ PARAM_PRIORS = {
     'sigma_C':  ('inv_gamma', 2.0, 0.0182, 1e-5, 0.5),
     'sigma_O':  ('inv_gamma', 2.0, 0.0475, 1e-5, 1.0),
     'sigma_Ys': ('inv_gamma', 2.0, 0.0067, 1e-5, 0.5),
-    'sigma_rp': ('inv_gamma', 2.0, 0.0037, 1e-5, 0.5),
+    # sigma_rp fjernet fra estimering — kalibreres fast til SIGMA_RP_FIXED=0.006 (PE-godkjent 2026-05-24).
     'sigma_i':  ('inv_gamma', 2.0, 0.0002, 1e-5, 0.1),
     'sigma_P':  ('inv_gamma', 2.0, 0.0027, 1e-5, 0.5),
     'sigma_H':  ('inv_gamma', 2.0, 0.0500, 1e-5, 1.0),
@@ -180,12 +182,18 @@ def log_prior(theta):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def build_Q(theta):
-    # A6 (PE-godkjent 2026-05-21): sigma_A fri. sigma_rp estimeres fritt (C3-fix rullet tilbake 2026-05-18)
+    # sigma_rp fast (SIGMA_RP_FIXED=0.006) — ikke i theta, bruker _fixed-oppslag.
     smap = {E_A:'sigma_A',E_C:'sigma_C',E_P:'sigma_P',E_O:'sigma_O',
             E_Ys:'sigma_Ys',E_rp:'sigma_rp',E_i:'sigma_i',E_H:'sigma_H'}
+    _fixed = {'sigma_rp': SIGMA_RP_FIXED}
     Q = np.zeros((NE,NE))
     for idx,pn in smap.items():
-        s = theta[PARAM_NAMES.index(pn)] if pn in PARAM_NAMES else getattr(Parameters,pn,0.01)
+        if pn in PARAM_NAMES:
+            s = theta[PARAM_NAMES.index(pn)]
+        elif pn in _fixed:
+            s = _fixed[pn]
+        else:
+            s = getattr(Parameters, pn, 0.01)
         Q[idx,idx] = s**2
     return Q
 
@@ -222,8 +230,8 @@ def log_posterior(theta, H, Sv, Y_pre, Y_post):
     try:
         class Pt(Parameters): pass
         for i,n in enumerate(PARAM_NAMES): setattr(Pt,n,float(theta[i]))
-        # A6 (PE-godkjent 2026-05-21): sigma_A er nå i PARAM_NAMES (fri)
-        setattr(Pt,'h_c',     H_C_FIXED)       # fast — PE-godkjent 2026-05-18 (C2 Alt A)
+        setattr(Pt,'h_c',      H_C_FIXED)       # fast — PE-godkjent 2026-05-18 (C2 Alt A)
+        setattr(Pt,'sigma_rp', SIGMA_RP_FIXED)  # fast — PE-godkjent 2026-05-24 (kj10)
         # phi_I1 er nå fri igjen (PE-godkjent 2026-05-20)
         G0,G1,Psi,Pi=build_matrices_v3(Pt,theta_H=0.05)
         with warnings.catch_warnings():
@@ -530,7 +538,15 @@ def adaptive_mcmc_with_monitoring(
 if __name__ == "__main__":
 
     print("Laster data...")
-    obs_df=pd.read_csv("data/processed/nemo_data_faktisk_v2.csv",index_col=0,parse_dates=True)
+    # Foretrekker pipeline-generert fil; faller tilbake til v2 hvis ikke tilgjengelig
+    _data_fil = (
+        "data/processed/nemo_data.csv"
+        if os.path.exists("data/processed/nemo_data.csv")
+        else "data/processed/nemo_data_faktisk_v2.csv"
+    )
+    print(f"  Datafil: {_data_fil}")
+    obs_df=pd.read_csv(_data_fil,index_col=0,parse_dates=True)
+    # COVID-hull: ekskluder 2020Q1–2021Q4 (PE-godkjent, Alt A 2026-05-23)
     pre =obs_df[obs_df.index<="2019-12-31"][OBS_NAMES].values
     post=obs_df[obs_df.index>="2022-01-01"][OBS_NAMES].values
     print(f"  Pre={len(pre)} kv  Post={len(post)} kv")
