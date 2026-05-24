@@ -329,3 +329,77 @@ Hybrid Phillips-kurven bedrer modellfit med +42 log-enheter — sterk evidens.
 **Bekymring:** psi_R=0.953 (høyere med utvidet grense) → effektiv KPI-koeff noe lavere.
 Data vil ha svært høy renteglatting UOG hybrid Phillips-kurve. Amplituden kan fortsatt være
 underdrevet selv om timingen er fikset. IRF-validering nødvendig etter fullføring.
+
+### Endelige resultater kj12 (etter fullføring)
+
+| Parameter | kj12   | K&M   | p5    | p95   |
+|-----------|--------|-------|-------|-------|
+| psi_R     | 0.953  | 0.667 | 0.932 | 0.972 |
+| psi_P1    | 0.210  | 0.292 | 0.087 | 0.356 |
+| gamma_p   | 0.230  | 0.350 | 0.072 | 0.453 |
+| phi_I1    | 0.154  | 4.000 | 0.105 | 0.230 |
+
+**PSRF_max:** 1.007 (gamma_p), **ESS_min:** 670 (gamma_p), **acc:** 0.182
+
+**Effektiv KPI-Taylor-koeffisient:** (1−0.953)×0.210 = **0.010** (svært lav)
+
+**B5-benchmark kj12 (normalisert til +1pp rentetopp):**
+
+| Variabel | kj12   | NB    | kj12/NB |
+|----------|--------|-------|---------|
+| BNP q4   | −51%   | −45%  | 1.14×   |
+| KPI q4   | −3.0%  | −15%  | **0.20×** |
+| RER q4   | −72%   | −40%  | 1.80×   |
+| Rente q8 | +67%   | +20%  | 3.35×   |
+
+**Konklusjon kj12:** gamma_p bedrer KPI-timing (kurven er nå negativt hellende gjennom hele horisonten, 
+ikke positiv ved q12 som i kj10). Men amplituden er 0.20× NB — ekstremt underdrevet.
+**Rotårsak identifisert:** κ_P = 5/phi_PQ = 5/669 = 0.0075 (ekstremt flat Phillips-kurve).
+Med phi_I1≈0.15 svinger BNP enormt, men BNP→KPI-transmission er nesten brutt.
+
+---
+
+## Kjøring 13 (ny serie) — phi_PQ fri (2026-05-24)
+
+- **Parametre:** 21 fri (phi_PQ ny, Steg A)
+- **Hypotese:** phi_PQ=669 (K&M) for høyt → κ_P=0.0075 for flat → KPI-respons 0.20× NB
+- **Prior phi_PQ:** Normal(669, 300, [50, 2000]) — sentrert ved K&M, tillater nedside
+- **Startverdi:** kj12 posterior means (fra chain direkte) + phi_PQ=669 kaldt start
+- **Fil:** `chain_kj13_prod_posterior.json`
+- **Trekk:** 200 000 produksjon + 20 000 burnin
+- **PSRF_max:** 1.019 (psi_Y), **ESS_min:** 415 (psi_Y), **acc:** 0.190
+
+### Nøkkelresultater kj13
+
+| Parameter | kj13    | kj12   | K&M   | p5     | p95    |
+|-----------|---------|--------|-------|--------|--------|
+| phi_PQ    | 584.4   | 669.0  | 669.0 | 104.4  | 1088.9 |
+| psi_R     | 0.9528  | 0.9528 | 0.667 | 0.932  | 0.972  |
+| psi_P1    | 0.2101  | 0.2099 | 0.292 | 0.086  | 0.349  |
+| gamma_p   | 0.2346  | 0.2296 | 0.350 | 0.073  | 0.465  |
+| phi_I1    | 0.1537  | 0.1536 | 4.000 | 0.105  | 0.231  |
+
+**kappa_P:** kj13=0.00856, kj12=0.00747 (+15%)
+
+**Effektiv KPI-Taylor-koeffisient:** (1−0.953)×0.210 = **0.010** (uendret fra kj12)
+
+**B5-benchmark kj13:**
+
+| Variabel | kj13   | kj12   | NB    | kj13/NB |
+|----------|--------|--------|-------|---------|
+| KPI q4   | −3.1%  | −3.0%  | −15%  | **0.21×** |
+| BNP q4   | −52%   | −51%   | −45%  | 1.15×   |
+| RER q4   | −72%   | −72%   | −40%  | 1.81×   |
+
+### Konklusjon kj13 ✗ (Steg A utilstrekkelig)
+
+**phi_PQ er svakt identifisert.** Posterior [104, 1089] er ekstremt bred — data kan ikke 
+skille mellom flat og moderat Phillips-kurve med de observerte variablene.
+phi_PQ falt kun 13% (669→584), κ_P økte kun 15% (0.0075→0.0086).
+**KPI q4 forbedret seg fra 0.20× → 0.21× NB — marginalt ubrukelig.**
+
+Alle andre parametere er identiske med kj12. phi_PQ absorberer ikke informasjon fra data 
+fordi den er en skalafaktor i Phillips-kurven som allerede er dekt av andre parametre.
+
+**Neste steg: Steg B — estimer kappa_M (importpriskanal).**
+**Ikke gjenta fri phi_PQ** — identifikasjonsproblemet er dokumentert.
