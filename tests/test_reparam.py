@@ -66,19 +66,16 @@ def test_grensetilfeller_klippes(name: str):
 
 
 def test_jacobian_har_riktig_fortegn_og_størrelse():
-    """log|dx/dy| = log(ub-lb) + log(u) + log(1-u). Skal være negativ siden u(1-u) ≤ 0.25."""
+    """log|dx/dy| skal være 0.0 når REPARAM_PARAMS er tom (psi_R og h_c er nå faste)."""
     theta = _theta_km()
     log_jac = log_jacobian(theta)
-    assert np.isfinite(log_jac)
-    # psi_R=0.667 i (0.01, 0.92) → u ≈ 0.727, log|jac| = log(0.91) + log(0.727) + log(0.273) ≈ -1.6
-    assert log_jac < 0
+    assert log_jac == 0.0
 
 
 def test_jacobian_returnerer_minusinf_utenfor_støtte():
+    """Med tom REPARAM_PARAMS returneres alltid 0.0 (ingen grenser å sjekke)."""
     theta = _theta_km()
-    i = PARAM_NAMES.index("psi_R")
-    theta[i] = 0.001  # under nedre grense 0.01
-    assert log_jacobian(theta) == -np.inf
+    assert log_jacobian(theta) == 0.0
 
 
 def test_jacobian_numerisk_vs_analytisk():

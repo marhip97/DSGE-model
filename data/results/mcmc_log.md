@@ -183,3 +183,280 @@ ikke datadrevet estimering.
 1. **Dedikert blokk for rho_rp** — skill ut fra AR-blokken for å bedre ESS/n
 2. **B5-benchmark oppdatering** med kj10-posterior (BNP-respons forventes forbedret vs kj9)
 3. **rho_A-diagnose** — er 0.39 vs K&M=0.95 et modell- eller dataproblem? Sjekk TFP-IRF.
+
+---
+
+## ⚠️ Navnekonvensjon — advarsel (2026-05-24)
+
+Fra og med 2026-05-24 starter ny numerert serie (kj9–kj12) med egne `chain_kj*_prod_*.json`-filer.
+**OBS:** `chain_kj10_prod_posterior.json` fra gammelt "Kjøring 10 — A4d + A_phi_L" er
+**overskrevet** av den nye kj10 (sigma_rp fast). Parameterresultatene i
+`Kjøring 10 — korrigert modell A4d + A_phi_L`-avsnittet over gjelder ikke lenger filen.
+
+Filreferanser ny serie:
+- `chain_kj9_prod_posterior.json` → kj9 nedenfor
+- `chain_kj10_prod_posterior.json` → kj10 nedenfor (overskrevet)
+- kj11: avbrutt, ingen posterior-JSON
+- `chain_kj12_prod_posterior.json` → kj12 nedenfor (pågår)
+
+---
+
+## Kjøring 9 (ny serie) — ny COVID-split + sigma_A fast (2026-05-23)
+
+- **Parametre:** 19 fri + sigma_A fast=0.006 (20 i PARAM_NAMES, men sigma_A = konstant)
+  - sigma_rp **fri** (ikke fast ennå), phi_I1 fri, h_c fast=0.938
+- **Ny Covid-split:** pre ≤ 2019Q4 (75 kv), post ≥ 2022Q1 (15 kv) — PE-godkjent Alt A 2026-05-23
+- **Startverdi:** chain_kj10_prod_posterior.json (A4d + A_phi_L base)
+- **Fil:** `chain_kj9_prod_posterior.json`
+- **Trekk:** 200 000 produksjon + 20 000 burnin
+- **PSRF_max:** 1.006 (psi_R), **ESS_min:** 447 (psi_R), **acc:** 0.259
+
+### Nøkkelresultater kj9
+
+| Parameter | Kj9    | K&M   | p5    | p95   |
+|-----------|--------|-------|-------|-------|
+| psi_R     | 0.911  | 0.667 | 0.900 | 0.918 |
+| psi_P1    | 0.140  | 0.292 | 0.063 | 0.234 |
+| sigma_rp  | 0.0163 | 0.006 | 0.014 | 0.019 |
+| rho_A     | 0.146  | 0.950 | 0.037 | 0.298 |
+| phi_I1    | 0.157  | 4.000 | 0.106 | 0.236 |
+| rho_Ys    | 0.815  | 0.900 | 0.686 | 0.934 |
+
+**Effektiv KPI-Taylor-koeffisient:** (1−0.911)×0.140 = **0.012** (svært lav)
+
+### Konklusjon kj9
+
+Ny COVID-split endre ikke bildet: psi_R=0.911, sigma_rp=0.016 uendret fra kj8.
+rho_A=0.146 (vs K&M=0.95) tyder på kort TFP-persistens i norske data.
+KPI-responsen er fortsatt underdrevet. Neste steg: fiks sigma_rp=0.006.
+
+---
+
+## Kjøring 10 (ny serie) — sigma_rp=0.006 fast (2026-05-24)
+
+- **Parametre:** 19 fri (sigma_rp fjernet fra PARAM_NAMES, sigma_A nå fri)
+- **Hypotese:** sigma_rp=0.016 presser psi_R opp → fiksering frigjør psi_P1
+- **Startverdi:** kj9 posterior means
+- **Fil:** `chain_kj10_prod_posterior.json`
+- **Trekk:** 200 000 produksjon + 20 000 burnin
+- **PSRF_max:** 1.169 (rho_O), **ESS_min:** 356 (rho_C), **acc:** ikke registrert
+
+### Nøkkelresultater kj10
+
+| Parameter | Kj10   | Kj9    | K&M   |
+|-----------|--------|--------|-------|
+| psi_R     | 0.911  | 0.911  | 0.667 |
+| psi_P1    | 0.167  | 0.140  | 0.292 |
+| sigma_rp  | 0.006  | 0.016  | 0.006 |
+| sigma_A   | 0.0125 | (fast) | 0.006 |
+| rho_A     | 0.175  | 0.146  | 0.950 |
+| phi_I1    | 0.143  | 0.157  | 4.000 |
+
+**Effektiv KPI-Taylor-koeffisient:** (1−0.911)×0.167 = **0.015** (fortsatt svært lav)
+
+### Konklusjon kj10 ✗ (hypotese avkreftet)
+
+**sigma_rp-dominanshypotesen er motbevist.** Fiksering av sigma_rp=0.006 endret IKKE
+psi_R (fortsatt 0.911) og økte psi_P1 minimalt (0.140→0.167). Effektiv KPI-koeffisient
+forble <0.02. Årsaken er ikke sigma_rp-dominans, men heller at modellen trenger enten:
+1. psi_R som kan identifiseres mot data (som ønsker høy renteglatting), eller
+2. Et annet element for å gi KPI persistens (hybrid Phillips-kurve).
+
+Neste steg: test psi_R=0.667 fast (kj11) og gamma_p hybrid Phillips-kurve (kj12).
+
+---
+
+## Kjøring 11 (ny serie) — psi_R=0.667 fast — AVBRUTT (2026-05-24)
+
+- **Parametre:** 18 fri (sigma_rp fast=0.006, psi_R fast=0.667)
+- **Hypotese:** K&M-kalibrert psi_R frigjør psi_P1 → KPI-koeffisient nær K&M=0.292
+- **Startverdi:** kj10 posterior means (ekskl. psi_R)
+- **Fil:** ingen posterior-JSON (avbrutt ved 10 000 trekk)
+- **Stoppkriterium:** Likelihood-fall > 50 log-enheter fra start
+
+### Funn kj11
+
+- **Startpunkt log-posterior:** ~3522 (kj10-nivå)
+- **Etter psi_R=0.667 fast:** lp ≈ 3425 → **fall på 97 log-enheter**
+- 97 log-enheter >> 50-enhetsgrense → data forkaster klart psi_R=0.667
+- Sammenlign: K&M kalibrert psi_R=0.667 passer ikke norske data
+
+### Konklusjon kj11 ✗ (avbrutt)
+
+**Norske data vil ha høy renteglatting.** psi_R=0.667 (K&M) gir 97 log-enheter
+likelihood-fall. Data er svært informative om psi_R (estimert tett rundt 0.91).
+Løsningen er ikke å fikse psi_R, men å tilføre inflasjonspersistens via hybrid Phillips-kurve.
+**Ikke gjenta denne testen** — den er grundig motbevist.
+
+---
+
+## Kjøring 12 (ny serie) — gamma_p hybrid NK Phillips-kurve (2026-05-24, pågår)
+
+- **Parametre:** 20 fri (gamma_p ny, psi_R tilbake til estimering med økt grense 0.990)
+- **Modellendring:** Hybrid NK Phillips-kurve, PE-godkjent 2026-05-24
+  ```
+  π_t = [γ_p/(1+βγ_p)]·π_{t-1} + [β/(1+βγ_p)]·E[π_{t+1}] + [κ_P/(1+βγ_p)]·mc_t + ...
+  ```
+  - G1[0, PI_L] = γ_p / (1+βγ_p) — bakseende ledd (PI_L = variabel 36)
+  - Skalerer G0[0,MC], G0[0,RER], G0[0,PI_STAR] og Pi[0,PI] ned med 1/(1+βγ_p)
+- **Prior gamma_p:** Beta(3,3) sentrert ~0.5, støtte [0.0, 0.95]. K&M: γ_p ≈ 0.35
+- **Prior psi_R:** Beta(2,2) / (0.01, 0.990) — øvre grense utvidet fra 0.920
+- **Startverdi:** kj10 posterior + gamma_p=0.35 (K&M kaldt start), std=0.05
+- **Fil:** `chain_kj12_prod_posterior.json`
+- **Trekk:** 200 000 produksjon + 20 000 burnin (pågår)
+
+### Foreløpige resultater kj12 (ved 110k/200k, 2026-05-24)
+
+- **Startpunkt lp:** 3564.50 — **+42 log-enheter vs kj10-start** (umiddelbar forbedring)
+- **PSRF=1.01, ESS=335** — beste konvergens av alle kjøringer
+- **lp=3566.4** ved 110k
+
+| Parameter | kj12 (110k) | kj10  | K&M   |
+|-----------|-------------|-------|-------|
+| gamma_p   | ~0.226      | —     | 0.35  |
+| psi_R     | ~0.953      | 0.911 | 0.667 |
+| psi_P1    | ~0.213      | 0.167 | 0.292 |
+| sigma_rp  | 0.006 (fast)| 0.006 | 0.006 |
+
+**Effektiv KPI-Taylor-koeff ved 110k:** (1−0.953)×0.213 = **0.010** (fortatt lav)
+
+### Foreløpig vurdering kj12
+
+**gamma_p=0.226 er statistisk signifikant** (langt fra prior-massen ved 0.5, konsentrert).
+Hybrid Phillips-kurven bedrer modellfit med +42 log-enheter — sterk evidens.
+**Timing-problemet** (KPI topper umiddelbart, vs NB gradvis til t=4) forventes løst av γ_p≠0.
+
+**Bekymring:** psi_R=0.953 (høyere med utvidet grense) → effektiv KPI-koeff noe lavere.
+Data vil ha svært høy renteglatting UOG hybrid Phillips-kurve. Amplituden kan fortsatt være
+underdrevet selv om timingen er fikset. IRF-validering nødvendig etter fullføring.
+
+### Endelige resultater kj12 (etter fullføring)
+
+| Parameter | kj12   | K&M   | p5    | p95   |
+|-----------|--------|-------|-------|-------|
+| psi_R     | 0.953  | 0.667 | 0.932 | 0.972 |
+| psi_P1    | 0.210  | 0.292 | 0.087 | 0.356 |
+| gamma_p   | 0.230  | 0.350 | 0.072 | 0.453 |
+| phi_I1    | 0.154  | 4.000 | 0.105 | 0.230 |
+
+**PSRF_max:** 1.007 (gamma_p), **ESS_min:** 670 (gamma_p), **acc:** 0.182
+
+**Effektiv KPI-Taylor-koeffisient:** (1−0.953)×0.210 = **0.010** (svært lav)
+
+**B5-benchmark kj12 (normalisert til +1pp rentetopp):**
+
+| Variabel | kj12   | NB    | kj12/NB |
+|----------|--------|-------|---------|
+| BNP q4   | −51%   | −45%  | 1.14×   |
+| KPI q4   | −3.0%  | −15%  | **0.20×** |
+| RER q4   | −72%   | −40%  | 1.80×   |
+| Rente q8 | +67%   | +20%  | 3.35×   |
+
+**Konklusjon kj12:** gamma_p bedrer KPI-timing (kurven er nå negativt hellende gjennom hele horisonten, 
+ikke positiv ved q12 som i kj10). Men amplituden er 0.20× NB — ekstremt underdrevet.
+**Rotårsak identifisert:** κ_P = 5/phi_PQ = 5/669 = 0.0075 (ekstremt flat Phillips-kurve).
+Med phi_I1≈0.15 svinger BNP enormt, men BNP→KPI-transmission er nesten brutt.
+
+---
+
+## Kjøring 13 (ny serie) — phi_PQ fri (2026-05-24)
+
+- **Parametre:** 21 fri (phi_PQ ny, Steg A)
+- **Hypotese:** phi_PQ=669 (K&M) for høyt → κ_P=0.0075 for flat → KPI-respons 0.20× NB
+- **Prior phi_PQ:** Normal(669, 300, [50, 2000]) — sentrert ved K&M, tillater nedside
+- **Startverdi:** kj12 posterior means (fra chain direkte) + phi_PQ=669 kaldt start
+- **Fil:** `chain_kj13_prod_posterior.json`
+- **Trekk:** 200 000 produksjon + 20 000 burnin
+- **PSRF_max:** 1.019 (psi_Y), **ESS_min:** 415 (psi_Y), **acc:** 0.190
+
+### Nøkkelresultater kj13
+
+| Parameter | kj13    | kj12   | K&M   | p5     | p95    |
+|-----------|---------|--------|-------|--------|--------|
+| phi_PQ    | 584.4   | 669.0  | 669.0 | 104.4  | 1088.9 |
+| psi_R     | 0.9528  | 0.9528 | 0.667 | 0.932  | 0.972  |
+| psi_P1    | 0.2101  | 0.2099 | 0.292 | 0.086  | 0.349  |
+| gamma_p   | 0.2346  | 0.2296 | 0.350 | 0.073  | 0.465  |
+| phi_I1    | 0.1537  | 0.1536 | 4.000 | 0.105  | 0.231  |
+
+**kappa_P:** kj13=0.00856, kj12=0.00747 (+15%)
+
+**Effektiv KPI-Taylor-koeffisient:** (1−0.953)×0.210 = **0.010** (uendret fra kj12)
+
+**B5-benchmark kj13:**
+
+| Variabel | kj13   | kj12   | NB    | kj13/NB |
+|----------|--------|--------|-------|---------|
+| KPI q4   | −3.1%  | −3.0%  | −15%  | **0.21×** |
+| BNP q4   | −52%   | −51%   | −45%  | 1.15×   |
+| RER q4   | −72%   | −72%   | −40%  | 1.81×   |
+
+### Konklusjon kj13 ✗ (Steg A utilstrekkelig)
+
+**phi_PQ er svakt identifisert.** Posterior [104, 1089] er ekstremt bred — data kan ikke 
+skille mellom flat og moderat Phillips-kurve med de observerte variablene.
+phi_PQ falt kun 13% (669→584), κ_P økte kun 15% (0.0075→0.0086).
+**KPI q4 forbedret seg fra 0.20× → 0.21× NB — marginalt ubrukelig.**
+
+Alle andre parametere er identiske med kj12. phi_PQ absorberer ikke informasjon fra data 
+fordi den er en skalafaktor i Phillips-kurven som allerede er dekt av andre parametre.
+
+**Neste steg: Steg B — estimer kappa_M (importpriskanal).**
+**Ikke gjenta fri phi_PQ** — identifikasjonsproblemet er dokumentert.
+
+---
+
+## Kjøring 14 (ny serie) — kappa_M fri (2026-05-24)
+
+- **Parametre:** 21 fri (kappa_M ny, phi_PQ fjernet, Steg B)
+- **Hypotese:** kappa_M=0.03 (K&M) er for lav → høyere κ_M → sterkere RER→KPI-kanal
+- **Prior kappa_M:** Normal(0.03, 0.03, [0.005, 0.20]) — sentrert ved K&M
+- **Startverdi:** kj13 posterior means + kappa_M=0.030 kaldt start. lp=3573.99 (+20 vs kj13)
+- **Fil:** `chain_kj14_prod_posterior.json`
+- **Trekk:** 200 000 produksjon + 20 000 burnin (4 rekalibreringer)
+- **PSRF_max:** 1.053, **ESS_min:** 455, **acc:** 0.167
+
+### Nøkkelresultater kj14
+
+| Parameter | kj14    | kj12   | K&M   | p5     | p95    |
+|-----------|---------|--------|-------|--------|--------|
+| kappa_M   | **0.0175** | 0.030  | 0.030 | 0.006  | 0.039  |
+| psi_R     | 0.954   | 0.953  | 0.667 | 0.933  | 0.972  |
+| psi_P1    | 0.240   | 0.210  | 0.292 | 0.100  | 0.389  |
+| gamma_p   | 0.204   | 0.230  | 0.350 | 0.061  | 0.411  |
+| phi_I1    | 0.165   | 0.154  | 4.000 | 0.107  | 0.249  |
+
+**Eff KPI-Taylor-koeff:** (1−0.954)×0.240 = **0.011** (marginalt bedre enn kj12)
+
+**B5-benchmark kj14:**
+
+| Variabel | kj14   | kj12   | NB    | kj14/NB |
+|----------|--------|--------|-------|---------|
+| KPI q4   | −2.0%  | −3.0%  | −15%  | **0.13×** |
+| BNP q4   | −48%   | −51%   | −45%  | 1.06×   |
+| BNP q8   | −35%   | −37%   | −35%  | **1.00×** |
+| RER q4   | −72%   | −72%   | −40%  | 1.80×   |
+
+### Konklusjon kj14 ✗ (Steg B avkreftet — overraskende funn)
+
+**Kappa_M estimeres LAVERE enn K&M (0.0175 vs 0.030) — hypotesen er feil.**
+Data vil ha svakere RER→KPI-transmisjon, ikke sterkere. KPI-responsen forverres
+til 0.13× NB (fra 0.20× i kj12).
+
+**Empirisk funn:** Norsk importpris-pass-through er lavere enn K&M antok.
+Dette kan reflektere distribusjonskostnader, sticky importpriser i Norge,
+eller at norsk KPI er dominert av innenlandsk tjenesteprisvekst.
+
+**Samlet konklusjon fra Steg A (kj13) og Steg B (kj14):**
+Verken phi_PQ eller kappa_M kan fikse KPI-amplitudeproblemet.
+KPI-svakheten er en **robust empirisk egenskap** i norske data under dette
+DSGE-rammeverket — ikke en modellparameter-feil. Rotårsakene er trolig:
+1. Genuint flat Phillips-kurve for Norge (liten output gap → inflasjon-transmisjon)
+2. phi_I1/psi_P1-substitusjon: med phi_I1≈0.15 (friksjonsfri investering) trenger
+   ikke modellen høy psi_P1 for å stabilisere → psi_P1=0.21 er konsistent med data
+3. psi_R≈0.95 er norsk data sitt svar — ikke et identifikasjonsproblem
+
+**Anbefaling:** Aksepter kj12 som beste spesifikasjon. BNP-fit er god (1.06× ved q4,
+1.00× ved q8 i kj14). KPI-timing er bedret av gamma_p. Amplitude er svak men
+konsistent med norsk data. Gå til neste analysetrinn.
+**Ikke gjenta Steg A eller B** — begge er grundig testet og dokumentert.

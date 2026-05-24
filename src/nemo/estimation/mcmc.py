@@ -42,8 +42,14 @@ SIGMA_A_FIXED = 0.006
 # phi_I1 var fast (PE-godkjent 2026-05-17), men frigjort igjen (PE-godkjent 2026-05-20):
 # B5-benchmark viste at phi_I1=4.0 gir BNP-respons 0.4× NB; fase2v2 med phi_I1≈0.5 traff NB eksakt.
 PHI_I1_FIXED  = 4.0  # beholdt som konstant for bakoverkompatibilitet; ikke lenger brukt i log_posterior
-# sigma_rp: C3-fix (2026-05-18) rullet tilbake — fiksering forverret IRF fordi
-# psi_R kompenserte (steg til 0.911). sigma_rp estimeres fritt igjen.
+# sigma_rp: fikseres til K&M-verdi (kjøring 10, PE-godkjent 2026-05-24).
+# sigma_rp=0.016 i kj9 (2.7× K&M) presset psi_R→0.911, effektiv KPI-koeff = 0.012 (for lav).
+# C3-eksperiment viste psi_P1→0.248 og KPI-ratio≈1× da sigma_rp=0.006.
+SIGMA_RP_FIXED = 0.006
+# psi_R: fikseres til K&M-verdi (kjøring 11, PE-godkjent 2026-05-24).
+# psi_R=0.911 i kj10 treffer priorbegrensningen (0.92) og holder effektiv
+# KPI-koeff = (1-0.911)×0.167 = 0.015. K&M=0.667 frigjør psi_P1 til å stige.
+PSI_R_FIXED = 0.667
 # h_c kalibreres fast — PE-godkjent 2026-05-18 (C2 Alt A): posterior treffer alltid
 # 0.9995-grensen og dreper konsumkanalen (a3_W→0.006). K&M-verdi 0.938 gir
 # a3_W=0.032 og BNP-ratio 1.8× vs NB Memo 3/2024 (mot 6-8× med h_c estimert).
@@ -103,6 +109,47 @@ def build_Sv_no_rer() -> np.ndarray:
            'dh_obs':0.004,'db_obs':0.002}
     return np.diag([sme[n]**2 for n in OBS_NAMES_NO_RER])
 
+# Test A (kj15, PE-godkjent 2026-05-24): fjern i_3m_obs for å eliminere dobbelvekting av I_R.
+# H[7,I_R]=4 (i_R_obs) OG H[8,I_R]=4 (i_3m_obs) → I_R over-identifisert → psi_R≈0.95 → psi_P1 lav.
+OBS_NAMES_NO_I3M = [n for n in OBS_NAMES if n != 'i_3m_obs']  # 13 obs
+N_OBS_NO_I3M = len(OBS_NAMES_NO_I3M)
+
+def build_H_no_i3m() -> np.ndarray:
+    """Observasjonsmatrise uten i_3m_obs — fjerner dobbelvekting av I_R. Test A (kj15)."""
+    H = np.zeros((N_OBS_NO_I3M, NZ))
+    mapping = {
+        'dy_obs': (Y, 1.0), 'dc_obs': (C, 1.0), 'dinv_obs': (INV, 1.0),
+        'dx_obs': (X, 1.0), 'dm_obs': (M, 1.0), 'pi_obs': (PI, 4.0),
+        'dw_obs': (W, 1.0), 'i_R_obs': (I_R, 4.0), 'ds_obs': (S, 1.0),
+        'dpO_obs': (PO, 1.0), 'dyS_obs': (YS, 1.0),
+        'dh_obs': (Q_H, 1.0), 'db_obs': (B_NW, 1.0),
+    }
+    for i, nm in enumerate(OBS_NAMES_NO_I3M):
+        col, scale = mapping[nm]
+        H[i, col] = scale
+    return H
+
+def build_Sv_no_i3m() -> np.ndarray:
+    """Målefeil-kovarians uten i_3m_obs (13×13 diagonal). Test A (kj15)."""
+    sme = {'dy_obs':0.005,'dc_obs':0.008,'dinv_obs':0.015,'dx_obs':0.010,
+           'dm_obs':0.012,'pi_obs':0.008,'dw_obs':0.004,'i_R_obs':0.0005,
+           'ds_obs':0.010,'dpO_obs':0.050,'dyS_obs':0.006,
+           'dh_obs':0.004,'db_obs':0.002}
+    return np.diag([sme[n]**2 for n in OBS_NAMES_NO_I3M])
+
+# Test B (kj16): KPI-JAE som pi-observasjon i stedet for total KPI.
+# H-matrisen er identisk med build_H() — PI-rad mapper til PI(0) uendret.
+# Forskjellen er i data: pre/post-arrayene bruker pi_core_obs-kolonnen (fra SSB 10235).
+# Krever at nemo_data-CSVen inneholder pi_core_obs (kjør pipeline med kpi_jae=True).
+# NB: SSB-API (data.ssb.no) er ikke tilgjengelig fra dette skymiljøet — kjøres lokalt.
+def build_H_core() -> np.ndarray:
+    """Observasjonsmatrise for KPI-JAE-test (identisk med build_H()). Test B (kj16)."""
+    return build_H()
+
+def build_Sv_core() -> np.ndarray:
+    """Målefeil-kovarians for KPI-JAE-test (identisk med build_Sv()). Test B (kj16)."""
+    return build_Sv()
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PARAMETERE OG PRIOR
@@ -123,16 +170,18 @@ PARAM_PRIORS = {
     'sigma_C':  ('inv_gamma', 2.0, 0.0182, 1e-5, 0.5),
     'sigma_O':  ('inv_gamma', 2.0, 0.0475, 1e-5, 1.0),
     'sigma_Ys': ('inv_gamma', 2.0, 0.0067, 1e-5, 0.5),
-    'sigma_rp': ('inv_gamma', 2.0, 0.0037, 1e-5, 0.5),
+    # sigma_rp fjernet fra estimering — kalibreres fast til SIGMA_RP_FIXED=0.006 (PE-godkjent 2026-05-24).
     'sigma_i':  ('inv_gamma', 2.0, 0.0002, 1e-5, 0.1),
     'sigma_P':  ('inv_gamma', 2.0, 0.0027, 1e-5, 0.5),
     'sigma_H':  ('inv_gamma', 2.0, 0.0500, 1e-5, 1.0),
-    # PE-godkjent 2026-05-18 (C3): utvidet fra (0.01, 0.85) til (0.01, 0.92).
-    # Posterior psi_R=0.842 traff prior-grensen 0.85 i kjøring 3 — data trykker høyere.
-    # 0.92 gir data rom uten å tillate patologiske verdier > GEORG ω_r=0.74 + 2σ.
-    'psi_R':   ('beta',   2.0, 2.0,  0.01, 0.92),
+    # psi_R: kj11 viste likelihood-fall på 97 log-enheter med K&M=0.667 → data vil ha høy renteglatting.
+    # Restores til estimering med utvidet øvre grense 0.990 (fra 0.92) — data trenger rom over 0.91.
+    'psi_R':   ('beta',   2.0, 2.0,  0.01, 0.990),
     'psi_P1':  ('normal', 0.29, 0.10, 0.05, 1.50),
     'psi_Y':   ('normal', 0.24, 0.05, 0.01, 0.80),
+    # gamma_p: Calvo-prisindeksasjon i hybrid NK Phillips-kurve (PE-godkjent 2026-05-24).
+    # K&M Tabell 8: γ_p ≈ 0.35. Beta(3,3) sentrert ~0.5, tillater [0, 0.95].
+    'gamma_p': ('beta',   3.0, 3.0,  0.0,  0.95),
     # h_c er fjernet fra estimering — kalibreres fast til H_C_FIXED=0.938 (PE-godkjent 2026-05-18, C2 Alt A).
     # Posterior traff alltid 0.9995-grensen og drepte konsumkanalen. K&M-verdi gjenoppretter a3_W=0.032.
     # phi_I1 frigjort igjen (PE-godkjent 2026-05-20, kjøring 9): fase2v2 estimerte ~0.5 og traff NB BNP -0.447
@@ -141,6 +190,10 @@ PARAM_PRIORS = {
     'phi_I2':  ('normal', 8.0,  4.0, 0.5,  40.0),
     # Fase 2v2 (2026-05-15): kapitalutnyttelseselastisitet (Alt. A, K&M Tabell 8)
     'phi_u':   ('normal', 0.22, 0.10, 0.01, 2.0),
+    # phi_PQ kj13: svakt identifisert [104,1089] → KPI 0.21× NB. Ikke estimer på nytt.
+    # 'phi_PQ':  ('normal', 669.0, 300.0, 50.0, 2000.0),  # DEAKTIVERT etter kj13
+    # kappa_M kj14: data vil ha LAVERE kappa_M (0.0175 < K&M=0.030) → KPI 0.13× NB. Ikke estimer på nytt.
+    # 'kappa_M': ('normal', 0.03, 0.03, 0.005, 0.20),   # DEAKTIVERT etter kj14
 }
 PARAM_NAMES = list(PARAM_PRIORS.keys())
 N_PARAMS    = len(PARAM_NAMES)
@@ -153,7 +206,8 @@ KM = {'rho_A':0.804,'rho_C':0.725,'rho_O':0.874,'rho_Ys':0.783,
       'rho_rp':0.737,'rho_H':0.694,'sigma_A':0.006,'sigma_C':0.030,
       'sigma_O':0.079,'sigma_Ys':0.011,'sigma_rp':0.006,'sigma_i':0.0003,
       'sigma_P':0.003,'sigma_H':0.050,'psi_R':0.666,'psi_P1':0.292,
-      'psi_Y':0.242,'h_c':0.938,'phi_I1':4.0,'phi_I2':8.0,'phi_u':0.2192}
+      'psi_Y':0.242,'h_c':0.938,'gamma_p':0.35,'phi_I1':4.0,'phi_I2':8.0,'phi_u':0.2192,
+      'phi_PQ':669.0,'kappa_M':0.03}
 
 def log_prior(theta):
     lp = 0.0
@@ -180,12 +234,18 @@ def log_prior(theta):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def build_Q(theta):
-    # A6 (PE-godkjent 2026-05-21): sigma_A fri. sigma_rp estimeres fritt (C3-fix rullet tilbake 2026-05-18)
+    # sigma_rp fast (SIGMA_RP_FIXED=0.006) — ikke i theta, bruker _fixed-oppslag.
     smap = {E_A:'sigma_A',E_C:'sigma_C',E_P:'sigma_P',E_O:'sigma_O',
             E_Ys:'sigma_Ys',E_rp:'sigma_rp',E_i:'sigma_i',E_H:'sigma_H'}
+    _fixed = {'sigma_rp': SIGMA_RP_FIXED}
     Q = np.zeros((NE,NE))
     for idx,pn in smap.items():
-        s = theta[PARAM_NAMES.index(pn)] if pn in PARAM_NAMES else getattr(Parameters,pn,0.01)
+        if pn in PARAM_NAMES:
+            s = theta[PARAM_NAMES.index(pn)]
+        elif pn in _fixed:
+            s = _fixed[pn]
+        else:
+            s = getattr(Parameters, pn, 0.01)
         Q[idx,idx] = s**2
     return Q
 
@@ -222,9 +282,9 @@ def log_posterior(theta, H, Sv, Y_pre, Y_post):
     try:
         class Pt(Parameters): pass
         for i,n in enumerate(PARAM_NAMES): setattr(Pt,n,float(theta[i]))
-        # A6 (PE-godkjent 2026-05-21): sigma_A er nå i PARAM_NAMES (fri)
-        setattr(Pt,'h_c',     H_C_FIXED)       # fast — PE-godkjent 2026-05-18 (C2 Alt A)
-        # phi_I1 er nå fri igjen (PE-godkjent 2026-05-20)
+        setattr(Pt,'h_c',      H_C_FIXED)       # fast — PE-godkjent 2026-05-18 (C2 Alt A)
+        setattr(Pt,'sigma_rp', SIGMA_RP_FIXED)  # fast — PE-godkjent 2026-05-24 (kj10)
+        setattr(Pt,'kappa_M',  KM['kappa_M'])   # fast K&M=0.030 — kj14 viste estimering forverrer KPI
         G0,G1,Psi,Pi=build_matrices_v3(Pt,theta_H=0.05)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
