@@ -278,12 +278,13 @@ def demean(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     return df_demeaned, means
 
 
-def kjor_pipeline(bruk_cache: bool = True) -> pd.DataFrame:
+def kjor_pipeline(bruk_cache: bool = True, inkluder_kpi_jae: bool = False) -> pd.DataFrame:
     """
     Kjører den fullstendige datapipelinen og lagrer resultater.
 
     1. Henter rådata fra SSB, Norges Bank og FRED.
     2. Transformerer til 14 NEMO-observasjonsvariabler.
+       Hvis inkluder_kpi_jae=True: henter også SSB 10235 og legger til pi_core_obs.
     3. Demeaner.
     4. Lagrer data/processed/nemo_data.csv og nemo_demean.json.
 
@@ -333,6 +334,11 @@ def kjor_pipeline(bruk_cache: bool = True) -> pd.DataFrame:
     logger.info("  FRED: Euro-sone BNP (handelspartnere)")
     euro_bnp = hent_euro_bnp(bruk_cache=bruk_cache)
 
+    kpi_jae = None
+    if inkluder_kpi_jae:
+        logger.info("  SSB: KPI-JAE (10235)")
+        kpi_jae = hent_kpi_jae(bruk_cache=bruk_cache)
+
     # ── Steg 2: Transformer ──────────────────────────────────────────────────
     logger.info("[2/3] Transformerer til observasjonsvariabler...")
 
@@ -347,6 +353,7 @@ def kjor_pipeline(bruk_cache: bool = True) -> pd.DataFrame:
         k2=k2,
         brent=brent,
         euro_bnp=euro_bnp,
+        kpi_jae=kpi_jae,
     )
 
     # Filtrer til estimeringsperiode
@@ -373,8 +380,12 @@ def kjor_pipeline(bruk_cache: bool = True) -> pd.DataFrame:
     processed_dir = repo_root / "data" / "processed"
     processed_dir.mkdir(parents=True, exist_ok=True)
 
-    csv_path = processed_dir / "nemo_data.csv"
-    json_path = processed_dir / "nemo_demean.json"
+    if inkluder_kpi_jae:
+        csv_path  = processed_dir / "nemo_data_kpi_jae.csv"
+        json_path = processed_dir / "nemo_demean_kpi_jae.json"
+    else:
+        csv_path  = processed_dir / "nemo_data.csv"
+        json_path = processed_dir / "nemo_demean.json"
 
     obs_demeaned.to_csv(csv_path, index_label="kvartal")
     logger.info("Lagret: %s (%d obs × %d var)", csv_path, *obs_demeaned.shape)
@@ -420,13 +431,18 @@ def main() -> None:
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         help="Loggingsnivå (standard: INFO).",
     )
+    parser.add_argument(
+        "--kpi-jae",
+        action="store_true",
+        help="Hent også KPI-JAE (SSB 10235) og lag nemo_data_kpi_jae.csv.",
+    )
     args = parser.parse_args()
 
     _konfigurer_logging(args.log_level)
     bruk_cache = not args.no_cache
 
     try:
-        df = kjor_pipeline(bruk_cache=bruk_cache)
+        df = kjor_pipeline(bruk_cache=bruk_cache, inkluder_kpi_jae=args.kpi_jae)
         print(f"\nFerdig! {len(df)} kvartaler × {len(df.columns)} variabler.")
         print(f"Periode: {df.index[0].date()} — {df.index[-1].date()}")
         print("\nDeskriptiv statistikk:")
