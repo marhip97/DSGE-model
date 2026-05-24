@@ -4,7 +4,7 @@ NEMO FASE II — PARAMETERE
 Kalibrert direkte fra Kravik og Mimir (2019), Tabell 8, 9 og 10
 ================================================================================
 Endringer fra Fase I:
-  phi_L    : 1.50 → 3.00   (ζ, Tabell 8 — faktor 2)
+  phi_L    : 1.50 → 3.00 → 1.50  (A_phi_L-rettelse, PE-godkjent 2026-05-21)
   delta    : 0.025 → 0.0108 (δ_K, Tabell 8 — 131% avvik korrigert)
   delta_H  : NY → 0.0228   (δ_H, boligkapitaldepresiering)
   eta_M    : 1.50 → 0.50   (µ, Tabell 8 — faktor 3)
@@ -54,7 +54,7 @@ class Parameters:
     h_d      = 0.4813     # (EST) b_d — habit innskudd, Tabell 8
 
     # Invers Frisch-elastisitet
-    phi_L    = 3.00       # (CAL) ζ — Tabell 8: 3.0
+    phi_L    = 1.50       # (CAL) ζ — Tabell 8: 1.5 (A_phi_L-rettelse, PE-godkjent 2026-05-21)
 
     # Invers IES (log-nytte: σ=1)
     sigma    = 1.00       # (CAL) σ
@@ -139,6 +139,9 @@ class Parameters:
 
     # Gjeldsavhengig risikopremie
     phi_B    = 0.0016     # (CAL) φ_B — Tabell 8 (lavere enn Fase I χ=0.001)
+
+    # Importpriskanal i NK Phillips-kurve (A14.9 — PE-godkjent 2026-05-22)
+    kappa_M  = 0.03       # (CAL) κ_M — importprisinflasjon-koeff. i Phillips
 
     # Olje-valuta-kanal i UIP (PE-godkjent 2026-05-20)
     # Kalibrert fra historisk NOK/olje-korrelasjon ~0.7:

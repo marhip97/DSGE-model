@@ -30,7 +30,7 @@ from scipy.special import betaln, gammaln
 
 from nemo.model.equations import (
     build_matrices_v3, NZ, NE,
-    Y, C, INV, X, M, PI, W, I_R, RER, PO, YS,
+    Y, C, INV, X, M, PI, W, I_R, RER, S, PO, YS,
     Q_H, B_NW, C_NW, I_D, I_L_NW, L, MC,
     E_A, E_C, E_P, E_O, E_Ys, E_rp, E_i, E_H, E_phi_h
 )
@@ -63,7 +63,7 @@ OBS_NAMES = [
 def build_H():
     H = np.zeros((N_OBS, NZ))
     H[0,Y]=1.0; H[1,C]=1.0; H[2,INV]=1.0; H[3,X]=1.0; H[4,M]=1.0
-    H[5,PI]=4.0; H[6,W]=1.0; H[7,I_R]=4.0; H[8,I_R]=4.0; H[9,RER]=1.0
+    H[5,PI]=4.0; H[6,W]=1.0; H[7,I_R]=4.0; H[8,I_R]=4.0; H[9,S]=1.0   # A12.1: ds_obs→S(19) ikke RER(15)
     H[10,PO]=1.0; H[11,YS]=1.0; H[12,Q_H]=1.0; H[13,B_NW]=1.0
     return H
 
@@ -117,7 +117,9 @@ PARAM_PRIORS = {
     'rho_Ys':  ('beta',     2.0,  0.5,  0.01, 0.9995),
     'rho_rp':  ('beta',     2.0,  0.5,  0.01, 0.9995),
     'rho_H':   ('beta',     2.0,  0.5,  0.01, 0.9995),
-    # sigma_A er fjernet
+    # PE-godkjent 2026-05-21 (A6): sigma_A fristilles. K&M Tabell 9 estimerer sigma_A.
+    # Bayesiansk faktor sigma_A=0.012 vs 0.006: ~10^27. rho_A=0.39 i kj10 er identifikasjonsartefakt.
+    'sigma_A':  ('normal', 0.010, 0.004, 0.002, 0.050),
     'sigma_C':  ('inv_gamma', 2.0, 0.0182, 1e-5, 0.5),
     'sigma_O':  ('inv_gamma', 2.0, 0.0475, 1e-5, 1.0),
     'sigma_Ys': ('inv_gamma', 2.0, 0.0067, 1e-5, 0.5),
@@ -148,7 +150,7 @@ PARAM_NAMES_V3_FULL = ['rho_A','rho_C','rho_O','rho_Ys','rho_rp','rho_H',
                         'sigma_i','sigma_P','sigma_H','psi_R','psi_P1','psi_Y','h_c']
 
 KM = {'rho_A':0.804,'rho_C':0.725,'rho_O':0.874,'rho_Ys':0.783,
-      'rho_rp':0.737,'rho_H':0.694,'sigma_C':0.030,
+      'rho_rp':0.737,'rho_H':0.694,'sigma_A':0.006,'sigma_C':0.030,
       'sigma_O':0.079,'sigma_Ys':0.011,'sigma_rp':0.006,'sigma_i':0.0003,
       'sigma_P':0.003,'sigma_H':0.050,'psi_R':0.666,'psi_P1':0.292,
       'psi_Y':0.242,'h_c':0.938,'phi_I1':4.0,'phi_I2':8.0,'phi_u':0.2192}
@@ -178,11 +180,10 @@ def log_prior(theta):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def build_Q(theta):
-    # sigma_A er fast; sigma_rp estimeres fritt (C3-fix rullet tilbake 2026-05-18)
-    smap = {E_C:'sigma_C',E_P:'sigma_P',E_O:'sigma_O',
+    # A6 (PE-godkjent 2026-05-21): sigma_A fri. sigma_rp estimeres fritt (C3-fix rullet tilbake 2026-05-18)
+    smap = {E_A:'sigma_A',E_C:'sigma_C',E_P:'sigma_P',E_O:'sigma_O',
             E_Ys:'sigma_Ys',E_rp:'sigma_rp',E_i:'sigma_i',E_H:'sigma_H'}
     Q = np.zeros((NE,NE))
-    Q[E_A,E_A] = SIGMA_A_FIXED**2   # fast
     for idx,pn in smap.items():
         s = theta[PARAM_NAMES.index(pn)] if pn in PARAM_NAMES else getattr(Parameters,pn,0.01)
         Q[idx,idx] = s**2
@@ -221,7 +222,7 @@ def log_posterior(theta, H, Sv, Y_pre, Y_post):
     try:
         class Pt(Parameters): pass
         for i,n in enumerate(PARAM_NAMES): setattr(Pt,n,float(theta[i]))
-        setattr(Pt,'sigma_A', SIGMA_A_FIXED)   # fast
+        # A6 (PE-godkjent 2026-05-21): sigma_A er nå i PARAM_NAMES (fri)
         setattr(Pt,'h_c',     H_C_FIXED)       # fast — PE-godkjent 2026-05-18 (C2 Alt A)
         # phi_I1 er nå fri igjen (PE-godkjent 2026-05-20)
         G0,G1,Psi,Pi=build_matrices_v3(Pt,theta_H=0.05)
@@ -529,7 +530,15 @@ def adaptive_mcmc_with_monitoring(
 if __name__ == "__main__":
 
     print("Laster data...")
-    obs_df=pd.read_csv("data/processed/nemo_data_faktisk_v2.csv",index_col=0,parse_dates=True)
+    # Foretrekker pipeline-generert fil; faller tilbake til v2 hvis ikke tilgjengelig
+    _data_fil = (
+        "data/processed/nemo_data.csv"
+        if os.path.exists("data/processed/nemo_data.csv")
+        else "data/processed/nemo_data_faktisk_v2.csv"
+    )
+    print(f"  Datafil: {_data_fil}")
+    obs_df=pd.read_csv(_data_fil,index_col=0,parse_dates=True)
+    # COVID-hull: ekskluder 2020Q1–2021Q4 (PE-godkjent, Alt A 2026-05-23)
     pre =obs_df[obs_df.index<="2019-12-31"][OBS_NAMES].values
     post=obs_df[obs_df.index>="2022-01-01"][OBS_NAMES].values
     print(f"  Pre={len(pre)} kv  Post={len(post)} kv")

@@ -108,7 +108,16 @@ A=37; EPS_C=38; EPS_H=39; EPS_G=40
 YS=41; EPS_RP=42; PI_STAR=43; I_STAR=44
 EPS_PHI_H=45; EPS_PREM=46; EPS_I_ADJ=47  # siste plass: investeringssjokk
 U_K=48  # Alt. A: kapitalutnyttelse (utilization rate)
- 
+
+# A9 (PE-godkjent 2026-05-22): 7 hjelpetilstander for RE-forventninger (NZ 49→56)
+PI_E=49; C_W_E=50; Q_H_E=51; PIW_E=52; INV_E=53; Q_K_E=54; RER_E=55
+NZ_V4 = 56
+
+# Alt B (PE-godkjent 2026-05-23): 4-periodes inflasjonsforventningskjede (NZ 49→53)
+# Taylor-regel reagerer på E_t[π_{t+4}] — NB NEMO-konvensjon (inflasjonsmål 4Q frem)
+PI_E1=49; PI_E2=50; PI_E3=51; PI_E4=52
+NZ_PI4 = 53
+
 # ── Sjokk-indekser ───────────────────────────────────────────────────────────
 E_A=0; E_C=1; E_H=2; E_G=3; E_O=4; E_Ys=5; E_rp=6
 E_i=7; E_P=8; E_phi_h=9; E_prem=10; E_I=11; E_piS=12
@@ -123,6 +132,8 @@ VAR_NAMES = [
     'a','eps_C','eps_H','eps_G',
     'yS','eps_rp','pi_star','i_star','eps_phi_h','eps_prem','eps_I_adj',
     'u_K',  # Alt. A: kapitalutnyttelse
+    # A9: hjelpetilstander for RE-forventninger
+    'pi_E','c_W_E','q_H_E','piW_E','inv_E','q_K_E','rer_E',
 ]
  
 SHOCK_NAMES = [
@@ -160,7 +171,7 @@ def build_matrices(p=None):
     omega  = p.omega_NW        # andel låntakere
     m_H    = p.m_H             # LTV
     gamma_G = p.gamma_G
-    kappa_M = 0.03             # importpriskanal (beholdes fra Fase I)
+    kappa_M = p.kappa_M        # importpriskanal (A14.9: fra parameters.py)
  
     # Avledede størrelser
     a1_W = h_c / (1 + h_c)
@@ -230,7 +241,7 @@ def build_matrices(p=None):
     G0[2, W]     = -(1.0 - m_H)           # reallønnskanal
     G0[2, L]     = -(1.0 - m_H)           # sysselsettingskanal
     Pi[2, Q_H]   =  m_H / beta            # E[q_H_{t+1}]: kollateralverdi
-    Psi[2, E_C]  =  a2_W                  # delt preferansesjokk
+    G0[2, EPS_C] = -a2_W    # A11.1: koble AR(1)-state EPS_C (delt preferansesjokk)
  
     # B3. Aggregert konsum: c = (1-ω)·c_W + ω·c_NW
     G0[3, C]    =  1.0
@@ -429,9 +440,10 @@ def build_matrices(p=None):
     # ════════════════════════════════════════════════════════════════════════
  
     # F1. Offentlig konsum (fiskalregel med lagg + AR(1)-sjokk)
-    G0[27, G]    =  1.0
-    G1[27, PO]   =  gamma_G
-    Psi[27, E_G] =  1.0   # offentlig forbrukssjokk
+    # A11.1 (PE-godkjent 2026-05-21): koble AR(1)-state EPS_G (var dead state)
+    G0[27, G]     =  1.0
+    G1[27, PO]    =  gamma_G
+    G0[27, EPS_G] = -1.0   # A11.1: AR(1)-persistens via EPS_G-state
  
     # F2. Oljepris AR(1)
     G0[28, PO]    =  1.0
@@ -532,24 +544,34 @@ def build_matrices_v2(p=None):
     return G0, G1, Psi, Pi
  
  
-def build_matrices_v3(p=None, theta_H: float = 0.05):
+def build_matrices_v3(
+    p=None,
+    theta_H: float = 0.05,
+    psi_UIP: float = 0.0,
+    fwd_housing_weight: float | None = None,
+):
     """
     NEMO Fase II v3 — Fullt estimeringsklart likningssystem.
- 
+
     Bygger på build_matrices_v2 og legger til:
       1. Boligpreferanse-kalibrering via theta_H (skalering av E_H-sjokket)
       2. Stabil boligprislikning med mean-reversion (Gelain et al. 2018)
       3. Bakseende forventningsdannelse for boligpriser (b_sa, lambda_sa)
       4. Korrekt h_c-oppdatering fra estimerte parametere
       5. Mimicking rule med estimert psi_R, psi_P1, psi_Y
- 
+
     Parametere
     ----------
-    p        : Parameters-klasse (eller underklasse med oppdaterte estimater)
-    theta_H  : Skaleringsfaktor for boligpreferansesjokket (default 0.05)
-               Brukes til å kontrollere boligsektorens relative volatilitet
-               under estimering. Posterior mean ≈ 0.05 i K&M (2019).
- 
+    p                  : Parameters-klasse (eller underklasse med oppdaterte estimater)
+    theta_H            : Skaleringsfaktor for boligpreferansesjokket (default 0.05)
+    psi_UIP            : Valutarisikopremie i UIP-likning (default 0.0 = ren UIP).
+                         PE-godkjent verdi: 0.02 (A9b, 2026-05-22).
+                         Setter G0[15, RER] = 1.0 + psi_UIP (bryter enhetsroten λ=1→1+ψ).
+    fwd_housing_weight : Fremoverskuende vekt for boligprisforventning Pi[6, Q_H].
+                         None (default) = bruk K&M-kalibrering (w_fwd ≈ 0.393).
+                         0.0 = fullt bakseende boligprisforventninger (BK-kandidat).
+                         Verdier i [0, 1] interpolerer mellom de to ytterpunktene.
+
     Returnerer
     ----------
     G0, G1, Psi, Pi : (NZ×NZ), (NZ×NZ), (NZ×NE), (NZ×NZ)
@@ -581,8 +603,8 @@ def build_matrices_v3(p=None, theta_H: float = 0.05):
     G1[1, C_W]  =  a1_W
     Pi[1, C_W]  =  a2_W
     Pi[1, PI]   = -a3_W
-    Psi[1, E_C] =  a2_W
- 
+    G0[1, EPS_C] = -a2_W    # A11.1 (PE-godkjent 2026-05-21): koble AR(1)-state EPS_C
+
     # Oppdater låntaker-likning (ligning 2) med korrekt h_c
     G0[2, :] = 0.0; G1[2, :] = 0.0; Pi[2, :] = 0.0; Psi[2, :] = 0.0
     G0[2, C_NW]  =  1.0
@@ -606,18 +628,24 @@ def build_matrices_v3(p=None, theta_H: float = 0.05):
     #   Fremoverskuende: 1 - b_sa × lambda_sa ≈ 0.393
     b_sa      = getattr(p, 'b_sa',      0.6393)
     lambda_sa = getattr(p, 'lambda_sa', 0.9495)
- 
-    w_back = b_sa * lambda_sa                   # bakseende vekt
-    w_fwd  = 1.0 - w_back                       # fremoverskuende vekt
- 
+
+    w_back     = b_sa * lambda_sa                   # bakseende vekt (K&M ≈ 0.607)
+    w_fwd_kalm = 1.0 - w_back                       # K&M fremoverskuende vekt (≈ 0.393)
+    # Alt D: fwd_housing_weight kontrollerer Pi[6,Q_H] og Pi[6,PI].
+    # fwd_housing_weight=0.0: begge Pi[6,*]=0 (alle fremoverskuende boligledd fjernes).
+    # G1[6,Q_H] beholdes alltid = w_back (K&M-kalibrert, endres ikke).
+    w_fwd_eff = w_fwd_kalm if fwd_housing_weight is None else float(fwd_housing_weight)
+    # Skaleringsfaktor for Pi[6,PI]: følger samme innstramming som Q_H-vekten
+    pi_scale  = (w_fwd_eff / w_fwd_kalm) if w_fwd_kalm > 0 else 0.0
+
     G0[6, :] = 0.0; G1[6, :] = 0.0; Pi[6, :] = 0.0; Psi[6, :] = 0.0
     G0[6, Q_H]    =  1.0
     G0[6, I_D]    =  1.0
     G0[6, PI]     = -1.0
-    G1[6, Q_H]    =  w_back       # bakseende: q_H_{t-1} (via lagg-identitet)
-    Pi[6, Q_H]    =  w_fwd        # fremoverskuende: E[q_H_{t+1}]
-    Pi[6, PI]     = -1.0          # E[π_{t+1}]
-    Psi[6, E_H]   =  theta_H      # skalert boligsjokk
+    G1[6, Q_H]    =  w_back       # bakseende vekt (K&M, beholdes alltid)
+    Pi[6, Q_H]    =  w_fwd_eff    # fremoverskuende Q_H (0.0 = fjernet)
+    Pi[6, PI]     = -pi_scale     # E[π_{t+1}]: skaleres proporsjonalt med fwd_vekt
+    G0[6, EPS_H]  = -theta_H      # A11.1: koble AR(1)-state EPS_H (skalert boligsjokk)
  
     # ── 3. Boligakkumulering v3 (stabilisert) ────────────────────────────────
     # Ligning 7: h_W = (1-δ_H)·h_W_{t-1} + δ_H·q_H
@@ -643,12 +671,14 @@ def build_matrices_v3(p=None, theta_H: float = 0.05):
     psi_P1 = p.psi_P1
     psi_Y  = p.psi_Y
     psi_S  = p.psi_S
+    psi_W  = p.psi_W
 
     G0[20, :] = 0.0; G1[20, :] = 0.0; Psi[20, :] = 0.0
     G0[20, I_R]   =  1.0
     G0[20, Y]     = -(1.0 - psi_R) * psi_Y
     G0[20, RER]   = -(1.0 - psi_R) * psi_S
     G0[20, PI]    = -(1.0 - psi_R) * psi_P1   # samtid inflasjon
+    G0[20, PIW]   = -(1.0 - psi_R) * psi_W    # A7 (PE-godkjent 2026-05-21): lønnsinflasjon, K&M §2.13
     G0[20, I_R_L] = -psi_R                     # 1-periodes lagg via lagg-tilstand
     Psi[20, E_i]  =  1.0
 
@@ -697,9 +727,9 @@ def build_matrices_v3(p=None, theta_H: float = 0.05):
     G0[12, :] = 0.0; G1[12, :] = 0.0; Psi[12, :] = 0.0; Pi[12, :] = 0.0
     G0[12, INV]   =  1.0
     G0[12, Q_K]   = -1.0 / (_phi_I1 * (1.0 + _beta))   # CEE-korrekt
-    G0[12, INV_L] = -(_phi_I1 / (_phi_I1 + _phi_I2))   # 1-periodes lagg
-    Pi[12, INV]   =  _phi_I2 / (_phi_I1 + _phi_I2)
-    Psi[12, E_I]  =  1.0
+    G0[12, INV_L] = -(1.0 / (1.0 + _beta))              # CEE: 1/(1+β) bakover → røtter {1, 1/β}
+    Pi[12, INV]   =  _beta / (1.0 + _beta)              # CEE: β/(1+β) fremover
+    G0[12, EPS_I_ADJ] = -1.0   # A11.1: koble AR(1)-state EPS_I_ADJ
 
     # Ligning 13: marginal kostnad  mc_t = σ̃·y_t − (1+φ_L/(1-α))·a_t − α/(1-α)·k_{t-1}
     # (v2-fix brukte G1[MC, K_L] = −α/(1-α) → K_{t-2}; rettelse: G0[MC, K_L] = +α/(1-α))
@@ -709,17 +739,18 @@ def build_matrices_v3(p=None, theta_H: float = 0.05):
     G0[MC, A]    =  (1.0 + p.phi_L / (1.0 - _alpha_K))
     G0[MC, K_L]  =  _alpha_K / (1.0 - _alpha_K)  # 1-periodes lagg (K_L_t = K_{t-1})
 
-    # Ligning 14: Tobin's Q  q_K_t + i_R_t − π_t − α_K·(mc_t + y_t − k̂_t) − β(1-δ)·E[q_K_{t+1}] = 0
-    # v2-fix brukte G1[Q_K, K_L] = −α_K → K_{t-2}; rettelse: G0[Q_K, K_L] = +α_K
-    # Alt. A: r_K avhenger av effektiv kapital k̂_t = K_L_t + U_K_t, så U_K-term legges til
+    # Ligning 14: Tobin's Q (A4d-rettelse, PE-godkjent 2026-05-21)
+    # r̂_K = mc + y − k̂  (leiepris log-avvik fra SS, koeff=1.0 på y-k̂-ledd)
+    # Hybrid: MC beholder α_K, mens (y−k̂) bruker 1.0 — ref. A_funn_rapport.md §A4d.
+    # Effekt: TFP-sjokk gir positiv BNP (test_09 bestått), KPI q4 ≈ 0.98× NB.
     G0[Q_K, :] = 0.0; G1[Q_K, :] = 0.0; Pi[Q_K, :] = 0.0
     G0[Q_K, Q_K] =  1.0
     G0[Q_K, I_R] =  1.0
     G0[Q_K, PI]  = -1.0
-    G0[Q_K, MC]  = -_alpha_K
-    G0[Q_K, Y]   = -_alpha_K
-    G0[Q_K, K_L] = +_alpha_K                      # 1-periodes lagg (K_L_t = K_{t-1})
-    G0[Q_K, U_K] = +_alpha_K                      # Alt. A: effektiv kapital
+    G0[Q_K, MC]  = -_alpha_K                      # kostnadskomponent: α_K·mc
+    G0[Q_K, Y]   = -1.0                           # A4d: output-koeff = 1.0 (ikke α_K)
+    G0[Q_K, K_L] = +1.0                           # A4d: kapital-koeff = 1.0
+    G0[Q_K, U_K] = +1.0                           # A4d: utnyttelse-koeff = 1.0
     Pi[Q_K, Q_K] =  (1.0 - _delta)
     Pi[Q_K, PI]  = -1.0
 
@@ -739,5 +770,196 @@ def build_matrices_v3(p=None, theta_H: float = 0.05):
     # Modifisere L-ligning (10) og MC-ligning (13) til å bruke k̂ = K_L + U_K
     G0[10, U_K] = _alpha_K / (1.0 - _alpha_K)  # produksjonsfunksjon: l avh. av k̂
     G0[MC, U_K] = _alpha_K / (1.0 - _alpha_K)  # mc avh. av k̂
+
+    # ── 7. Alt D: psi_UIP — valutarisikopremie i UIP-likning ─────────────────
+    # G0[15, RER] = 1.0 + psi_UIP bryter enhetsroten λ=1.0 → 1.0+ψ > 1.
+    # PE-godkjent verdi: 0.02 (A9b, 2026-05-22). Default 0.0 = ren UIP (v3 standard).
+    if psi_UIP != 0.0:
+        G0[15, RER] = 1.0 + psi_UIP
+
+    return G0, G1, Psi, Pi
+
+
+def build_matrices_v4(p=None, theta_H: float = 0.05):
+    """
+    NEMO Fase II v4 — RE-korrekt (A9+A9b, PE-godkjent 2026-05-22).
+
+    Implementerer fremoverskuende RE via 7 hjelpetilstander (NZ: 49→56).
+    n_unstable=7 = rank(Pi)=7 → BK oppfylt → Schur-projeksjon → stabil løsning.
+
+    Nøkkelendringer fra v3:
+      A9:  7 hjelpetilstander PI_E..RER_E for E_t[X_{t+1}] i strukturelle likninger.
+           Konsistenslikninger: G0[k,X]=1, G1[k,X_E]=1, Pi[k,X]=1.
+      A9b: psi_UIP=0.02 i UIP-likning — bryter enhetsroten (λ=1.0→1.02).
+           Tolkes som valutarisikopremie/ufullkommen kapitalbevegelighet (C3-kanal).
+
+    Produksjonsklar — brukes i estimering fra kj14.
+
+    Referanse: K&M (2019), Sims (2002) "Solving Linear Rational Expectations Models"
+
+    Parametere
+    ----------
+    p        : Parameters-klasse
+    theta_H  : Skaleringsfaktor for boligpreferansesjokk (default 0.05)
+
+    Returnerer
+    ----------
+    G0, G1, Psi, Pi : (NZ_V4×NZ_V4), (NZ_V4×NZ_V4), (NZ_V4×NE), (NZ_V4×NZ_V4)
+    """
+    if p is None:
+        p = Parameters
+
+    # Hent v3-matriser (49×49) og utvid til 56×56
+    G0_49, G1_49, Psi_49, Pi_49 = build_matrices_v3(p, theta_H)
+
+    G0  = np.zeros((NZ_V4, NZ_V4))
+    G1  = np.zeros((NZ_V4, NZ_V4))
+    Psi = np.zeros((NZ_V4, NE))
+    Pi  = np.zeros((NZ_V4, NZ_V4))
+
+    # Kopier v3-matriser inn i øvre venstre blokk
+    # NB: Pi_49 kopieres IKKE — alle Pi[eq,X]=c-ledd erstattes av G0[eq,X_E]=-c
+    G0[:NZ, :NZ] = G0_49
+    G1[:NZ, :NZ] = G1_49
+    Psi[:NZ, :]  = Psi_49
+
+    # Avledede parametere (gjenberegnes for konsistens med p)
+    beta      = p.beta
+    delta     = p.delta
+    h_c       = p.h_c
+    m_H       = p.m_H
+    phi_I1    = p.phi_I1
+    phi_I2    = p.phi_I2
+    a2_W      = 1.0 / (1.0 + h_c)
+    a3_W      = (1.0 - h_c) / (p.sigma * (1.0 + h_c))
+    b_sa      = getattr(p, 'b_sa',      0.6393)
+    lambda_sa = getattr(p, 'lambda_sa', 0.9495)
+    w_fwd     = 1.0 - b_sa * lambda_sa
+
+    # ── Modifiser strukturelle likninger ──────────────────────────────────────
+    # Konvensjon: Pi_49[eq, X] = c  ↔  +c·E_t[X_{t+1}] på RHS
+    # Flytt til LHS: G0[eq, X_E] = −c  (X_E ≡ E_t[X_{t+1}])
+
+    # Ligning 0 (NK Phillips): β·E_t[π_{t+1}]
+    G0[0, PI_E]  = -beta
+
+    # Ligning 1 (Euler sparere): a2_W·E_t[c_W_{t+1}] − a3_W·E_t[π_{t+1}]
+    G0[1, C_W_E] = -a2_W
+    G0[1, PI_E] +=  a3_W       # += fordi PI_E opptrer i flere likninger
+
+    # Ligning 2 (Euler låntakere): (m_H/β)·E_t[q_H_{t+1}]
+    G0[2, Q_H_E] = -m_H / beta
+
+    # Ligning 4 (Lønnsinflasjon): β·E_t[π_W_{t+1}]
+    G0[4, PIW_E] = -beta
+
+    # Ligning 6 (Boligpris v3): w_fwd·E_t[q_H_{t+1}] − E_t[π_{t+1}]
+    G0[6, Q_H_E] += -w_fwd     # += fordi Q_H_E opptrer i to likninger
+    G0[6, PI_E]  +=  1.0
+
+    # Ligning 12 (Investering, CEE): β/(1+β)·E_t[inv_{t+1}]
+    G0[12, INV_E] = -(beta / (1.0 + beta))
+
+    # Ligning 14 (Tobin's Q): (1−δ)·E_t[q_K_{t+1}] − E_t[π_{t+1}]
+    G0[14, Q_K_E]  = -(1.0 - delta)
+    G0[14, PI_E]  +=  1.0
+
+    # Ligning 15 (UIP): E_t[rer_{t+1}]
+    # A9b (PE-godkjent 2026-05-22): psi_UIP=0.02 bryter enhetsroten fra ren UIP.
+    # Ren UIP (koeff=1.0) gir companion eigenverdi λ=1.0 (enhetsrot) → BK ikke oppfylt.
+    # Med psi_UIP: (1+ψ)·rer_t = E_t[rer_{t+1}] + ... → eigenverdi 1+ψ≈1.02 > 1.001.
+    # Tolkning: 2% valutarisikopremie/ufullkommen kapitalbevegelighet (C3-kanal).
+    psi_UIP = 0.02
+    G0[15, RER_E] = -1.0
+    G0[15, RER]  += psi_UIP
+
+    # ── Konsistenslikninger (rader 49–55): X_t = X_E_{t-1} + η_{X,t} ─────────
+    # Sims (2002): G0[k,X]=1, G1[k,X_E]=1, Pi[k,X]=1
+    # Tolkning: X_t er lik forrige periodes forventning + forventningsfeil
+    for (k, X_orig, X_aux) in [
+        (PI_E,  PI,  PI_E),
+        (C_W_E, C_W, C_W_E),
+        (Q_H_E, Q_H, Q_H_E),
+        (PIW_E, PIW, PIW_E),
+        (INV_E, INV, INV_E),
+        (Q_K_E, Q_K, Q_K_E),
+        (RER_E, RER, RER_E),
+    ]:
+        G0[k, X_orig] = 1.0
+        G1[k, X_aux]  = 1.0
+        Pi[k, X_orig] = 1.0
+
+    return G0, G1, Psi, Pi
+
+
+def build_matrices_pi4chain(p=None, theta_H: float = 0.05):
+    """
+    NEMO Alt B — fremoverskuende Taylor med 4-periodes inflasjonsforventningskjede.
+
+    **DIAGNOSTISK FUNKSJON — ikke produksjonsklar (se ADVARSEL nedenfor).**
+
+    Taylor-regelen reagerer på E_t[π_{t+4}] i stedet for samtid π_t (A4b).
+    NZ: 49→53. Fire nye tilstander:
+      PI_E1 = E_t[π_{t+1}],  PI_E2 = E_t[π_{t+2}]
+      PI_E3 = E_t[π_{t+3}],  PI_E4 = E_t[π_{t+4}]  ← Taylor
+
+    Kjede (Sims 2002):
+      PI_E1: π_t    = PI_E1_{t-1} + η_{π,t}
+      PI_E2: PI_E1_t = PI_E2_{t-1} + η_{PI_E1,t}
+      PI_E3: PI_E2_t = PI_E3_{t-1} + η_{PI_E2,t}
+      PI_E4: PI_E3_t = PI_E4_{t-1} + η_{PI_E3,t}
+
+    ADVARSEL — matematisk infeasibel med K&M-kalibrering:
+      - rank(Pi) = 10 (7 fra v3 + 3 nye kolonner PI_E1/PI_E2/PI_E3)
+      - Klein n_explosive = 6  →  BK-gap ≠ 10 (verre enn v3s 5≠7)
+      - MSV-fallback ustabil: max|eig(T)| = 4.26  (v3 MSV: 0.998 ✓)
+      - Årsak: fjerning av G0[20,PI] (samtid inflasjon) uten erstatning
+        bryter den stabiliserende feedback-sløyfen i NK-Phillips/Taylor.
+    Bruk build_matrices_v3 for produksjon.
+
+    Parametere
+    ----------
+    p        : Parameters-klasse (bruker kalibrerte verdier hvis None)
+    theta_H  : Boligpris-forventningsparameter (videresendt til build_matrices_v3)
+
+    Returnerer
+    ----------
+    G0, G1, Psi, Pi : (NZ_PI4×NZ_PI4) matriser
+    """
+    from nemo.model.parameters import Parameters as _DefaultP
+    if p is None:
+        p = _DefaultP
+
+    G0_49, G1_49, Psi_49, Pi_49 = build_matrices_v3(p, theta_H)
+
+    G0  = np.zeros((NZ_PI4, NZ_PI4))
+    G1  = np.zeros((NZ_PI4, NZ_PI4))
+    Psi = np.zeros((NZ_PI4, NE))
+    Pi  = np.zeros((NZ_PI4, NZ_PI4))
+
+    G0[:NZ, :NZ] = G0_49
+    G1[:NZ, :NZ] = G1_49
+    Psi[:NZ, :]  = Psi_49
+    Pi[:NZ, :NZ] = Pi_49
+
+    psi_R  = p.psi_R
+    psi_P1 = p.psi_P1
+
+    # Taylor-regel: bytt samtid π → E_t[π_{t+4}]
+    G0[20, PI]    = 0.0
+    G0[20, PI_E4] = -(1.0 - psi_R) * psi_P1
+
+    # ── Konsistenslikninger: PI_E1..PI_E4 ────────────────────────────────────
+    # Tolkning: X_t = E_{t-1}[X_t] + η_{X,t}
+    #   G0[row, X]=1, G1[row, X_E]=1, Pi[row, X]=1
+    for (row, X_now, X_lag) in [
+        (PI_E1, PI,    PI_E1),   # π_t    = PI_E1_{t-1} + η_{π,t}
+        (PI_E2, PI_E1, PI_E2),   # PI_E1_t = PI_E2_{t-1} + η_{PI_E1,t}
+        (PI_E3, PI_E2, PI_E3),   # PI_E2_t = PI_E3_{t-1} + η_{PI_E2,t}
+        (PI_E4, PI_E3, PI_E4),   # PI_E3_t = PI_E4_{t-1} + η_{PI_E3,t}
+    ]:
+        G0[row, X_now] = 1.0
+        G1[row, X_lag] = 1.0
+        Pi[row, X_now] = 1.0
 
     return G0, G1, Psi, Pi
