@@ -28,6 +28,9 @@ skal brukes til å analysere sjokk og optimale pengepolitiske responser.
 | 2026-05-14 | Legge til ESS-mangel som eksplisitt risiko og Spor C8 | PSRF-konvergens er oppfylt, men effektivt antall trekk (ESS_min=662) er en faktor 6 under suksesskriterium 3. Dette gjør h_c=0.989 og psi_R=0.960 tolkningsmessig svake — vi vet ikke om verdiene er datadrevne eller samplingsartefakter. Må diagnostiseres før Fase 2. |
 | 2026-05-14 | B5 NB-benchmark bruker posterior-trekk, ikke kun mean | IRF basert på posterior mean med ESS=662 arver Monte Carlo-usikkerhet. Kvantitative avvik fra NB Memo 3/2024 Figur 1 kan ellers feiltolkes som spesifikasjonsproblem når det er samplingsstøy. B5 rapporterer mean-IRF + 5/95-bånd fra trekk. |
 | 2026-05-14 | Fase 2 omformulert fra "reestimering" til "revidert estimering med forbedret sampler / informert prior" | Den gamle formuleringen ga inntrykk av at det bare gjenstår å trykke "kjør på nytt". Faktisk arbeid: forbedre mixing (blokksampling for korrelerte parametere, reparametrisering, eller HMC etter PE-godkjenning) **og** revidere prior basert på Fase 0.5 Spor C-funn. |
+| 2026-05-20 | phi_I1 frigjøres i kjøring 9 (19 param) | B5-analyse viste at fast phi_I1=4.0 er hovedårsak til BNP-ratio ~10×. Fri phi_I1 (~0.5) traff NB eksakt. |
+| 2026-05-23 | **Alt A godkjent — akseptér modellbegrensning, start Fase 1** | sigma_rp=0.017 er strukturelt (oljepris/valutakanal mangler). 7 MCMC-kjøringer viser at ingen parameterfikseringer løser problemet. IRF-avvik (BNP 6×, RER 29×) dokumenteres i begrensningsdokument. Alt B (oljepriskanal) utsettes til etter Fase 1 når nyere data er tilgjengelig. Se `docs/oppgaver/fase05_begrensningsdokument.md`. |
+| 2026-05-23 | **MSV godkjent som produksjonslikevekt** | BK-determinisme ikke oppnåelig med minimal v3-endring (Alt D bekreftet, gap=1 strukturelt). MSV (M=0, T=G0⁻¹G1) er korrekt fundamental-likevekt — K&M-konsistent, stabil, 15/15 IRF. |
 
 ## Fase 0 — Restart og fundament ✅
 
@@ -46,7 +49,10 @@ skal brukes til å analysere sjokk og optimale pengepolitiske responser.
 
 **Status:** Fullført 2026-05-14.
 
-## Fase 0.5 — Modellkvalitetssikring 🚧
+## Fase 0.5 — Modellkvalitetssikring ✅
+
+**Avsluttet 2026-05-23.** PE godkjente Alt A: akseptér begrensninger, start Fase 1.
+Begrensningsdokument: `docs/oppgaver/fase05_begrensningsdokument.md`.
 
 **Statusoppdatering 2026-05-20:** 8 MCMC-kjøringer gjennomført. Nøkkelfunn:
 - Modellfix A4a/A4c/CEE/A5/E3E4 implementert og bekreftet ✓
@@ -182,7 +188,7 @@ tilpasning" med separat begrunnelse.
 
 Hvis Spor A eller C avdekker større problemer, kan dette utvides.
 
-## Fase 1 — Faktisk datainnhenting
+## Fase 1 — Faktisk datainnhenting 🚧
 
 **Mål:** Erstatte syntetisk fallback med ekte API-kall.
 

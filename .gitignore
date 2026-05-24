@@ -35,6 +35,10 @@ data/raw/
 # Store MCMC-kjeder (binærfiler — ikke commit, for store for git)
 data/results/*.npy
 
+# MCMC-kjørelogger (genereres under kjøring)
+data/results/*.txt
+data/results/*.log
+
 # Referanse-PDF-er (offentlige dokumenter, ikke en del av prosjektets leveranser)
 docs/references/*.pdf
 

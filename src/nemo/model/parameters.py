@@ -144,7 +144,6 @@ class Parameters:
     kappa_M  = 0.03       # (CAL) κ_M — importprisinflasjon-koeff. i Phillips
     gamma_p  = 0.0        # (CAL) γ_p — Calvo-prisindeksasjon; 0=rent fremoverskuende; estimeres i kj12
 
-
     # Olje-valuta-kanal i UIP (PE-godkjent 2026-05-20)
     # Kalibrert fra historisk NOK/olje-korrelasjon ~0.7:
     # +10% oljepris → ~1.5% NOK-appresiering → phi_O ≈ 0.15
