@@ -149,6 +149,12 @@ PARAM_PRIORS = {
     'phi_I2':  ('normal', 8.0,  4.0, 0.5,  40.0),
     # Fase 2v2 (2026-05-15): kapitalutnyttelseselastisitet (Alt. A, K&M Tabell 8)
     'phi_u':   ('normal', 0.22, 0.10, 0.01, 2.0),
+    # phi_PQ: Rotemberg-prisjusteringskostnad (PE-godkjent 2026-05-24, Steg A).
+    # K&M Tabell 8: φ_PQ=669. kappa_P=(eps_P-1)/phi_PQ=5/phi_PQ.
+    # Lavere phi_PQ → brattere Phillips-kurve → sterkere KPI-respons.
+    # kj12 viste KPI-ratio=0.20× NB → κ_P=0.0075 er for flat.
+    # Normal(669,300,[50,2000]): sentrert ved K&M, tillater 50–2000.
+    'phi_PQ':  ('normal', 669.0, 300.0, 50.0, 2000.0),
 }
 PARAM_NAMES = list(PARAM_PRIORS.keys())
 N_PARAMS    = len(PARAM_NAMES)
@@ -161,7 +167,8 @@ KM = {'rho_A':0.804,'rho_C':0.725,'rho_O':0.874,'rho_Ys':0.783,
       'rho_rp':0.737,'rho_H':0.694,'sigma_A':0.006,'sigma_C':0.030,
       'sigma_O':0.079,'sigma_Ys':0.011,'sigma_rp':0.006,'sigma_i':0.0003,
       'sigma_P':0.003,'sigma_H':0.050,'psi_R':0.666,'psi_P1':0.292,
-      'psi_Y':0.242,'h_c':0.938,'gamma_p':0.35,'phi_I1':4.0,'phi_I2':8.0,'phi_u':0.2192}
+      'psi_Y':0.242,'h_c':0.938,'gamma_p':0.35,'phi_I1':4.0,'phi_I2':8.0,'phi_u':0.2192,
+      'phi_PQ':669.0}
 
 def log_prior(theta):
     lp = 0.0
