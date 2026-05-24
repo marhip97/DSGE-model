@@ -137,6 +137,19 @@ def build_Sv_no_i3m() -> np.ndarray:
            'dh_obs':0.004,'db_obs':0.002}
     return np.diag([sme[n]**2 for n in OBS_NAMES_NO_I3M])
 
+# Test B (kj16): KPI-JAE som pi-observasjon i stedet for total KPI.
+# H-matrisen er identisk med build_H() — PI-rad mapper til PI(0) uendret.
+# Forskjellen er i data: pre/post-arrayene bruker pi_core_obs-kolonnen (fra SSB 10235).
+# Krever at nemo_data-CSVen inneholder pi_core_obs (kjør pipeline med kpi_jae=True).
+# NB: SSB-API (data.ssb.no) er ikke tilgjengelig fra dette skymiljøet — kjøres lokalt.
+def build_H_core() -> np.ndarray:
+    """Observasjonsmatrise for KPI-JAE-test (identisk med build_H()). Test B (kj16)."""
+    return build_H()
+
+def build_Sv_core() -> np.ndarray:
+    """Målefeil-kovarians for KPI-JAE-test (identisk med build_Sv()). Test B (kj16)."""
+    return build_Sv()
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PARAMETERE OG PRIOR

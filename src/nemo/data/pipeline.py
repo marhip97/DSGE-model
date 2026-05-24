@@ -29,6 +29,7 @@ import pandas as pd
 from nemo.data.ssb import (
     hent_nasjonalregnskap,
     hent_kpi,
+    hent_kpi_jae,
     hent_lonnsinndeks,
     hent_boligprisindeks,
 )
@@ -152,6 +153,7 @@ def transformer_til_obs(
     k2: pd.Series,
     brent: pd.Series,
     euro_bnp: pd.Series,
+    kpi_jae: pd.Series | None = None,
 ) -> pd.DataFrame:
     """
     Transformerer rådata til de 14 observerte NEMO-variablene.
@@ -165,6 +167,8 @@ def transformer_til_obs(
         eksport, import_).
     kpi : pd.Series
         KPI-indeks (kvartalssnitt).
+    kpi_jae : pd.Series or None
+        KPI-JAE-indeks (kvartalssnitt). Hvis gitt, legges pi_core_obs til.
     lonn : pd.Series
         Lønnsindeks (kvartal).
     bolig : pd.Series
@@ -207,6 +211,9 @@ def transformer_til_obs(
     # 6. pi_obs: KPI-inflasjon, annualisert (log-diff × 4)
     kpi_aligned = kpi.reindex(nr.index)
     obs["pi_obs"] = log_diff(kpi_aligned) * 4
+    if kpi_jae is not None:
+        kpi_jae_aligned = kpi_jae.reindex(nr.index)
+        obs["pi_core_obs"] = log_diff(kpi_jae_aligned) * 4
 
     # 7. dw_obs: Lønnsvekst, log-differanse
     lonn_aligned = lonn.reindex(nr.index)

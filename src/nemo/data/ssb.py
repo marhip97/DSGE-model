@@ -322,6 +322,53 @@ def hent_kpi(bruk_cache: bool = True) -> pd.Series:
     return s_kvartal
 
 
+def hent_kpi_jae(bruk_cache: bool = True) -> pd.Series:
+    """
+    Henter månedlig KPI-JAE fra SSB tabell 10235 og beregner kvartalssnitt.
+
+    KPI-JAE = Konsumprisindeksen justert for avgiftsendringer og uten energivarer.
+    Tilsvarer NB MEMOs «kjerneinflasjon» og er det NBs NEMO bruker som pi_obs.
+
+    Parametere
+    ----------
+    bruk_cache : bool
+        Om cache skal brukes.
+
+    Returnerer
+    ----------
+    pd.Series
+        Kvartalsvis KPI-JAE-indeks med pd.Timestamp-indeks (siste dag i kvartal).
+    """
+    table_id = "10235"
+
+    maaned_koder = [
+        f"{y}M{m:02d}"
+        for y in range(2001, 2026)
+        for m in range(1, 13)
+    ]
+
+    query = {
+        "query": [
+            {
+                "code": "ContentsCode",
+                "selection": {"filter": "item", "values": ["KpiJAE"]},
+            },
+            {
+                "code": "Tid",
+                "selection": {"filter": "item", "values": maaned_koder},
+            },
+        ],
+        "response": {"format": "json-stat2"},
+    }
+
+    data = hent_ssb_tabell(table_id, query, bruk_cache=bruk_cache)
+    s = _parse_json_stat2_maaned(data, "KpiJAE")
+
+    s_kvartal = s.resample("QE").mean()
+    logger.info("KPI-JAE hentet: %d kvartaler", len(s_kvartal))
+    return s_kvartal
+
+
 def _parse_json_stat2_maaned(data: dict, contents_code: str) -> pd.Series:
     """
     Parser JSON-stat2-respons med månedlige tidskoder (format: '2001M01').
