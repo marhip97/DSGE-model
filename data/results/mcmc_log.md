@@ -403,3 +403,60 @@ fordi den er en skalafaktor i Phillips-kurven som allerede er dekt av andre para
 
 **Neste steg: Steg B — estimer kappa_M (importpriskanal).**
 **Ikke gjenta fri phi_PQ** — identifikasjonsproblemet er dokumentert.
+
+---
+
+## Kjøring 14 (ny serie) — kappa_M fri (2026-05-24)
+
+- **Parametre:** 21 fri (kappa_M ny, phi_PQ fjernet, Steg B)
+- **Hypotese:** kappa_M=0.03 (K&M) er for lav → høyere κ_M → sterkere RER→KPI-kanal
+- **Prior kappa_M:** Normal(0.03, 0.03, [0.005, 0.20]) — sentrert ved K&M
+- **Startverdi:** kj13 posterior means + kappa_M=0.030 kaldt start. lp=3573.99 (+20 vs kj13)
+- **Fil:** `chain_kj14_prod_posterior.json`
+- **Trekk:** 200 000 produksjon + 20 000 burnin (4 rekalibreringer)
+- **PSRF_max:** 1.053, **ESS_min:** 455, **acc:** 0.167
+
+### Nøkkelresultater kj14
+
+| Parameter | kj14    | kj12   | K&M   | p5     | p95    |
+|-----------|---------|--------|-------|--------|--------|
+| kappa_M   | **0.0175** | 0.030  | 0.030 | 0.006  | 0.039  |
+| psi_R     | 0.954   | 0.953  | 0.667 | 0.933  | 0.972  |
+| psi_P1    | 0.240   | 0.210  | 0.292 | 0.100  | 0.389  |
+| gamma_p   | 0.204   | 0.230  | 0.350 | 0.061  | 0.411  |
+| phi_I1    | 0.165   | 0.154  | 4.000 | 0.107  | 0.249  |
+
+**Eff KPI-Taylor-koeff:** (1−0.954)×0.240 = **0.011** (marginalt bedre enn kj12)
+
+**B5-benchmark kj14:**
+
+| Variabel | kj14   | kj12   | NB    | kj14/NB |
+|----------|--------|--------|-------|---------|
+| KPI q4   | −2.0%  | −3.0%  | −15%  | **0.13×** |
+| BNP q4   | −48%   | −51%   | −45%  | 1.06×   |
+| BNP q8   | −35%   | −37%   | −35%  | **1.00×** |
+| RER q4   | −72%   | −72%   | −40%  | 1.80×   |
+
+### Konklusjon kj14 ✗ (Steg B avkreftet — overraskende funn)
+
+**Kappa_M estimeres LAVERE enn K&M (0.0175 vs 0.030) — hypotesen er feil.**
+Data vil ha svakere RER→KPI-transmisjon, ikke sterkere. KPI-responsen forverres
+til 0.13× NB (fra 0.20× i kj12).
+
+**Empirisk funn:** Norsk importpris-pass-through er lavere enn K&M antok.
+Dette kan reflektere distribusjonskostnader, sticky importpriser i Norge,
+eller at norsk KPI er dominert av innenlandsk tjenesteprisvekst.
+
+**Samlet konklusjon fra Steg A (kj13) og Steg B (kj14):**
+Verken phi_PQ eller kappa_M kan fikse KPI-amplitudeproblemet.
+KPI-svakheten er en **robust empirisk egenskap** i norske data under dette
+DSGE-rammeverket — ikke en modellparameter-feil. Rotårsakene er trolig:
+1. Genuint flat Phillips-kurve for Norge (liten output gap → inflasjon-transmisjon)
+2. phi_I1/psi_P1-substitusjon: med phi_I1≈0.15 (friksjonsfri investering) trenger
+   ikke modellen høy psi_P1 for å stabilisere → psi_P1=0.21 er konsistent med data
+3. psi_R≈0.95 er norsk data sitt svar — ikke et identifikasjonsproblem
+
+**Anbefaling:** Aksepter kj12 som beste spesifikasjon. BNP-fit er god (1.06× ved q4,
+1.00× ved q8 i kj14). KPI-timing er bedret av gamma_p. Amplitude er svak men
+konsistent med norsk data. Gå til neste analysetrinn.
+**Ikke gjenta Steg A eller B** — begge er grundig testet og dokumentert.
