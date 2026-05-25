@@ -226,16 +226,12 @@ def _parse_json_stat2(data: dict, contents_code: str) -> pd.Series:
 
 
 def _lag_ssb_query(contents_codes: list[str], start_year: int = 2001) -> dict:
-    """Bygger SSB JSON-stat2 API-spørring. Bruker filter=all for Tid."""
+    """Bygger SSB JSON-stat2 API-spørring. Tid-dimensjonen utelates for å få alle perioder."""
     return {
         "query": [
             {
                 "code": "ContentsCode",
                 "selection": {"filter": "item", "values": contents_codes},
-            },
-            {
-                "code": "Tid",
-                "selection": {"filter": "all", "values": ["*"]},
             },
         ],
         "response": {"format": "json-stat2"},
@@ -308,10 +304,6 @@ def hent_kpi(bruk_cache: bool = True) -> pd.Series:
                 "code": "ContentsCode",
                 "selection": {"filter": "item", "values": ["KPI"]},
             },
-            {
-                "code": "Tid",
-                "selection": {"filter": "all", "values": ["*"]},
-            },
         ],
         "response": {"format": "json-stat2"},
     }
@@ -349,10 +341,6 @@ def hent_kpi_jae(bruk_cache: bool = True) -> pd.Series:
             {
                 "code": "ContentsCode",
                 "selection": {"filter": "item", "values": ["KpiJAE"]},
-            },
-            {
-                "code": "Tid",
-                "selection": {"filter": "all", "values": ["*"]},
             },
         ],
         "response": {"format": "json-stat2"},
