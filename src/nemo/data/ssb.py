@@ -422,7 +422,7 @@ def _parse_nr_ny_struktur(data: dict) -> pd.DataFrame:
         return idx
 
     serier = {}
-    for kolonne in label_map:
+    for kolonne in _label_fallback:
         kode = finn_kode(kolonne)
         agg_pos = agg_cats.index(kode)
         serie = {}
