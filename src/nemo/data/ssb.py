@@ -579,49 +579,20 @@ def hent_lonnsinndeks(bruk_cache: bool = True) -> pd.Series:
         Kvartalsvise lønnsindeksverdier med pd.Timestamp-indeks.
     """
     table_id = "09786"
+    query = {"query": [], "response": {"format": "json-stat2"}}
 
-    # Prøv å hente metadata for å finne riktig ContentsCode
-    # Bruk 'Lonnsinndeks' eller tilsvarende kode
-    query_meta = {
-        "query": [],
-        "response": {"format": "json-stat2"},
-    }
+    data = hent_ssb_tabell(table_id, query, bruk_cache=bruk_cache)
 
-    # Kjente koder for lønnsindeks i 09786
-    # Prøver LCI (Labour Cost Index) eller tilsvarende
-    lonn_koder = ["LCI", "LONN", "Lonnsinndeks", "LI"]
-
-    # Hent med en enkelt spørring
-    kvartal_koder = _ssb_kvartal_koder(2001)
-    query = {
-        "query": [
-            {
-                "code": "Tid",
-                "selection": {"filter": "item", "values": kvartal_koder},
-            },
-        ],
-        "response": {"format": "json-stat2"},
-    }
-
-    try:
-        data = hent_ssb_tabell(table_id, query, bruk_cache=bruk_cache)
-    except Exception as exc:
-        logger.warning("Feil ved henting av lønnsindeks: %s", exc)
-        raise
-
-    # Finn tilgjengelig ContentsCode
     dims = data.get("id", [])
     dimension = data.get("dimension", {})
-    sizes = data.get("size", [])
     values = data.get("value", [])
 
     if "ContentsCode" in dims:
         contents_cats = list(dimension["ContentsCode"]["category"]["index"].keys())
-        logger.info("Tilgjengelige lønnsindeks-koder: %s", contents_cats)
-        code = contents_cats[0]  # Ta første tilgjengelige
+        logger.info("Lønnsindeks (09786) tilgjengelige koder: %s", contents_cats)
+        code = contents_cats[0]
         s = _parse_json_stat2(data, code)
     else:
-        # Én-dimensjonal serie
         tid_cats = list(dimension["Tid"]["category"]["index"].keys())
         s = pd.Series(
             [float(v) if v is not None else np.nan for v in values],
@@ -629,6 +600,7 @@ def hent_lonnsinndeks(bruk_cache: bool = True) -> pd.Series:
             name="lonnsinndeks",
         )
 
+    s = s[[k for k in s.index if "K" in str(k)]]  # behold kun kvartalskoder
     s.index = [ssb_kode_til_dato(k) for k in s.index]
     s = s.sort_index()
     logger.info("Lønnsindeks hentet: %d kvartaler", len(s))
@@ -650,32 +622,17 @@ def hent_boligprisindeks(bruk_cache: bool = True) -> pd.Series:
         Kvartalsvise boligprisindeksverdier med pd.Timestamp-indeks.
     """
     table_id = "07241"
-    kvartal_koder = _ssb_kvartal_koder(2001)
+    query = {"query": [], "response": {"format": "json-stat2"}}
 
-    query = {
-        "query": [
-            {
-                "code": "Tid",
-                "selection": {"filter": "item", "values": kvartal_koder},
-            },
-        ],
-        "response": {"format": "json-stat2"},
-    }
-
-    try:
-        data = hent_ssb_tabell(table_id, query, bruk_cache=bruk_cache)
-    except Exception as exc:
-        logger.warning("Feil ved henting av boligprisindeks: %s", exc)
-        raise
+    data = hent_ssb_tabell(table_id, query, bruk_cache=bruk_cache)
 
     dims = data.get("id", [])
     dimension = data.get("dimension", {})
-    sizes = data.get("size", [])
     values = data.get("value", [])
 
     if "ContentsCode" in dims:
         contents_cats = list(dimension["ContentsCode"]["category"]["index"].keys())
-        logger.info("Tilgjengelige boligpris-koder: %s", contents_cats)
+        logger.info("Boligprisindeks (07241) tilgjengelige koder: %s", contents_cats)
         code = contents_cats[0]
         s = _parse_json_stat2(data, code)
     else:
@@ -686,6 +643,7 @@ def hent_boligprisindeks(bruk_cache: bool = True) -> pd.Series:
             name="boligprisindeks",
         )
 
+    s = s[[k for k in s.index if "K" in str(k)]]  # behold kun kvartalskoder
     s.index = [ssb_kode_til_dato(k) for k in s.index]
     s = s.sort_index()
     s.name = "boligprisindeks"
