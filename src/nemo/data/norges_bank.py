@@ -257,9 +257,12 @@ def hent_nibor_3m(bruk_cache: bool = True) -> pd.Series:
     return s_kvartal
 
 
-def hent_valutakurs_nok_eur(bruk_cache: bool = True) -> pd.Series:
+def hent_valutakurs_importveid(bruk_cache: bool = True) -> pd.Series:
     """
-    Henter NOK/EUR spotkurs fra Norges Bank og beregner kvartalssnitt.
+    Henter importveid valutakurs I-44 fra Norges Bank og beregner kvartalssnitt.
+
+    I-44 er NB's importveide kursindeks (44 handelspartnere), brukt som
+    ds_obs (nominell valutakursendring) i NEMO-estimeringen.
 
     Parametere
     ----------
@@ -269,7 +272,7 @@ def hent_valutakurs_nok_eur(bruk_cache: bool = True) -> pd.Series:
     Returnerer
     ----------
     pd.Series
-        Kvartalsvise importveid valutakurs-gjennomsnitt (I-44).
+        Kvartalsvise importveid valutakurs-gjennomsnitt (I-44, NOK per valutakurv).
         Indeks: pd.Timestamp (siste dag i kvartal).
     """
     url = (
@@ -279,8 +282,8 @@ def hent_valutakurs_nok_eur(bruk_cache: bool = True) -> pd.Series:
     data = _hent_nb_api("EXR_B_I44_NOK_SP", url, bruk_cache=bruk_cache)
     s = _parse_sdmx_json(data)
     s_kvartal = _dagsdata_til_kvartalssnitt(s)
-    s_kvartal.name = "nok_eur"
-    logger.info("Importveid valutakurs (I-44) hentet: %d kvartaler", len(s_kvartal))
+    s_kvartal.name = "importveid_kurs"
+    logger.info("Importveid valutakurs I-44 hentet: %d kvartaler", len(s_kvartal))
     return s_kvartal
 
 
