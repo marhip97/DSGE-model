@@ -337,26 +337,48 @@ def _parse_nr_ny_struktur(data: dict) -> pd.DataFrame:
         dimension[agg_dim]["category"].get("label", {}).values()
     )}
     logger.info("Aggregat-dimensjon: '%s' med %d serier", agg_dim, len(agg_cats))
-    logger.info("Tilgjengelige koder og labels: %s", dict(list(agg_labels.items())[:20]))
+    # Logg ALLE koder og labels (for diagnostikk ved feil)
+    logger.info("Alle tilgjengelige koder og labels i '%s':", agg_dim)
+    for _k, _v in agg_labels.items():
+        logger.info("  %s: %s", _k, _v)
 
-    # Label-matching for de seriene vi trenger
+    # Label-matching for de seriene vi trenger.
+    # Søketermer er presise nok til å unngå feil treff på sub-aggregater.
     label_map = {
-        "bnp_fastland":       ["fastland", "mainland", "bnp fast"],
-        "privat_konsum":      ["privat konsum", "husholdningenes konsum", "private consumption"],
-        "bruttoinvesteringer":["bruttoinvesteringer", "brutto realinvesteringer", "gross fixed"],
-        "eksport":            ["eksport", "export"],
-        "import_":            ["import"],
+        # BNP Fastlands-Norge — må inneholde BEGGE ord for å unngå treff på
+        # bruttoinvestering/etterspørsel-serier som også inneholder "fastlands"
+        "bnp_fastland": [
+            "bruttonasjonalprodukt fastlands",
+            "bnp fastlands",
+            "gross domestic product mainland",
+        ],
+        # Privat konsum = husholdninger + ideelle org (koh.nrpriv)
+        "privat_konsum": [
+            "konsum i husholdninger og ideelle",
+            "konsum i husholdninger",
+            "privat konsum",
+            "husholdningenes konsum",
+        ],
+        # Bruttoinvestering i alt (bif.nr8_) — entall, med "i alt" for å unngå sub-aggregater
+        "bruttoinvesteringer": [
+            "bruttoinvestering i alt",
+            "bruttoinvesteringer i alt",
+            "gross capital formation",
+        ],
+        "eksport": ["eksport i alt", "eksport", "export"],
+        "import_": ["import i alt", "samlet import", "import"],
     }
 
     def finn_kode(kolonne: str) -> str:
         for kode, label in agg_labels.items():
             for soek in label_map[kolonne]:
                 if soek.lower() in label.lower():
+                    logger.info("  Matchet '%s' → kode='%s', label='%s'", kolonne, kode, label)
                     return kode
-        tilgj = list(agg_labels.items())[:30]
         raise ValueError(
             f"Fant ikke '{kolonne}' i aggregat-dim '{agg_dim}'. "
-            f"Tilgjengelige (kode: label): {tilgj}"
+            f"Søketermer: {label_map[kolonne]}. "
+            f"Alle tilgjengelige: {list(agg_labels.items())}"
         )
 
     n = [sizes[i] for i in range(len(dims))]
