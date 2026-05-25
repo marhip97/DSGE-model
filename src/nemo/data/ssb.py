@@ -380,6 +380,8 @@ def _parse_nr_ny_struktur(data: dict) -> pd.DataFrame:
         agg_pos = agg_cats.index(kode)
         serie = {}
         for t_pos, tid_kode in enumerate(tid_cats):
+            if "K" not in tid_kode:   # hopp over årslige tidskoder (nye i NR23-tabellen)
+                continue
             fi = flat_idx(agg_pos, volum_pos, t_pos)
             val = values[fi]
             serie[tid_kode] = float(val) if val is not None else np.nan
