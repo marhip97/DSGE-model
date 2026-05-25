@@ -566,7 +566,11 @@ def _parse_json_stat2_maaned(data: dict, contents_code: str) -> pd.Series:
 
 def hent_lonnsinndeks(bruk_cache: bool = True) -> pd.Series:
     """
-    Henter kvartalsvise lønnsindeksdata fra SSB tabell 09786.
+    Henter kvartalsvise lønnsindeksdata fra SSB tabell 11654 (PxWeb v2).
+
+    Tabell 11654 er kvartalserstatningen for den nedlagte lønnsindeksen (09786).
+    Bruker ContentsCode=LonnIndeks, alle næringer samlet, begge kjønn.
+    Basisperiode: 1. kvartal 2024 = 100 (SSB endret basis 2024).
 
     Parametere
     ----------
@@ -578,32 +582,85 @@ def hent_lonnsinndeks(bruk_cache: bool = True) -> pd.Series:
     pd.Series
         Kvartalsvise lønnsindeksverdier med pd.Timestamp-indeks.
     """
-    table_id = "09786"
-    query = {"query": [], "response": {"format": "json-stat2"}}
+    table_id = "11654"
+    cache_fil = _cache_path(table_id)
 
-    data = hent_ssb_tabell(table_id, query, bruk_cache=bruk_cache)
+    if bruk_cache and cache_fil.exists():
+        logger.info("Leser SSB-tabell %s fra cache: %s", table_id, cache_fil)
+        with open(cache_fil, encoding="utf-8") as f:
+            data = json.load(f)
+    else:
+        url = f"{_SSB_PXWEB_V2}/{table_id}/data"
+        params = {
+            "lang": "no",
+            "valueCodes[ContentsCode]": "LonnIndeks",
+            "valueCodes[Tid]": "top(200)",
+            "outputFormat": "json-stat2",
+        }
+        logger.info("Henter SSB-tabell %s (PxWeb v2 GET)", table_id)
+        siste_exc: Exception | None = None
+        data = None
+        for forsok in range(1, 4):
+            try:
+                resp = requests.get(url, params=params, timeout=60)
+                resp.raise_for_status()
+                data = resp.json()
+                with open(cache_fil, "w", encoding="utf-8") as f:
+                    json.dump(data, f, ensure_ascii=False)
+                break
+            except Exception as exc:
+                siste_exc = exc
+                if forsok < 3:
+                    vent = 2 ** forsok
+                    logger.warning("SSB 11654 feilet (forsøk %d/3): %s. Venter %ds.", forsok, exc, vent)
+                    time.sleep(vent)
+        if data is None:
+            fallback = _find_latest_cache(table_id)
+            if fallback:
+                with open(fallback, encoding="utf-8") as f:
+                    data = json.load(f)
+            else:
+                raise RuntimeError(f"SSB PxWeb v2 feilet og ingen cache for {table_id}.") from siste_exc
 
     dims = data.get("id", [])
     dimension = data.get("dimension", {})
     values = data.get("value", [])
+    sizes = data.get("size", [])
 
-    if "ContentsCode" in dims:
-        contents_cats = list(dimension["ContentsCode"]["category"]["index"].keys())
-        logger.info("Lønnsindeks (09786) tilgjengelige koder: %s", contents_cats)
-        code = contents_cats[0]
-        s = _parse_json_stat2(data, code)
+    tid_idx = dims.index("Tid")
+    tid_cats = list(dimension["Tid"]["category"]["index"].keys())
+
+    # Tabell 11654 kan ha flere dimensjoner — summer/aggreger om nødvendig,
+    # eller ta første verdi (alle næringer) om det bare er én serie
+    if len(dims) == 2:
+        # Bare ContentsCode + Tid: én serie
+        cc_idx = dims.index("ContentsCode")
+        cc_cats = list(dimension["ContentsCode"]["category"]["index"].keys())
+        logger.info("Lønnsindeks (11654) ContentsCodes: %s", cc_cats)
+        s = _parse_json_stat2(data, cc_cats[0])
     else:
-        tid_cats = list(dimension["Tid"]["category"]["index"].keys())
-        s = pd.Series(
-            [float(v) if v is not None else np.nan for v in values],
-            index=tid_cats,
-            name="lonnsinndeks",
+        # Finn "alle næringer"-rad via label-matching
+        agg_dims = [d for d in dims if d not in ("ContentsCode", "Tid")]
+        agg_dim = agg_dims[0]
+        agg_cats = list(dimension[agg_dim]["category"]["index"].keys())
+        agg_labels = {k: v for k, v in zip(
+            agg_cats,
+            dimension[agg_dim]["category"].get("label", {}).values()
+        )}
+        logger.info("Lønnsindeks (11654) aggregater: %s", dict(list(agg_labels.items())[:10]))
+        alle_naer = next(
+            (k for k, v in agg_labels.items()
+             if "alle" in v.lower() or "total" in v.lower() or "i alt" in v.lower()),
+            agg_cats[0],
         )
+        logger.info("  Bruker aggregat '%s': '%s'", alle_naer, agg_labels.get(alle_naer))
+        s = _parse_json_stat2(data, list(dimension["ContentsCode"]["category"]["index"].keys())[0])
 
-    s = s[[k for k in s.index if "K" in str(k)]]  # behold kun kvartalskoder
+    s = s[[k for k in s.index if "K" in str(k)]]
     s.index = [ssb_kode_til_dato(k) for k in s.index]
     s = s.sort_index()
-    logger.info("Lønnsindeks hentet: %d kvartaler", len(s))
+    logger.info("Lønnsindeks hentet: %d kvartaler (%s–%s)",
+                len(s), s.index[0].date() if len(s) else "?", s.index[-1].date() if len(s) else "?")
     return s
 
 

@@ -36,7 +36,7 @@ from nemo.data.ssb import (
 from nemo.data.norges_bank import (
     hent_styringsrente,
     hent_nibor_3m,
-    hent_valutakurs_nok_eur,
+    hent_valutakurs_importveid,
     hent_k2_husholdning,
 )
 from nemo.data.fred import (
@@ -58,7 +58,7 @@ OBSERVASJONSVARIABLER = [
     "dw_obs",    # Lønnsindeks, log-diff
     "i_R_obs",   # Styringsrente / 400 (kvartalsverdier)
     "i_3m_obs",  # NIBOR 3M / 400
-    "ds_obs",    # NOK/EUR valutakurs, log-diff
+    "ds_obs",    # Importveid valutakurs I-44, log-diff
     "dpO_obs",   # Brent oljepris, log-diff
     "dyS_obs",   # Handelspartner-BNP, HP-gap
     "dh_obs",    # Boligprisindeks, log-diff
@@ -149,7 +149,7 @@ def transformer_til_obs(
     bolig: pd.Series,
     styringsrente: pd.Series,
     nibor: pd.Series,
-    nok_eur: pd.Series,
+    importveid_kurs: pd.Series,
     k2: pd.Series,
     brent: pd.Series,
     euro_bnp: pd.Series,
@@ -177,8 +177,8 @@ def transformer_til_obs(
         Styringsrente (annualisert %, kvartalsgj.snitt).
     nibor : pd.Series
         NIBOR 3M (annualisert %, kvartalsgj.snitt).
-    nok_eur : pd.Series
-        NOK/EUR spotkurs (kvartalssnitt).
+    importveid_kurs : pd.Series
+        Importveid valutakurs I-44 (kvartalssnitt).
     k2 : pd.Series
         K2 husholdningskreditt (nivå, kvartalssnitt).
     brent : pd.Series
@@ -227,8 +227,8 @@ def transformer_til_obs(
     nibor_aligned = nibor.reindex(nr.index)
     obs["i_3m_obs"] = nibor_aligned / 400.0
 
-    # 10. ds_obs: Valutakursendring, log-differanse NOK/EUR
-    nok_aligned = nok_eur.reindex(nr.index)
+    # 10. ds_obs: Valutakursendring, log-differanse importveid kurs I-44
+    nok_aligned = importveid_kurs.reindex(nr.index)
     obs["ds_obs"] = log_diff(nok_aligned)
 
     # 11. dpO_obs: Brent oljeprisvekst, log-differanse
@@ -322,8 +322,8 @@ def kjor_pipeline(bruk_cache: bool = True, inkluder_kpi_jae: bool = False) -> pd
     logger.info("  NB: NIBOR 3M")
     nibor = hent_nibor_3m(bruk_cache=bruk_cache)
 
-    logger.info("  NB: NOK/EUR valutakurs")
-    nok_eur = hent_valutakurs_nok_eur(bruk_cache=bruk_cache)
+    logger.info("  NB: Importveid valutakurs I-44")
+    importveid_kurs = hent_valutakurs_importveid(bruk_cache=bruk_cache)
 
     logger.info("  NB: K2 husholdning")
     k2 = hent_k2_husholdning(bruk_cache=bruk_cache)
@@ -349,7 +349,7 @@ def kjor_pipeline(bruk_cache: bool = True, inkluder_kpi_jae: bool = False) -> pd
         bolig=bolig,
         styringsrente=styringsrente,
         nibor=nibor,
-        nok_eur=nok_eur,
+        importveid_kurs=importveid_kurs,
         k2=k2,
         brent=brent,
         euro_bnp=euro_bnp,
