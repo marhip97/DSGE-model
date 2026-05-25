@@ -712,6 +712,21 @@ def _ssb_bygg_url(base_url: str, params: dict) -> str:
     return base_url + "?" + "&".join(deler)
 
 
+def _ssb_get_uenkodet(full_url: str, timeout: int = 60) -> requests.Response:
+    """
+    Sender GET til SSB uten at requests re-enkoder brackets i URL-en.
+
+    requests.PreparedRequest.prepare_url() enkoder '[' → '%5B' og ']' → '%5D',
+    som SSB-API avviser. Løsning: overstyr prepped.url etter forberedelse.
+    """
+    session = requests.Session()
+    req = requests.Request("GET", full_url)
+    prepped = req.prepare()
+    prepped.url = full_url  # hindrer re-enkoding
+    return session.send(prepped, timeout=timeout)
+
+
+
 def _ssb_hent_variabler(table_id: str) -> list[dict]:
     """
     Henter variabeldefinisjonene for en SSB PxWeb v2-tabell.
@@ -801,7 +816,7 @@ def hent_nibor_3m(bruk_cache: bool = True) -> pd.Series:
         siste_exc: Exception | None = None
         for forsok in range(1, 4):
             try:
-                resp = requests.get(full_url, timeout=60)
+                resp = _ssb_get_uenkodet(full_url, timeout=60)
                 resp.raise_for_status()
                 data = resp.json()
                 with open(cache_fil, "w", encoding="utf-8") as f:
@@ -983,7 +998,7 @@ def hent_k2_husholdning(bruk_cache: bool = True) -> pd.Series:
         siste_exc: Exception | None = None
         for forsok in range(1, 4):
             try:
-                resp = requests.get(full_url, timeout=60)
+                resp = _ssb_get_uenkodet(full_url, timeout=60)
                 resp.raise_for_status()
                 data = resp.json()
                 with open(cache_fil, "w", encoding="utf-8") as f:
