@@ -269,18 +269,18 @@ def hent_valutakurs_nok_eur(bruk_cache: bool = True) -> pd.Series:
     Returnerer
     ----------
     pd.Series
-        Kvartalsvise NOK/EUR-gjennomsnitt.
+        Kvartalsvise importveid valutakurs-gjennomsnitt (I-44).
         Indeks: pd.Timestamp (siste dag i kvartal).
     """
     url = (
-        f"{NB_BASE_URL}/EXR/B.EUR.NOK.SP"
+        f"{NB_BASE_URL}/EXR/B.I44.NOK.SP"
         f"?startPeriod={START_PERIOD}&format=sdmx-json&locale=no"
     )
-    data = _hent_nb_api("EXR_B_EUR_NOK_SP", url, bruk_cache=bruk_cache)
+    data = _hent_nb_api("EXR_B_I44_NOK_SP", url, bruk_cache=bruk_cache)
     s = _parse_sdmx_json(data)
     s_kvartal = _dagsdata_til_kvartalssnitt(s)
     s_kvartal.name = "nok_eur"
-    logger.info("NOK/EUR hentet: %d kvartaler", len(s_kvartal))
+    logger.info("Importveid valutakurs (I-44) hentet: %d kvartaler", len(s_kvartal))
     return s_kvartal
 
 
