@@ -727,34 +727,132 @@ def _ssb_get_uenkodet(full_url: str, timeout: int = 60) -> requests.Response:
 
 
 
-def _ssb_hent_variabler(table_id: str) -> list[dict]:
+def _ssb_v0_hent_struktur(table_id: str) -> list[dict]:
     """
-    Henter variabeldefinisjonene for en SSB PxWeb v2-tabell.
+    Henter variabelstruktur fra SSB v0 GET-endepunkt.
 
-    Prøver GET /tables/{id} (tabell-metadata som inkluderer variabler).
-    Returnerer liste med dicts à {'id': str, 'values': [...], 'valueTexts': [...]}.
-    Returnerer tom liste ved feil.
+    GET /api/v0/no/table/{id} returnerer variabelnavn, koder og tekster
+    uten å kreve mandatory dimensjonsvalg. Returnerer liste med dicts
+    {'code': str, 'values': [...], 'valueTexts': [...]}.
     """
-    # PxWeb v2 tabell-metadata er på /tables/{id} — ikke /tables/{id}/variables
-    url = f"{_SSB_PXWEB_V2}/{table_id}"
+    url = f"{SSB_BASE_URL}/{table_id}"
     try:
         resp = requests.get(url, params={"lang": "no"}, timeout=30)
         resp.raise_for_status()
         data = resp.json()
-        if isinstance(data, list):
-            return data
-        return data.get("variables", [])
+        variabler = data.get("variables", [])
+        logger.info("SSB %s v0 struktur: %s", table_id, [v.get("code") for v in variabler])
+        for v in variabler:
+            koder = v.get("values", [])
+            tekster = v.get("valueTexts", koder)
+            logger.info("  %s: %s", v.get("code"), dict(list(zip(koder, tekster))[:6]))
+        return variabler
     except Exception as exc:
-        logger.warning("SSB %s tabell-metadata feilet: %s", table_id, exc)
+        logger.warning("SSB %s v0 struktur feilet: %s", table_id, exc)
         return []
+
+
+def _ssb_v0_finn_kode(variabler: list[dict], dim_kode: str, soketermer: list[str]) -> str | None:
+    """Finner første variabelverdi der label eller kode matcher søketermene."""
+    for var in variabler:
+        if var.get("code", "").lower() != dim_kode.lower():
+            continue
+        values = var.get("values", [])
+        value_texts = var.get("valueTexts", values)
+        for kode, tekst in zip(values, value_texts):
+            if any(t.lower() in (kode + " " + tekst).lower() for t in soketermer):
+                return kode
+    return None
+
+
+def _ssb_v0_post(table_id: str, query: list[dict], bruk_cache: bool, cache_fil: "Path") -> dict:
+    """
+    Henter data fra SSB v0 POST-API (json-stat2).
+
+    Unngår bracket-encoding-problemet i PxWeb v2 GET ved å bruke POST med JSON-body.
+    """
+    url = f"{SSB_BASE_URL}/{table_id}"
+    payload = {"query": query, "response": {"format": "json-stat2"}}
+
+    if bruk_cache and cache_fil.exists():
+        logger.info("Leser SSB-tabell %s fra cache: %s", table_id, cache_fil)
+        with open(cache_fil, encoding="utf-8") as f:
+            return json.load(f)
+
+    siste_exc: Exception | None = None
+    for forsok in range(1, 4):
+        try:
+            resp = requests.post(url, json=payload, timeout=60)
+            resp.raise_for_status()
+            data = resp.json()
+            with open(cache_fil, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False)
+            logger.info("Cachet SSB-tabell %s → %s", table_id, cache_fil)
+            return data
+        except Exception as exc:
+            siste_exc = exc
+            body = ""
+            try:
+                body = resp.text[:300]  # type: ignore[possibly-undefined]
+            except Exception:
+                pass
+            if forsok < 3:
+                vent = 2 ** forsok
+                logger.warning(
+                    "SSB %s v0 POST feilet (forsøk %d/3): %s | body: %s. Venter %ds.",
+                    table_id, forsok, exc, body, vent,
+                )
+                time.sleep(vent)
+
+    fallback = _find_latest_cache(table_id)
+    if fallback is not None:
+        logger.info("SSB %s: cache-fallback %s", table_id, fallback)
+        with open(fallback, encoding="utf-8") as f:
+            return json.load(f)
+    raise RuntimeError(f"SSB v0 POST feilet og ingen cache for {table_id}.") from siste_exc
+
+
+def _ssb_parse_maaned_serie(data: dict, serie_navn: str) -> pd.Series:
+    """Parser json-stat2 månedsserie til pd.Series med DatetimeIndex."""
+    dims = data.get("id", [])
+    dimension = data.get("dimension", {})
+    values = data.get("value", [])
+    sizes = data.get("size", [])
+
+    tid_idx = dims.index("Tid")
+    tid_cats = list(dimension["Tid"]["category"]["index"].keys())
+    n_tid = sizes[tid_idx]
+
+    n_andre = 1
+    for i, sz in enumerate(sizes):
+        if i != tid_idx:
+            n_andre *= sz
+
+    if n_andre > 1:
+        logger.warning("SSB parse: %d kombinasjoner × %d Tid — tar første.", n_andre, n_tid)
+    obs_values = values[:n_tid]
+
+    s = pd.Series(
+        {k: float(v) if v is not None else np.nan for k, v in zip(tid_cats, obs_values)},
+        name=serie_navn,
+    )
+    parsed = []
+    for k in s.index:
+        try:
+            parsed.append(pd.Timestamp(k.replace("M", "-") + "-01") + pd.offsets.MonthEnd(0))
+        except Exception:
+            parsed.append(None)
+    s.index = parsed
+    s = s[pd.notna(s.index)].sort_index()
+    s.index = pd.DatetimeIndex(s.index)
+    return s
 
 
 def hent_nibor_3m(bruk_cache: bool = True) -> pd.Series:
     """
     Henter 3M NIBOR fra SSB tabell 10701 og beregner kvartalssnitt.
 
-    Tabell 10701 inneholder månedlige NIBOR og foliorente-observasjoner.
-    Dimensjonskoder oppdages via /variables-endepunktet (ikke data-query).
+    Bruker v0 GET for å oppdage dimensjonsnavn, deretter v0 POST for data.
     Kvartalsverdier beregnes som gjennomsnitt av tre måneder.
 
     Parametere
@@ -769,10 +867,34 @@ def hent_nibor_3m(bruk_cache: bool = True) -> pd.Series:
         Indeks: pd.Timestamp (siste dag i kvartal).
     """
     table_id = "10701"
-    data_url = f"{_SSB_PXWEB_V2}/{table_id}/data"
 
-    # Oppdage dimensjonskoder via tabell-metadata (/tables/{id})
-    variabler = _ssb_hent_variabler(table_id)
+    variabler = _ssb_v0_hent_struktur(table_id)
+
+    # Finn rentedimensjon og NIBOR 3M-kode
+    query: list[dict] = []
+    for var in variabler:
+        kode = var.get("code", "")
+        values = var.get("values", [])
+        if kode == "Tid":
+            query.append({"code": "Tid", "selection": {"filter": "all", "values": ["*"]}})
+        else:
+            nibor = _ssb_v0_finn_kode(variabler, kode, ["nibor", "3 mån", "3m", "3 month"])
+            if nibor:
+                logger.info("SSB 10701: bruker %s=%s", kode, nibor)
+                query.append({"code": kode, "selection": {"filter": "item", "values": [nibor]}})
+            elif values:
+                logger.info("SSB 10701: %s — ingen NIBOR-treff, tar første: %s", kode, values[0])
+                query.append({"code": kode, "selection": {"filter": "item", "values": [values[0]]}})
+
+    if not query:
+        raise RuntimeError("SSB 10701: ingen variabelstruktur funnet — kan ikke hente NIBOR 3M.")
+
+    data = _ssb_v0_post(table_id, query, bruk_cache, _cache_path(table_id))
+    s_maaned = _ssb_parse_maaned_serie(data, "nibor_3m")
+    s_kvartal = s_maaned.resample("QE").mean()
+    s_kvartal.name = "nibor_3m"
+    logger.info("NIBOR 3M (SSB 10701) hentet: %d kvartaler", len(s_kvartal))
+    return s_kvartal
     params: dict[str, str] = {
         "lang": "no",
         "valueCodes[Tid]": "*",
@@ -919,9 +1041,9 @@ def hent_k2_husholdning(bruk_cache: bool = True) -> pd.Series:
     """
     Henter K2 innenlandsk lånegjeld fra SSB tabell 11599 og beregner kvartalssnitt.
 
-    Tabell 11599: innenlandsk lånegjeld, beholdninger og transaksjoner.
-    Bruker Publikum som låntakersektor og ujusterte beholdninger (K2-definisjon).
-    Månedlige data aggregeres til kvartalsvise gjennomsnitt.
+    Bruker v0 GET for å oppdage dimensjonsnavn og -koder, deretter v0 POST for data.
+    Velger Publikum (låntakersektor), ujusterte beholdninger (ContentsCode) og
+    I alt (valuta). Månedlige data aggregeres til kvartalsvise gjennomsnitt.
 
     Parametere
     ----------
@@ -935,149 +1057,43 @@ def hent_k2_husholdning(bruk_cache: bool = True) -> pd.Series:
         Indeks: pd.Timestamp (siste dag i kvartal).
     """
     table_id = "11599"
-    data_url = f"{_SSB_PXWEB_V2}/{table_id}/data"
+    variabler = _ssb_v0_hent_struktur(table_id)
 
-    # Oppdage dimensjonskoder via /variables (robust mot tabeller som ikke støtter top(N))
-    variabler = _ssb_hent_variabler(table_id)
-    params: dict[str, str] = {
-        "lang": "no",
-        "valueCodes[Tid]": "*",
-        "outputFormat": "json-stat2",
-    }
-
+    query: list[dict] = []
     for var in variabler:
-        var_id = var.get("id", "")
-        if var_id == "Tid":
-            continue
+        kode = var.get("code", "")
         values = var.get("values", [])
-        value_texts = var.get("valueTexts", values)
-        logger.info("SSB 11599 variabel %s: %s", var_id, dict(zip(values[:6], value_texts[:6])))
+        kode_lower = kode.lower()
 
-        var_id_lower = var_id.lower()
-        kode = None
-
-        if "valuta" in var_id_lower:
-            # "I alt" — alle valutaer samlet
-            for v, t in zip(values, value_texts):
-                if any(s in (v + " " + t).lower() for s in ["i alt", "total", "alle"]):
-                    kode = v
-                    break
-
-        elif "sektor" in var_id_lower or "låntaker" in var_id_lower:
-            # Publikum
-            for v, t in zip(values, value_texts):
-                if any(s in (v + " " + t).lower() for s in ["publikum", "public"]):
-                    kode = v
-                    break
-
-        elif "contents" in var_id_lower or "statistikkvariabel" in var_id_lower:
-            # Ujusterte beholdninger
-            for v, t in zip(values, value_texts):
-                if any(s in (v + " " + t).lower() for s in ["ujustert", "beholdning"]):
-                    kode = v
-                    break
-
-        if kode:
-            params[f"valueCodes[{var_id}]"] = kode
-            logger.info("SSB 11599: %s=%s", var_id, kode)
+        if kode == "Tid":
+            query.append({"code": "Tid", "selection": {"filter": "all", "values": ["*"]}})
+        elif "valuta" in kode_lower:
+            valgt = _ssb_v0_finn_kode(variabler, kode, ["i alt", "total", "alle"])
+            valgt = valgt or (values[0] if values else None)
+            if valgt:
+                logger.info("SSB 11599: %s=%s", kode, valgt)
+                query.append({"code": kode, "selection": {"filter": "item", "values": [valgt]}})
+        elif "sektor" in kode_lower or "låntaker" in kode_lower:
+            valgt = _ssb_v0_finn_kode(variabler, kode, ["publikum", "public"])
+            valgt = valgt or (values[0] if values else None)
+            if valgt:
+                logger.info("SSB 11599: %s=%s", kode, valgt)
+                query.append({"code": kode, "selection": {"filter": "item", "values": [valgt]}})
+        elif "contents" in kode_lower or "statistikkvariabel" in kode_lower:
+            valgt = _ssb_v0_finn_kode(variabler, kode, ["ujustert", "beholdning"])
+            valgt = valgt or (values[0] if values else None)
+            if valgt:
+                logger.info("SSB 11599: %s=%s", kode, valgt)
+                query.append({"code": kode, "selection": {"filter": "item", "values": [valgt]}})
         elif values:
-            # Obligatorisk dimensjon — ta første kode
-            params[f"valueCodes[{var_id}]"] = values[0]
-            logger.info("SSB 11599: %s — ingen match, bruker %s", var_id, values[0])
+            logger.info("SSB 11599: ukjent dim %s — tar første: %s", kode, values[0])
+            query.append({"code": kode, "selection": {"filter": "item", "values": [values[0]]}})
 
-    cache_fil = _cache_path(table_id)
-    data = None
+    if not query:
+        raise RuntimeError("SSB 11599: ingen variabelstruktur funnet — kan ikke hente K2.")
 
-    if bruk_cache and cache_fil.exists():
-        logger.info("Leser SSB-tabell %s fra cache: %s", table_id, cache_fil)
-        with open(cache_fil, encoding="utf-8") as f:
-            data = json.load(f)
-    else:
-        full_url = _ssb_bygg_url(data_url, params)
-        logger.info("SSB 11599 data-URL: %s", full_url)
-        siste_exc: Exception | None = None
-        for forsok in range(1, 4):
-            try:
-                resp = _ssb_get_uenkodet(full_url, timeout=60)
-                resp.raise_for_status()
-                data = resp.json()
-                with open(cache_fil, "w", encoding="utf-8") as f:
-                    json.dump(data, f, ensure_ascii=False)
-                logger.info("Cachet SSB-tabell %s → %s", table_id, cache_fil)
-                break
-            except Exception as exc:
-                siste_exc = exc
-                body = ""
-                try:
-                    body = resp.text[:300]  # type: ignore[possibly-undefined]
-                except Exception:
-                    pass
-                if forsok < 3:
-                    vent = 2 ** forsok
-                    logger.warning(
-                        "SSB 11599 feilet (forsøk %d/3): %s | body: %s. Venter %ds.",
-                        forsok, exc, body, vent,
-                    )
-                    time.sleep(vent)
-        if data is None:
-            fallback = _find_latest_cache(table_id)
-            if fallback is not None:
-                logger.info("SSB 11599: bruker cache-fallback %s", fallback)
-                with open(fallback, encoding="utf-8") as f:
-                    data = json.load(f)
-            else:
-                raise RuntimeError(
-                    f"SSB PxWeb v2 feilet og ingen cache for {table_id}."
-                ) from siste_exc
-
-    # Parse: finn Tid-dimensjonen og flatt array
-    dims_data = data.get("id", [])
-    dimension = data.get("dimension", {})
-    values = data.get("value", [])
-    sizes = data.get("size", [])
-
-    if "Tid" not in dims_data:
-        raise ValueError(f"SSB 11599: ingen Tid-dimensjon i responsen. id={dims_data}")
-
-    tid_idx = dims_data.index("Tid")
-    tid_cats = list(dimension["Tid"]["category"]["index"].keys())
-    n_tid = sizes[tid_idx]
-
-    # Hvis vi har filtrert alle andre dims til 1 verdi, er flat array = tidsserie
-    n_andre = 1
-    for i, sz in enumerate(sizes):
-        if i != tid_idx:
-            n_andre *= sz
-
-    if n_andre == 1:
-        # Flat array er direkte tidsserien
-        obs_values = values[:n_tid]
-    else:
-        # Ta første kombinasjon (øverste rad) langs alle andre dimensjoner
-        logger.warning(
-            "SSB 11599: %d kombinasjoner × %d Tid — tar første kombinasjon.",
-            n_andre, n_tid,
-        )
-        obs_values = values[:n_tid]
-
-    s_maaned = pd.Series(
-        {k: float(v) if v is not None else np.nan for k, v in zip(tid_cats, obs_values)},
-        name="k2_husholdning",
-    )
-
-    # Parse månedskoder ('YYYYMXX') til dato
-    parsed_index = []
-    for k in s_maaned.index:
-        try:
-            parsed_index.append(
-                pd.Timestamp(k.replace("M", "-") + "-01") + pd.offsets.MonthEnd(0)
-            )
-        except Exception:
-            parsed_index.append(None)
-    s_maaned.index = parsed_index
-    s_maaned = s_maaned[pd.notna(s_maaned.index)].sort_index()
-    s_maaned.index = pd.DatetimeIndex(s_maaned.index)
-
+    data = _ssb_v0_post(table_id, query, bruk_cache, _cache_path(table_id))
+    s_maaned = _ssb_parse_maaned_serie(data, "k2_husholdning")
     s_kvartal = s_maaned.resample("QE").mean()
     s_kvartal.name = "k2_husholdning"
     logger.info("K2 (SSB 11599) hentet: %d kvartaler", len(s_kvartal))
