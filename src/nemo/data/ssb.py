@@ -794,3 +794,195 @@ def hent_nibor_3m(bruk_cache: bool = True) -> pd.Series:
     return s_kvartal
 
 
+def _ssb_oppdag_kode(
+    dimension: dict,
+    dim_id: str,
+    soketermer: list[str],
+) -> str | None:
+    """
+    Finner første dimensjonskode der label eller kode-ID inneholder ett av søkeordene.
+
+    Returnerer kode-ID (str) eller None hvis ingen treff.
+    """
+    if dim_id not in dimension:
+        return None
+    cat = dimension[dim_id].get("category", {})
+    koder = list(cat.get("index", {}).keys())
+    labels = cat.get("label", {})
+    for kode in koder:
+        tekst = (labels.get(kode, "") + " " + kode).lower()
+        if any(term.lower() in tekst for term in soketermer):
+            return kode
+    return None
+
+
+def hent_k2_husholdning(bruk_cache: bool = True) -> pd.Series:
+    """
+    Henter K2 innenlandsk lånegjeld fra SSB tabell 11599 og beregner kvartalssnitt.
+
+    Tabell 11599: innenlandsk lånegjeld, beholdninger og transaksjoner.
+    Bruker Publikum som låntakersektor og ujusterte beholdninger (K2-definisjon).
+    Månedlige data aggregeres til kvartalsvise gjennomsnitt.
+
+    Parametere
+    ----------
+    bruk_cache : bool
+        Om cache skal brukes.
+
+    Returnerer
+    ----------
+    pd.Series
+        Kvartalsvise K2-verdier (beholdning, NOK + utenl. valuta).
+        Indeks: pd.Timestamp (siste dag i kvartal).
+    """
+    table_id = "11599"
+    url = f"{_SSB_PXWEB_V2}/{table_id}/data"
+
+    # Steg 1: hent minimal rad for å oppdage dimensjonskoder
+    meta_params = {
+        "lang": "no",
+        "valueCodes[Tid]": "top(1)",
+        "outputFormat": "json-stat2",
+    }
+    try:
+        meta_resp = requests.get(url, params=meta_params, timeout=30)
+        meta_resp.raise_for_status()
+        meta = meta_resp.json()
+    except Exception as exc:
+        logger.warning("SSB 11599 metadata-kall feilet: %s. Prøver uten filter.", exc)
+        meta = None
+
+    # Bestem dimensjonsfiltre fra metadata
+    params: dict[str, str] = {
+        "lang": "no",
+        "valueCodes[Tid]": "*",
+        "outputFormat": "json-stat2",
+    }
+
+    if meta is not None:
+        dim = meta.get("dimension", {})
+        dims = meta.get("id", [])
+        logger.info("SSB 11599 dimensjoner: %s", dims)
+        for d in dims:
+            koder = list(dim.get(d, {}).get("category", {}).get("index", {}).keys())
+            labels = dim.get(d, {}).get("category", {}).get("label", {})
+            logger.info("  %s: %s", d, {k: labels.get(k, k) for k in koder[:8]})
+
+        # Valuta: "I alt" eller tilsvarende
+        valuta_kode = _ssb_oppdag_kode(dim, "Valuta", ["i alt", "total", "alle"])
+        if valuta_kode:
+            params[f"valueCodes[Valuta]"] = valuta_kode
+
+        # Låntakersektor: "Publikum"
+        sektor_kode = _ssb_oppdag_kode(dim, "Låntakersektor", ["publikum", "public"])
+        if not sektor_kode:
+            sektor_kode = _ssb_oppdag_kode(dim, "Sektor", ["publikum", "public"])
+        sektor_dim = "Låntakersektor" if "Låntakersektor" in (meta.get("id") or []) else "Sektor"
+        if sektor_kode:
+            params[f"valueCodes[{sektor_dim}]"] = sektor_kode
+
+        # ContentsCode: ujusterte beholdninger
+        cc_kode = _ssb_oppdag_kode(
+            dim, "ContentsCode",
+            ["ujustert", "beholdning", "stock", "outstanding"],
+        )
+        if cc_kode:
+            params["valueCodes[ContentsCode]"] = cc_kode
+
+    cache_fil = _cache_path(table_id)
+    data = None
+
+    if bruk_cache and cache_fil.exists():
+        logger.info("Leser SSB-tabell %s fra cache: %s", table_id, cache_fil)
+        with open(cache_fil, encoding="utf-8") as f:
+            data = json.load(f)
+    else:
+        siste_exc: Exception | None = None
+        for forsok in range(1, 4):
+            try:
+                resp = requests.get(url, params=params, timeout=60)
+                resp.raise_for_status()
+                data = resp.json()
+                with open(cache_fil, "w", encoding="utf-8") as f:
+                    json.dump(data, f, ensure_ascii=False)
+                logger.info("Cachet SSB-tabell %s → %s", table_id, cache_fil)
+                break
+            except Exception as exc:
+                siste_exc = exc
+                body = ""
+                try:
+                    body = resp.text[:300]  # type: ignore[possibly-undefined]
+                except Exception:
+                    pass
+                if forsok < 3:
+                    vent = 2 ** forsok
+                    logger.warning(
+                        "SSB 11599 feilet (forsøk %d/3): %s | body: %s. Venter %ds.",
+                        forsok, exc, body, vent,
+                    )
+                    time.sleep(vent)
+        if data is None:
+            fallback = _find_latest_cache(table_id)
+            if fallback is not None:
+                logger.info("SSB 11599: bruker cache-fallback %s", fallback)
+                with open(fallback, encoding="utf-8") as f:
+                    data = json.load(f)
+            else:
+                raise RuntimeError(
+                    f"SSB PxWeb v2 feilet og ingen cache for {table_id}."
+                ) from siste_exc
+
+    # Parse: finn Tid-dimensjonen og flatt array
+    dims_data = data.get("id", [])
+    dimension = data.get("dimension", {})
+    values = data.get("value", [])
+    sizes = data.get("size", [])
+
+    if "Tid" not in dims_data:
+        raise ValueError(f"SSB 11599: ingen Tid-dimensjon i responsen. id={dims_data}")
+
+    tid_idx = dims_data.index("Tid")
+    tid_cats = list(dimension["Tid"]["category"]["index"].keys())
+    n_tid = sizes[tid_idx]
+
+    # Hvis vi har filtrert alle andre dims til 1 verdi, er flat array = tidsserie
+    n_andre = 1
+    for i, sz in enumerate(sizes):
+        if i != tid_idx:
+            n_andre *= sz
+
+    if n_andre == 1:
+        # Flat array er direkte tidsserien
+        obs_values = values[:n_tid]
+    else:
+        # Ta første kombinasjon (øverste rad) langs alle andre dimensjoner
+        logger.warning(
+            "SSB 11599: %d kombinasjoner × %d Tid — tar første kombinasjon.",
+            n_andre, n_tid,
+        )
+        obs_values = values[:n_tid]
+
+    s_maaned = pd.Series(
+        {k: float(v) if v is not None else np.nan for k, v in zip(tid_cats, obs_values)},
+        name="k2_husholdning",
+    )
+
+    # Parse månedskoder ('YYYYMXX') til dato
+    parsed_index = []
+    for k in s_maaned.index:
+        try:
+            parsed_index.append(
+                pd.Timestamp(k.replace("M", "-") + "-01") + pd.offsets.MonthEnd(0)
+            )
+        except Exception:
+            parsed_index.append(None)
+    s_maaned.index = parsed_index
+    s_maaned = s_maaned[pd.notna(s_maaned.index)].sort_index()
+    s_maaned.index = pd.DatetimeIndex(s_maaned.index)
+
+    s_kvartal = s_maaned.resample("QE").mean()
+    s_kvartal.name = "k2_husholdning"
+    logger.info("K2 (SSB 11599) hentet: %d kvartaler", len(s_kvartal))
+    return s_kvartal
+
+

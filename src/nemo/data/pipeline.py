@@ -33,11 +33,11 @@ from nemo.data.ssb import (
     hent_lonnsinndeks,
     hent_boligprisindeks,
     hent_nibor_3m,
+    hent_k2_husholdning,
 )
 from nemo.data.norges_bank import (
     hent_styringsrente,
     hent_valutakurs_importveid,
-    hent_k2_husholdning,
 )
 from nemo.data.fred import (
     hent_brent_oljepris,
@@ -325,7 +325,7 @@ def kjor_pipeline(bruk_cache: bool = True, inkluder_kpi_jae: bool = False) -> pd
     logger.info("  NB: Importveid valutakurs I-44")
     importveid_kurs = hent_valutakurs_importveid(bruk_cache=bruk_cache)
 
-    logger.info("  NB: K2 husholdning")
+    logger.info("  SSB: K2 innenlandsk lånegjeld (11599)")
     k2 = hent_k2_husholdning(bruk_cache=bruk_cache)
 
     logger.info("  FRED: Brent oljepris (%s)", "DCOILBRENTEU")
