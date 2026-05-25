@@ -459,10 +459,19 @@ def hent_kpi(bruk_cache: bool = True) -> pd.Series:
     """
     table_id = "03013"
 
-    # Månedlige tidskoder
     query = {"query": [], "response": {"format": "json-stat2"}}
     data = hent_ssb_tabell(table_id, query, bruk_cache=bruk_cache)
-    s = _parse_json_stat2_maaned(data, "KPI")
+
+    # Finn riktig ContentsCode — SSB har skiftet navn over tid
+    cc_cats = list(data.get("dimension", {}).get("ContentsCode", {})
+                       .get("category", {}).get("index", {}).keys())
+    logger.info("KPI (03013) tilgjengelige ContentsCodes: %s", cc_cats)
+    kpi_kode = next(
+        (c for c in cc_cats if c.upper() in ("KPI", "KPIALT", "KONSUMPRISER")),
+        cc_cats[0] if cc_cats else "KPI",
+    )
+    logger.info("Bruker ContentsCode='%s' for KPI", kpi_kode)
+    s = _parse_json_stat2_maaned(data, kpi_kode)
 
     # Konverter til kvartalssnitt
     s_kvartal = s.resample("QE").mean()
@@ -492,7 +501,16 @@ def hent_kpi_jae(bruk_cache: bool = True) -> pd.Series:
     query = {"query": [], "response": {"format": "json-stat2"}}
 
     data = hent_ssb_tabell(table_id, query, bruk_cache=bruk_cache)
-    s = _parse_json_stat2_maaned(data, "KpiJAE")
+
+    cc_cats = list(data.get("dimension", {}).get("ContentsCode", {})
+                       .get("category", {}).get("index", {}).keys())
+    logger.info("KPI-JAE (14706) tilgjengelige ContentsCodes: %s", cc_cats)
+    jae_kode = next(
+        (c for c in cc_cats if "JAE" in c.upper() or "JAE" in c),
+        cc_cats[0] if cc_cats else "KpiJAE",
+    )
+    logger.info("Bruker ContentsCode='%s' for KPI-JAE", jae_kode)
+    s = _parse_json_stat2_maaned(data, jae_kode)
 
     s_kvartal = s.resample("QE").mean()
     logger.info("KPI-JAE hentet: %d kvartaler", len(s_kvartal))
@@ -516,6 +534,14 @@ def _parse_json_stat2_maaned(data: dict, contents_code: str) -> pd.Series:
     contents_cats = list(dimension["ContentsCode"]["category"]["index"].keys())
     tid_cats = list(dimension["Tid"]["category"]["index"].keys())
 
+    if contents_code not in contents_cats:
+        logger.error(
+            "ContentsCode '%s' ikke funnet i månedstabell. Tilgjengelig: %s",
+            contents_code, contents_cats,
+        )
+        raise ValueError(
+            f"ContentsCode '{contents_code}' ikke funnet. Tilgjengelig: {contents_cats}"
+        )
     code_pos = contents_cats.index(contents_code)
     n_contents = sizes[contents_idx]
     n_tid = sizes[tid_idx]
