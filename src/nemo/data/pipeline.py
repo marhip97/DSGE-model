@@ -256,7 +256,8 @@ def transformer_til_obs(
     k2_aligned = k2.reindex(nr.index)
     obs["db_obs"] = log_diff(k2_aligned)
 
-    return obs[OBSERVASJONSVARIABLER]
+    kolonner = OBSERVASJONSVARIABLER + (["pi_core_obs"] if kpi_jae is not None else [])
+    return obs[kolonner]
 
 
 def demean(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
