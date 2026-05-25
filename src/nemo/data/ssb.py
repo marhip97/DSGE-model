@@ -269,27 +269,128 @@ def hent_nasjonalregnskap(bruk_cache: bool = True) -> pd.DataFrame:
                   eksport, import_ — indeks som pd.Timestamp (siste dag i kvartal).
     """
     table_id = "09189"
-    codes = ["BNPfastland", "PK", "BINV", "EKSPORT", "IMPORT"]
-    query = _lag_ssb_query(codes)
+    query = _lag_ssb_query([])
 
     data = hent_ssb_tabell(table_id, query, bruk_cache=bruk_cache)
 
-    serier = {}
-    navn_map = {
+    # Prøv gammel struktur (ContentsCode = serienavn) først
+    gammel_map = {
         "BNPfastland": "bnp_fastland",
-        "PK": "privat_konsum",
-        "BINV": "bruttoinvesteringer",
-        "EKSPORT": "eksport",
-        "IMPORT": "import_",
+        "PK":          "privat_konsum",
+        "BINV":        "bruttoinvesteringer",
+        "EKSPORT":     "eksport",
+        "IMPORT":      "import_",
     }
-    for code, kolonne in navn_map.items():
-        s = _parse_json_stat2(data, code)
+    try:
+        serier = {}
+        for code, kolonne in gammel_map.items():
+            s = _parse_json_stat2(data, code)
+            s.index = [ssb_kode_til_dato(k) for k in s.index]
+            serier[kolonne] = s
+        df = pd.DataFrame(serier).sort_index()
+        logger.info("Nasjonalregnskap (gammel struktur) hentet: %d kvartaler", len(df))
+        return df
+    except ValueError:
+        pass
+
+    # Ny struktur (NR23-revisjon): ContentsCode er måletype, aggregat i annen dim
+    logger.info("Prøver ny 09189-struktur (ContentsCode=Volum, aggregat-dim matchet på label)")
+    return _parse_nr_ny_struktur(data)
+
+
+def _parse_nr_ny_struktur(data: dict) -> pd.DataFrame:
+    """
+    Parser tabell 09189 etter NR23-revisjon der ContentsCode = måletype
+    (Priser/Faste/Volum/Endringer) og aggregatene er i en annen dimensjon.
+
+    Matcher serier på norsk label-tekst — robust mot kodeendringer.
+    """
+    dims = data.get("id", [])
+    sizes = data.get("size", [])
+    values = data.get("value", [])
+    dimension = data.get("dimension", {})
+
+    # Finn Tid-dimensjon
+    if "Tid" not in dims:
+        raise ValueError(f"Fant ikke Tid-dimensjon i tabell 09189. Dims: {dims}")
+    tid_idx = dims.index("Tid")
+    tid_cats = list(dimension["Tid"]["category"]["index"].keys())
+
+    # Finn ContentsCode-dimensjon og velg "Volum" (volumindeks)
+    if "ContentsCode" not in dims:
+        raise ValueError(f"Fant ikke ContentsCode i tabell 09189. Dims: {dims}")
+    cc_idx = dims.index("ContentsCode")
+    cc_cats = list(dimension["ContentsCode"]["category"]["index"].keys())
+    volum_code = next((c for c in cc_cats if "olum" in c or "aste" in c), cc_cats[0])
+    volum_pos = cc_cats.index(volum_code)
+    logger.info("Bruker ContentsCode='%s' for volumindekser", volum_code)
+
+    # Finn aggregat-dimensjonen (den eneste dimensjonen som ikke er ContentsCode eller Tid)
+    agg_dims = [d for d in dims if d not in ("ContentsCode", "Tid")]
+    if not agg_dims:
+        raise ValueError(f"Fant ingen aggregat-dimensjon i {dims}")
+    agg_dim = agg_dims[0]
+    agg_idx = dims.index(agg_dim)
+    agg_cats  = list(dimension[agg_dim]["category"]["index"].keys())
+    agg_labels = {k: v for k, v in zip(
+        agg_cats,
+        dimension[agg_dim]["category"].get("label", {}).values()
+    )}
+    logger.info("Aggregat-dimensjon: '%s' med %d serier", agg_dim, len(agg_cats))
+    logger.info("Tilgjengelige koder og labels: %s", dict(list(agg_labels.items())[:20]))
+
+    # Label-matching for de seriene vi trenger
+    label_map = {
+        "bnp_fastland":       ["fastland", "mainland", "bnp fast"],
+        "privat_konsum":      ["privat konsum", "husholdningenes konsum", "private consumption"],
+        "bruttoinvesteringer":["bruttoinvesteringer", "brutto realinvesteringer", "gross fixed"],
+        "eksport":            ["eksport", "export"],
+        "import_":            ["import"],
+    }
+
+    def finn_kode(kolonne: str) -> str:
+        for kode, label in agg_labels.items():
+            for soek in label_map[kolonne]:
+                if soek.lower() in label.lower():
+                    return kode
+        tilgj = list(agg_labels.items())[:30]
+        raise ValueError(
+            f"Fant ikke '{kolonne}' i aggregat-dim '{agg_dim}'. "
+            f"Tilgjengelige (kode: label): {tilgj}"
+        )
+
+    n = [sizes[i] for i in range(len(dims))]
+
+    def flat_idx(agg_pos: int, cc_pos: int, t_pos: int) -> int:
+        """Beregner flatindeks for 3-dim array med dims-rekkefølge."""
+        idx = 0
+        pos = [0] * len(dims)
+        pos[agg_idx] = agg_pos
+        pos[cc_idx]  = cc_pos
+        pos[tid_idx] = t_pos
+        stride = 1
+        for d in reversed(range(len(dims))):
+            idx += pos[d] * stride
+            stride *= sizes[d]
+        return idx
+
+    serier = {}
+    for kolonne in label_map:
+        kode = finn_kode(kolonne)
+        agg_pos = agg_cats.index(kode)
+        serie = {}
+        for t_pos, tid_kode in enumerate(tid_cats):
+            fi = flat_idx(agg_pos, volum_pos, t_pos)
+            val = values[fi]
+            serie[tid_kode] = float(val) if val is not None else np.nan
+        s = pd.Series(serie, name=kolonne)
         s.index = [ssb_kode_til_dato(k) for k in s.index]
         serier[kolonne] = s
+        logger.info("  %s ← kode '%s' ('%s')", kolonne, kode, agg_labels[kode])
 
-    df = pd.DataFrame(serier)
-    df = df.sort_index()
-    logger.info("Nasjonalregnskap hentet: %d kvartaler (%s–%s)", len(df), df.index[0].date(), df.index[-1].date())
+    df = pd.DataFrame(serier).sort_index()
+    logger.info("Nasjonalregnskap (ny struktur) hentet: %d kvartaler (%s–%s)",
+                len(df), df.index[0].date(), df.index[-1].date())
     return df
 
 
