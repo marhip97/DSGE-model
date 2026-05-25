@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import time
+import urllib.parse
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -697,24 +698,39 @@ def hent_boligprisindeks(bruk_cache: bool = True) -> pd.Series:
     return s
 
 
+def _ssb_bygg_url(base_url: str, params: dict) -> str:
+    """
+    Bygger SSB PxWeb v2 data-URL med uenkodede brackets i parameternøkler.
+
+    SSB-API krever `valueCodes[Dim]=verdi` — ikke `valueCodes%5BDim%5D=verdi`.
+    Verdiene enkodes (bortsett fra wildcard `*`).
+    """
+    deler = []
+    for k, v in params.items():
+        enkoded_v = urllib.parse.quote(str(v), safe="*")
+        deler.append(f"{k}={enkoded_v}")
+    return base_url + "?" + "&".join(deler)
+
+
 def _ssb_hent_variabler(table_id: str) -> list[dict]:
     """
-    Henter variabeldefinisjonene for en SSB PxWeb v2-tabell via /variables-endepunktet.
+    Henter variabeldefinisjonene for en SSB PxWeb v2-tabell.
 
+    Prøver GET /tables/{id} (tabell-metadata som inkluderer variabler).
     Returnerer liste med dicts à {'id': str, 'values': [...], 'valueTexts': [...]}.
     Returnerer tom liste ved feil.
     """
-    url = f"{_SSB_PXWEB_V2}/{table_id}/variables"
+    # PxWeb v2 tabell-metadata er på /tables/{id} — ikke /tables/{id}/variables
+    url = f"{_SSB_PXWEB_V2}/{table_id}"
     try:
         resp = requests.get(url, params={"lang": "no"}, timeout=30)
         resp.raise_for_status()
         data = resp.json()
-        # Responsen er enten {"variables": [...]} eller direkte en liste
         if isinstance(data, list):
             return data
         return data.get("variables", [])
     except Exception as exc:
-        logger.warning("SSB %s /variables feilet: %s", table_id, exc)
+        logger.warning("SSB %s tabell-metadata feilet: %s", table_id, exc)
         return []
 
 
@@ -738,9 +754,9 @@ def hent_nibor_3m(bruk_cache: bool = True) -> pd.Series:
         Indeks: pd.Timestamp (siste dag i kvartal).
     """
     table_id = "10701"
-    url = f"{_SSB_PXWEB_V2}/{table_id}/data"
+    data_url = f"{_SSB_PXWEB_V2}/{table_id}/data"
 
-    # Oppdage dimensjonskoder via /variables (støtter ikke top(N) i data-endepunkt)
+    # Oppdage dimensjonskoder via tabell-metadata (/tables/{id})
     variabler = _ssb_hent_variabler(table_id)
     params: dict[str, str] = {
         "lang": "no",
@@ -780,10 +796,12 @@ def hent_nibor_3m(bruk_cache: bool = True) -> pd.Series:
         with open(cache_fil, encoding="utf-8") as f:
             data = json.load(f)
     else:
+        full_url = _ssb_bygg_url(data_url, params)
+        logger.info("SSB 10701 data-URL: %s", full_url)
         siste_exc: Exception | None = None
         for forsok in range(1, 4):
             try:
-                resp = requests.get(url, params=params, timeout=60)
+                resp = requests.get(full_url, timeout=60)
                 resp.raise_for_status()
                 data = resp.json()
                 with open(cache_fil, "w", encoding="utf-8") as f:
@@ -902,7 +920,7 @@ def hent_k2_husholdning(bruk_cache: bool = True) -> pd.Series:
         Indeks: pd.Timestamp (siste dag i kvartal).
     """
     table_id = "11599"
-    url = f"{_SSB_PXWEB_V2}/{table_id}/data"
+    data_url = f"{_SSB_PXWEB_V2}/{table_id}/data"
 
     # Oppdage dimensjonskoder via /variables (robust mot tabeller som ikke støtter top(N))
     variabler = _ssb_hent_variabler(table_id)
@@ -960,10 +978,12 @@ def hent_k2_husholdning(bruk_cache: bool = True) -> pd.Series:
         with open(cache_fil, encoding="utf-8") as f:
             data = json.load(f)
     else:
+        full_url = _ssb_bygg_url(data_url, params)
+        logger.info("SSB 11599 data-URL: %s", full_url)
         siste_exc: Exception | None = None
         for forsok in range(1, 4):
             try:
-                resp = requests.get(url, params=params, timeout=60)
+                resp = requests.get(full_url, timeout=60)
                 resp.raise_for_status()
                 data = resp.json()
                 with open(cache_fil, "w", encoding="utf-8") as f:
