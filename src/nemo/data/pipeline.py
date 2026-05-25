@@ -32,10 +32,10 @@ from nemo.data.ssb import (
     hent_kpi_jae,
     hent_lonnsinndeks,
     hent_boligprisindeks,
+    hent_nibor_3m,
 )
 from nemo.data.norges_bank import (
     hent_styringsrente,
-    hent_nibor_3m,
     hent_valutakurs_importveid,
     hent_k2_husholdning,
 )
@@ -319,7 +319,7 @@ def kjor_pipeline(bruk_cache: bool = True, inkluder_kpi_jae: bool = False) -> pd
     logger.info("  NB: Styringsrente (POLICY_RATE)")
     styringsrente = hent_styringsrente(bruk_cache=bruk_cache)
 
-    logger.info("  NB: NIBOR 3M")
+    logger.info("  SSB: NIBOR 3M (10701)")
     nibor = hent_nibor_3m(bruk_cache=bruk_cache)
 
     logger.info("  NB: Importveid valutakurs I-44")

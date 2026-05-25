@@ -695,3 +695,102 @@ def hent_boligprisindeks(bruk_cache: bool = True) -> pd.Series:
     s.name = "boligprisindeks"
     logger.info("Boligprisindeks hentet: %d kvartaler", len(s))
     return s
+
+
+def hent_nibor_3m(bruk_cache: bool = True) -> pd.Series:
+    """
+    Henter 3M NIBOR fra SSB tabell 10701 og beregner kvartalssnitt.
+
+    Tabell 10701 inneholder månedlige NIBOR og foliorente-observasjoner.
+    Kvartalsverdier beregnes som gjennomsnitt av tre måneder (m1+m2+m3)/3.
+
+    Parametere
+    ----------
+    bruk_cache : bool
+        Om cache skal brukes.
+
+    Returnerer
+    ----------
+    pd.Series
+        Kvartalsvise NIBOR 3M-verdier (annualisert, i %).
+        Indeks: pd.Timestamp (siste dag i kvartal).
+    """
+    table_id = "10701"
+    url = f"{_SSB_PXWEB_V2}/{table_id}/data"
+    params = {
+        "lang": "no",
+        "valueCodes[Rente]": "Nibor3M",
+        "valueCodes[Tid]": "*",
+        "outputFormat": "json-stat2",
+    }
+
+    cache_fil = _cache_path(table_id)
+    data = None
+
+    if bruk_cache and cache_fil.exists():
+        logger.info("Leser SSB-tabell %s (nibor3m) fra cache: %s", table_id, cache_fil)
+        with open(cache_fil, encoding="utf-8") as f:
+            data = json.load(f)
+    else:
+        siste_exc: Exception | None = None
+        for forsok in range(1, 4):
+            try:
+                resp = requests.get(url, params=params, timeout=60)
+                resp.raise_for_status()
+                data = resp.json()
+                with open(cache_fil, "w", encoding="utf-8") as f:
+                    json.dump(data, f, ensure_ascii=False)
+                logger.info("Cachet SSB-tabell %s → %s", table_id, cache_fil)
+                break
+            except Exception as exc:
+                siste_exc = exc
+                body = ""
+                try:
+                    body = resp.text[:300]  # type: ignore[possibly-undefined]
+                except Exception:
+                    pass
+                if forsok < 3:
+                    vent = 2 ** forsok
+                    logger.warning(
+                        "SSB 10701 feilet (forsøk %d/3): %s | body: %s. Venter %ds.",
+                        forsok, exc, body, vent,
+                    )
+                    time.sleep(vent)
+        if data is None:
+            fallback = _find_latest_cache(table_id)
+            if fallback is not None:
+                logger.info("SSB 10701: bruker cache-fallback %s", fallback)
+                with open(fallback, encoding="utf-8") as f:
+                    data = json.load(f)
+            else:
+                raise RuntimeError(
+                    f"SSB PxWeb v2 feilet og ingen cache for {table_id}."
+                ) from siste_exc
+
+    # Dimensjonsstruktur: ["Rente", "Tid"] — én rentekode, flat array = tidsserie
+    dimension = data.get("dimension", {})
+    values = data.get("value", [])
+    tid_cats = list(dimension["Tid"]["category"]["index"].keys())
+
+    s_maaned = pd.Series(
+        {k: float(v) if v is not None else np.nan for k, v in zip(tid_cats, values)},
+        name="nibor_3m",
+    )
+    # Konverter 'YYYYMXX'-koder til månedsdatoer
+    def _parse_maaned(kode: str) -> pd.Timestamp | None:
+        try:
+            return pd.Timestamp(kode.replace("M", "-") + "-01") + pd.offsets.MonthEnd(0)
+        except Exception:
+            return None
+
+    s_maaned.index = [_parse_maaned(k) for k in s_maaned.index]
+    s_maaned = s_maaned[s_maaned.index.notna()].sort_index()
+    s_maaned.index = pd.DatetimeIndex(s_maaned.index)
+
+    # Kvartalssnitt (gjennomsnitt av tre måneder)
+    s_kvartal = s_maaned.resample("QE").mean()
+    s_kvartal.name = "nibor_3m"
+    logger.info("NIBOR 3M (SSB 10701) hentet: %d kvartaler", len(s_kvartal))
+    return s_kvartal
+
+
