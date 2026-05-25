@@ -53,8 +53,10 @@ jobs:
       - name: Sjekk om data er endret
         id: diff
         run: |
-          # Standard datafil
-          if git diff --quiet data/processed/nemo_data.csv data/processed/nemo_demean.json 2>/dev/null; then
+          # Stage filene — git diff --quiet ser ikke nye utrakkede filer,
+          # men git diff --cached gjør det etter staging.
+          git add data/processed/nemo_data.csv data/processed/nemo_demean.json 2>/dev/null || true
+          if git diff --cached --quiet data/processed/nemo_data.csv data/processed/nemo_demean.json 2>/dev/null; then
             echo "endret=false" >> $GITHUB_OUTPUT
           else
             echo "endret=true" >> $GITHUB_OUTPUT
@@ -73,7 +75,7 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/processed/nemo_data.csv data/processed/nemo_demean.json
+          # nemo_data.csv og nemo_demean.json er allerede staged fra diff-steget
           # Legg til KPI-JAE-filer hvis de finnes
           if [ -f data/processed/nemo_data_kpi_jae.csv ]; then
             git add data/processed/nemo_data_kpi_jae.csv data/processed/nemo_demean_kpi_jae.json || true
