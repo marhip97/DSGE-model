@@ -214,13 +214,15 @@ def _parse_json_stat2(data: dict, contents_code: str) -> pd.Series:
     # Finn posisjon til ønsket ContentsCode
     if contents_code not in contents_cats:
         tilgjengelig = ", ".join(contents_cats)
-        # Logg full dimensjonsstruktur for diagnose av tabellendringer
-        alle_dims = {d: list(dimension.get(d, {}).get("category", {}).get("index", {}).keys())[:15]
-                     for d in dims if d not in ("ContentsCode", "Tid")}
+        # Dump ALLE koder i ALLE dimensjoner for å kunne oppdatere hent_nasjonalregnskap
+        alle_dims = {d: list(dimension.get(d, {}).get("category", {}).get("index", {}).keys())
+                     for d in dims if d not in ("Tid",)}
+        label_dims = {d: list(dimension.get(d, {}).get("category", {}).get("label", {}).values())
+                      for d in dims if d not in ("Tid",)}
         logger.error(
-            "ContentsCode '%s' ikke funnet. ContentsCode tilgjengelig: [%s]. "
-            "Andre dimensjoner: %s",
-            contents_code, tilgjengelig, alle_dims
+            "ContentsCode '%s' ikke funnet. Tilgjengelig: [%s]. "
+            "ALLE dims/koder: %s. Labels: %s",
+            contents_code, tilgjengelig, alle_dims, label_dims
         )
         raise ValueError(
             f"ContentsCode '{contents_code}' ikke funnet. Tilgjengelig: {tilgjengelig}"

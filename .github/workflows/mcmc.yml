@@ -1,0 +1,101 @@
+name: MCMC — NEMO estimering
+
+on:
+  workflow_dispatch:
+    inputs:
+      kjoring:
+        description: "Kjøring å starte"
+        required: true
+        type: choice
+        options:
+          - kj15
+          - kj17
+          - kj18
+      no_cache:
+        description: "Ignorer eksisterende chain (start fra kj12)"
+        required: false
+        default: "false"
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  mcmc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350   # 5h 50min — under GitHub Actions 6h-grensen
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Installer NEMO
+        run: pip install -e .
+
+      - name: Opprett resultatmappe
+        run: mkdir -p data/results
+
+      - name: Kjør MCMC
+        run: |
+          echo "Starter kjøring ${{ inputs.kjoring }} ..."
+          python scripts/${{ inputs.kjoring }}_prod.py 2>&1 | tee data/results/${{ inputs.kjoring }}_stdout.log
+          echo "Kjøring fullført."
+
+      - name: Last opp chain som artifact
+        if: always()   # last opp selv om kjøringen feiler (partial chain)
+        uses: actions/upload-artifact@v4
+        with:
+          name: chain-${{ inputs.kjoring }}-${{ github.run_id }}
+          path: |
+            data/results/chain_${{ inputs.kjoring }}_prod*.npy
+            data/results/${{ inputs.kjoring }}_stdout.log
+          retention-days: 30
+
+      - name: Commit posterior-sammendrag til repo
+        if: success()
+        run: |
+          python - <<'EOF'
+          import numpy as np, json, sys
+          sys.path.insert(0, 'src')
+          from nemo.estimation.mcmc import PARAM_NAMES, KM
+          import pathlib
+
+          kj = "${{ inputs.kjoring }}"
+          fil = pathlib.Path(f"data/results/chain_{kj}_prod.npy")
+          if not fil.exists():
+              print(f"Ingen fullstendig chain funnet: {fil}")
+              sys.exit(0)
+
+          chain = np.load(fil)
+          burn = len(chain) // 5
+          post = chain[burn:]
+          summary = {
+              "kjoring": kj,
+              "n_trekk": int(len(post)),
+              "parametere": {
+                  name: {
+                      "mean": float(post[:, i].mean()),
+                      "std":  float(post[:, i].std()),
+                      "p5":   float(np.percentile(post[:, i], 5)),
+                      "p95":  float(np.percentile(post[:, i], 95)),
+                      "km":   float(KM.get(name, float("nan"))),
+                  }
+                  for i, name in enumerate(PARAM_NAMES)
+              }
+          }
+          ut = pathlib.Path(f"data/results/posterior_{kj}.json")
+          ut.write_text(json.dumps(summary, indent=2, ensure_ascii=False))
+          print(f"Lagret: {ut}")
+          EOF
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/results/posterior_${{ inputs.kjoring }}.json || true
+          git diff --cached --quiet || git commit -m "[MCMC] ${{ inputs.kjoring }} fullført — posterior-sammendrag"
+          git push || true
