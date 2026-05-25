@@ -702,7 +702,8 @@ def hent_nibor_3m(bruk_cache: bool = True) -> pd.Series:
     Henter 3M NIBOR fra SSB tabell 10701 og beregner kvartalssnitt.
 
     Tabell 10701 inneholder månedlige NIBOR og foliorente-observasjoner.
-    Kvartalsverdier beregnes som gjennomsnitt av tre måneder (m1+m2+m3)/3.
+    Dimensjonskoder oppdages automatisk via minimal metadata-query.
+    Kvartalsverdier beregnes som gjennomsnitt av tre måneder.
 
     Parametere
     ----------
@@ -717,18 +718,51 @@ def hent_nibor_3m(bruk_cache: bool = True) -> pd.Series:
     """
     table_id = "10701"
     url = f"{_SSB_PXWEB_V2}/{table_id}/data"
-    params = {
+
+    # Steg 1: oppdage dimensjonskoder via minimal query
+    try:
+        meta_resp = requests.get(
+            url,
+            params={"lang": "no", "valueCodes[Tid]": "top(1)", "outputFormat": "json-stat2"},
+            timeout=30,
+        )
+        meta_resp.raise_for_status()
+        meta = meta_resp.json()
+    except Exception as exc:
+        logger.warning("SSB 10701 metadata-kall feilet: %s. Prøver uten filter.", exc)
+        meta = None
+
+    params: dict[str, str] = {
         "lang": "no",
-        "valueCodes[Rente]": "Nibor3M",
         "valueCodes[Tid]": "*",
         "outputFormat": "json-stat2",
     }
+
+    if meta is not None:
+        dim = meta.get("dimension", {})
+        dims = meta.get("id", [])
+        logger.info("SSB 10701 dimensjoner: %s", dims)
+        for d in dims:
+            koder = list(dim.get(d, {}).get("category", {}).get("index", {}).keys())
+            labels = dim.get(d, {}).get("category", {}).get("label", {})
+            logger.info("  %s: %s", d, {k: labels.get(k, k) for k in koder})
+
+        # Finn rentedimensjonen (alt unntatt Tid)
+        rente_dims = [d for d in dims if d != "Tid"]
+        for rente_dim in rente_dims:
+            nibor_kode = _ssb_oppdag_kode(
+                dim, rente_dim, ["nibor", "3 mån", "3m", "3 month"],
+            )
+            if nibor_kode:
+                params[f"valueCodes[{rente_dim}]"] = nibor_kode
+                logger.info("SSB 10701: bruker %s=%s for NIBOR 3M", rente_dim, nibor_kode)
+                break
 
     cache_fil = _cache_path(table_id)
     data = None
 
     if bruk_cache and cache_fil.exists():
-        logger.info("Leser SSB-tabell %s (nibor3m) fra cache: %s", table_id, cache_fil)
+        logger.info("Leser SSB-tabell %s fra cache: %s", table_id, cache_fil)
         with open(cache_fil, encoding="utf-8") as f:
             data = json.load(f)
     else:
@@ -767,27 +801,45 @@ def hent_nibor_3m(bruk_cache: bool = True) -> pd.Series:
                     f"SSB PxWeb v2 feilet og ingen cache for {table_id}."
                 ) from siste_exc
 
-    # Dimensjonsstruktur: ["Rente", "Tid"] — én rentekode, flat array = tidsserie
+    # Parse: Tid-dimensjonen, flat array = tidsserie (én rentekode valgt)
+    dims_data = data.get("id", [])
     dimension = data.get("dimension", {})
     values = data.get("value", [])
+    sizes = data.get("size", [])
+
+    tid_idx = dims_data.index("Tid")
     tid_cats = list(dimension["Tid"]["category"]["index"].keys())
+    n_tid = sizes[tid_idx]
+
+    # Antall kombinasjoner langs andre dimensjoner
+    n_andre = 1
+    for i, sz in enumerate(sizes):
+        if i != tid_idx:
+            n_andre *= sz
+
+    if n_andre == 1:
+        obs_values = values[:n_tid]
+    else:
+        logger.warning("SSB 10701: %d kombinasjoner — tar første rad.", n_andre)
+        obs_values = values[:n_tid]
 
     s_maaned = pd.Series(
-        {k: float(v) if v is not None else np.nan for k, v in zip(tid_cats, values)},
+        {k: float(v) if v is not None else np.nan for k, v in zip(tid_cats, obs_values)},
         name="nibor_3m",
     )
-    # Konverter 'YYYYMXX'-koder til månedsdatoer
-    def _parse_maaned(kode: str) -> pd.Timestamp | None:
-        try:
-            return pd.Timestamp(kode.replace("M", "-") + "-01") + pd.offsets.MonthEnd(0)
-        except Exception:
-            return None
 
-    s_maaned.index = [_parse_maaned(k) for k in s_maaned.index]
-    s_maaned = s_maaned[s_maaned.index.notna()].sort_index()
+    parsed_index = []
+    for k in s_maaned.index:
+        try:
+            parsed_index.append(
+                pd.Timestamp(k.replace("M", "-") + "-01") + pd.offsets.MonthEnd(0)
+            )
+        except Exception:
+            parsed_index.append(None)
+    s_maaned.index = parsed_index
+    s_maaned = s_maaned[pd.notna(s_maaned.index)].sort_index()
     s_maaned.index = pd.DatetimeIndex(s_maaned.index)
 
-    # Kvartalssnitt (gjennomsnitt av tre måneder)
     s_kvartal = s_maaned.resample("QE").mean()
     s_kvartal.name = "nibor_3m"
     logger.info("NIBOR 3M (SSB 10701) hentet: %d kvartaler", len(s_kvartal))
