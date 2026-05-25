@@ -226,7 +226,7 @@ def _parse_json_stat2(data: dict, contents_code: str) -> pd.Series:
 
 
 def _lag_ssb_query(contents_codes: list[str], start_year: int = 2001) -> dict:
-    """Bygger SSB JSON-stat2 API-spørring."""
+    """Bygger SSB JSON-stat2 API-spørring. Bruker filter=all for Tid."""
     return {
         "query": [
             {
@@ -235,10 +235,7 @@ def _lag_ssb_query(contents_codes: list[str], start_year: int = 2001) -> dict:
             },
             {
                 "code": "Tid",
-                "selection": {
-                    "filter": "item",
-                    "values": _ssb_kvartal_koder(start_year),
-                },
+                "selection": {"filter": "all", "values": ["*"]},
             },
         ],
         "response": {"format": "json-stat2"},
@@ -305,12 +302,6 @@ def hent_kpi(bruk_cache: bool = True) -> pd.Series:
     table_id = "03013"
 
     # Månedlige tidskoder
-    maaned_koder = [
-        f"{y}M{m:02d}"
-        for y in range(2001, 2026)
-        for m in range(1, 13)
-    ]
-
     query = {
         "query": [
             {
@@ -319,7 +310,7 @@ def hent_kpi(bruk_cache: bool = True) -> pd.Series:
             },
             {
                 "code": "Tid",
-                "selection": {"filter": "item", "values": maaned_koder},
+                "selection": {"filter": "all", "values": ["*"]},
             },
         ],
         "response": {"format": "json-stat2"},
@@ -353,12 +344,6 @@ def hent_kpi_jae(bruk_cache: bool = True) -> pd.Series:
     """
     table_id = "10235"
 
-    maaned_koder = [
-        f"{y}M{m:02d}"
-        for y in range(2001, 2026)
-        for m in range(1, 13)
-    ]
-
     query = {
         "query": [
             {
@@ -367,7 +352,7 @@ def hent_kpi_jae(bruk_cache: bool = True) -> pd.Series:
             },
             {
                 "code": "Tid",
-                "selection": {"filter": "item", "values": maaned_koder},
+                "selection": {"filter": "all", "values": ["*"]},
             },
         ],
         "response": {"format": "json-stat2"},
