@@ -568,9 +568,10 @@ def hent_lonnsinndeks(bruk_cache: bool = True) -> pd.Series:
     """
     Henter kvartalsvise lønnsindeksdata fra SSB tabell 11654 (PxWeb v2).
 
-    Tabell 11654 er kvartalserstatningen for den nedlagte lønnsindeksen (09786).
-    Bruker ContentsCode=LonnIndeks, alle næringer samlet, begge kjønn.
-    Basisperiode: 1. kvartal 2024 = 100 (SSB endret basis 2024).
+    Tabell 11654 er kvartalsvis erstatning for nedlagt lønnsindeks (09786).
+    Bruker GjMdTotalIndeks (indeks for gjennomsnittlig total månedslønn),
+    alle næringer (NACE2007=00-99), hele landet (Region=Ialt).
+    Basisperiode: 1. kvartal 2024 = 100.
 
     Parametere
     ----------
@@ -593,8 +594,10 @@ def hent_lonnsinndeks(bruk_cache: bool = True) -> pd.Series:
         url = f"{_SSB_PXWEB_V2}/{table_id}/data"
         params = {
             "lang": "no",
-            "valueCodes[ContentsCode]": "LonnIndeks",
-            "valueCodes[Tid]": "top(200)",
+            "valueCodes[NACE2007]": "00-99",        # alle næringer
+            "valueCodes[Region]":   "Ialt",          # hele landet
+            "valueCodes[ContentsCode]": "GjMdTotalIndeks",  # total lønnsindeks
+            "valueCodes[Tid]": "*",                  # alle kvartaler
             "outputFormat": "json-stat2",
         }
         logger.info("Henter SSB-tabell %s (PxWeb v2 GET)", table_id)
@@ -607,12 +610,19 @@ def hent_lonnsinndeks(bruk_cache: bool = True) -> pd.Series:
                 data = resp.json()
                 with open(cache_fil, "w", encoding="utf-8") as f:
                     json.dump(data, f, ensure_ascii=False)
+                logger.info("Cachet SSB-tabell %s → %s", table_id, cache_fil)
                 break
             except Exception as exc:
                 siste_exc = exc
+                body = ""
+                try:
+                    body = resp.text[:300]  # type: ignore[possibly-undefined]
+                except Exception:
+                    pass
                 if forsok < 3:
                     vent = 2 ** forsok
-                    logger.warning("SSB 11654 feilet (forsøk %d/3): %s. Venter %ds.", forsok, exc, vent)
+                    logger.warning("SSB 11654 feilet (forsøk %d/3): %s | body: %s. Venter %ds.",
+                                   forsok, exc, body, vent)
                     time.sleep(vent)
         if data is None:
             fallback = _find_latest_cache(table_id)
@@ -620,47 +630,26 @@ def hent_lonnsinndeks(bruk_cache: bool = True) -> pd.Series:
                 with open(fallback, encoding="utf-8") as f:
                     data = json.load(f)
             else:
-                raise RuntimeError(f"SSB PxWeb v2 feilet og ingen cache for {table_id}.") from siste_exc
+                raise RuntimeError(
+                    f"SSB PxWeb v2 feilet og ingen cache for {table_id}."
+                ) from siste_exc
 
-    dims = data.get("id", [])
+    # Med én verdi per dim utenom Tid er flat-arrayen direkte tidsserien
     dimension = data.get("dimension", {})
     values = data.get("value", [])
-    sizes = data.get("size", [])
-
-    tid_idx = dims.index("Tid")
     tid_cats = list(dimension["Tid"]["category"]["index"].keys())
-
-    # Tabell 11654 kan ha flere dimensjoner — summer/aggreger om nødvendig,
-    # eller ta første verdi (alle næringer) om det bare er én serie
-    if len(dims) == 2:
-        # Bare ContentsCode + Tid: én serie
-        cc_idx = dims.index("ContentsCode")
-        cc_cats = list(dimension["ContentsCode"]["category"]["index"].keys())
-        logger.info("Lønnsindeks (11654) ContentsCodes: %s", cc_cats)
-        s = _parse_json_stat2(data, cc_cats[0])
-    else:
-        # Finn "alle næringer"-rad via label-matching
-        agg_dims = [d for d in dims if d not in ("ContentsCode", "Tid")]
-        agg_dim = agg_dims[0]
-        agg_cats = list(dimension[agg_dim]["category"]["index"].keys())
-        agg_labels = {k: v for k, v in zip(
-            agg_cats,
-            dimension[agg_dim]["category"].get("label", {}).values()
-        )}
-        logger.info("Lønnsindeks (11654) aggregater: %s", dict(list(agg_labels.items())[:10]))
-        alle_naer = next(
-            (k for k, v in agg_labels.items()
-             if "alle" in v.lower() or "total" in v.lower() or "i alt" in v.lower()),
-            agg_cats[0],
-        )
-        logger.info("  Bruker aggregat '%s': '%s'", alle_naer, agg_labels.get(alle_naer))
-        s = _parse_json_stat2(data, list(dimension["ContentsCode"]["category"]["index"].keys())[0])
-
+    s = pd.Series(
+        {k: float(v) if v is not None else np.nan
+         for k, v in zip(tid_cats, values)},
+        name="lonnsinndeks",
+    )
     s = s[[k for k in s.index if "K" in str(k)]]
     s.index = [ssb_kode_til_dato(k) for k in s.index]
     s = s.sort_index()
     logger.info("Lønnsindeks hentet: %d kvartaler (%s–%s)",
-                len(s), s.index[0].date() if len(s) else "?", s.index[-1].date() if len(s) else "?")
+                len(s),
+                s.index[0].date() if len(s) else "?",
+                s.index[-1].date() if len(s) else "?")
     return s
 
 
