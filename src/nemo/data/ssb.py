@@ -342,7 +342,7 @@ def hent_kpi_jae(bruk_cache: bool = True) -> pd.Series:
     pd.Series
         Kvartalsvis KPI-JAE-indeks med pd.Timestamp-indeks (siste dag i kvartal).
     """
-    table_id = "10235"
+    table_id = "14706"  # erstatter 05327/10235 fra 10. februar 2026
 
     query = {
         "query": [
