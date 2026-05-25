@@ -226,19 +226,12 @@ def _parse_json_stat2(data: dict, contents_code: str) -> pd.Series:
 
 
 def _lag_ssb_query(contents_codes: list[str], start_year: int = 2001) -> dict:
-    """Bygger SSB JSON-stat2 API-spørring."""
+    """Bygger SSB JSON-stat2 API-spørring. Tid-dimensjonen utelates for å få alle perioder."""
     return {
         "query": [
             {
                 "code": "ContentsCode",
                 "selection": {"filter": "item", "values": contents_codes},
-            },
-            {
-                "code": "Tid",
-                "selection": {
-                    "filter": "item",
-                    "values": _ssb_kvartal_koder(start_year),
-                },
             },
         ],
         "response": {"format": "json-stat2"},
@@ -305,21 +298,11 @@ def hent_kpi(bruk_cache: bool = True) -> pd.Series:
     table_id = "03013"
 
     # Månedlige tidskoder
-    maaned_koder = [
-        f"{y}M{m:02d}"
-        for y in range(2001, 2026)
-        for m in range(1, 13)
-    ]
-
     query = {
         "query": [
             {
                 "code": "ContentsCode",
                 "selection": {"filter": "item", "values": ["KPI"]},
-            },
-            {
-                "code": "Tid",
-                "selection": {"filter": "item", "values": maaned_koder},
             },
         ],
         "response": {"format": "json-stat2"},
@@ -351,23 +334,13 @@ def hent_kpi_jae(bruk_cache: bool = True) -> pd.Series:
     pd.Series
         Kvartalsvis KPI-JAE-indeks med pd.Timestamp-indeks (siste dag i kvartal).
     """
-    table_id = "10235"
-
-    maaned_koder = [
-        f"{y}M{m:02d}"
-        for y in range(2001, 2026)
-        for m in range(1, 13)
-    ]
+    table_id = "14706"  # erstatter 05327/10235 fra 10. februar 2026
 
     query = {
         "query": [
             {
                 "code": "ContentsCode",
                 "selection": {"filter": "item", "values": ["KpiJAE"]},
-            },
-            {
-                "code": "Tid",
-                "selection": {"filter": "item", "values": maaned_koder},
             },
         ],
         "response": {"format": "json-stat2"},
