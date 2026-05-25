@@ -697,12 +697,33 @@ def hent_boligprisindeks(bruk_cache: bool = True) -> pd.Series:
     return s
 
 
+def _ssb_hent_variabler(table_id: str) -> list[dict]:
+    """
+    Henter variabeldefinisjonene for en SSB PxWeb v2-tabell via /variables-endepunktet.
+
+    Returnerer liste med dicts à {'id': str, 'values': [...], 'valueTexts': [...]}.
+    Returnerer tom liste ved feil.
+    """
+    url = f"{_SSB_PXWEB_V2}/{table_id}/variables"
+    try:
+        resp = requests.get(url, params={"lang": "no"}, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        # Responsen er enten {"variables": [...]} eller direkte en liste
+        if isinstance(data, list):
+            return data
+        return data.get("variables", [])
+    except Exception as exc:
+        logger.warning("SSB %s /variables feilet: %s", table_id, exc)
+        return []
+
+
 def hent_nibor_3m(bruk_cache: bool = True) -> pd.Series:
     """
     Henter 3M NIBOR fra SSB tabell 10701 og beregner kvartalssnitt.
 
     Tabell 10701 inneholder månedlige NIBOR og foliorente-observasjoner.
-    Dimensjonskoder oppdages automatisk via minimal metadata-query.
+    Dimensjonskoder oppdages via /variables-endepunktet (ikke data-query).
     Kvartalsverdier beregnes som gjennomsnitt av tre måneder.
 
     Parametere
@@ -719,44 +740,37 @@ def hent_nibor_3m(bruk_cache: bool = True) -> pd.Series:
     table_id = "10701"
     url = f"{_SSB_PXWEB_V2}/{table_id}/data"
 
-    # Steg 1: oppdage dimensjonskoder via minimal query
-    try:
-        meta_resp = requests.get(
-            url,
-            params={"lang": "no", "valueCodes[Tid]": "top(1)", "outputFormat": "json-stat2"},
-            timeout=30,
-        )
-        meta_resp.raise_for_status()
-        meta = meta_resp.json()
-    except Exception as exc:
-        logger.warning("SSB 10701 metadata-kall feilet: %s. Prøver uten filter.", exc)
-        meta = None
-
+    # Oppdage dimensjonskoder via /variables (støtter ikke top(N) i data-endepunkt)
+    variabler = _ssb_hent_variabler(table_id)
     params: dict[str, str] = {
         "lang": "no",
         "valueCodes[Tid]": "*",
         "outputFormat": "json-stat2",
     }
 
-    if meta is not None:
-        dim = meta.get("dimension", {})
-        dims = meta.get("id", [])
-        logger.info("SSB 10701 dimensjoner: %s", dims)
-        for d in dims:
-            koder = list(dim.get(d, {}).get("category", {}).get("index", {}).keys())
-            labels = dim.get(d, {}).get("category", {}).get("label", {})
-            logger.info("  %s: %s", d, {k: labels.get(k, k) for k in koder})
+    for var in variabler:
+        var_id = var.get("id", "")
+        if var_id == "Tid":
+            continue
+        values = var.get("values", [])
+        value_texts = var.get("valueTexts", values)
+        logger.info("SSB 10701 variabel %s: %s", var_id, dict(zip(values, value_texts)))
 
-        # Finn rentedimensjonen (alt unntatt Tid)
-        rente_dims = [d for d in dims if d != "Tid"]
-        for rente_dim in rente_dims:
-            nibor_kode = _ssb_oppdag_kode(
-                dim, rente_dim, ["nibor", "3 mån", "3m", "3 month"],
-            )
-            if nibor_kode:
-                params[f"valueCodes[{rente_dim}]"] = nibor_kode
-                logger.info("SSB 10701: bruker %s=%s for NIBOR 3M", rente_dim, nibor_kode)
+        # Finn NIBOR 3M-koden ved å søke i tekster og koder
+        nibor_kode = None
+        for kode, tekst in zip(values, value_texts):
+            combined = (kode + " " + tekst).lower()
+            if any(t in combined for t in ["nibor", "3 mån", "3m", "3 month"]):
+                nibor_kode = kode
                 break
+        if nibor_kode:
+            params[f"valueCodes[{var_id}]"] = nibor_kode
+            logger.info("SSB 10701: bruker %s=%s for NIBOR 3M", var_id, nibor_kode)
+        else:
+            # Obligatorisk dimensjon uten NIBOR-treff — ta første kode
+            if values:
+                params[f"valueCodes[{var_id}]"] = values[0]
+                logger.info("SSB 10701: %s — ingen NIBOR-treff, bruker første kode: %s", var_id, values[0])
 
     cache_fil = _cache_path(table_id)
     data = None
@@ -890,56 +904,53 @@ def hent_k2_husholdning(bruk_cache: bool = True) -> pd.Series:
     table_id = "11599"
     url = f"{_SSB_PXWEB_V2}/{table_id}/data"
 
-    # Steg 1: hent minimal rad for å oppdage dimensjonskoder
-    meta_params = {
-        "lang": "no",
-        "valueCodes[Tid]": "top(1)",
-        "outputFormat": "json-stat2",
-    }
-    try:
-        meta_resp = requests.get(url, params=meta_params, timeout=30)
-        meta_resp.raise_for_status()
-        meta = meta_resp.json()
-    except Exception as exc:
-        logger.warning("SSB 11599 metadata-kall feilet: %s. Prøver uten filter.", exc)
-        meta = None
-
-    # Bestem dimensjonsfiltre fra metadata
+    # Oppdage dimensjonskoder via /variables (robust mot tabeller som ikke støtter top(N))
+    variabler = _ssb_hent_variabler(table_id)
     params: dict[str, str] = {
         "lang": "no",
         "valueCodes[Tid]": "*",
         "outputFormat": "json-stat2",
     }
 
-    if meta is not None:
-        dim = meta.get("dimension", {})
-        dims = meta.get("id", [])
-        logger.info("SSB 11599 dimensjoner: %s", dims)
-        for d in dims:
-            koder = list(dim.get(d, {}).get("category", {}).get("index", {}).keys())
-            labels = dim.get(d, {}).get("category", {}).get("label", {})
-            logger.info("  %s: %s", d, {k: labels.get(k, k) for k in koder[:8]})
+    for var in variabler:
+        var_id = var.get("id", "")
+        if var_id == "Tid":
+            continue
+        values = var.get("values", [])
+        value_texts = var.get("valueTexts", values)
+        logger.info("SSB 11599 variabel %s: %s", var_id, dict(zip(values[:6], value_texts[:6])))
 
-        # Valuta: "I alt" eller tilsvarende
-        valuta_kode = _ssb_oppdag_kode(dim, "Valuta", ["i alt", "total", "alle"])
-        if valuta_kode:
-            params[f"valueCodes[Valuta]"] = valuta_kode
+        var_id_lower = var_id.lower()
+        kode = None
 
-        # Låntakersektor: "Publikum"
-        sektor_kode = _ssb_oppdag_kode(dim, "Låntakersektor", ["publikum", "public"])
-        if not sektor_kode:
-            sektor_kode = _ssb_oppdag_kode(dim, "Sektor", ["publikum", "public"])
-        sektor_dim = "Låntakersektor" if "Låntakersektor" in (meta.get("id") or []) else "Sektor"
-        if sektor_kode:
-            params[f"valueCodes[{sektor_dim}]"] = sektor_kode
+        if "valuta" in var_id_lower:
+            # "I alt" — alle valutaer samlet
+            for v, t in zip(values, value_texts):
+                if any(s in (v + " " + t).lower() for s in ["i alt", "total", "alle"]):
+                    kode = v
+                    break
 
-        # ContentsCode: ujusterte beholdninger
-        cc_kode = _ssb_oppdag_kode(
-            dim, "ContentsCode",
-            ["ujustert", "beholdning", "stock", "outstanding"],
-        )
-        if cc_kode:
-            params["valueCodes[ContentsCode]"] = cc_kode
+        elif "sektor" in var_id_lower or "låntaker" in var_id_lower:
+            # Publikum
+            for v, t in zip(values, value_texts):
+                if any(s in (v + " " + t).lower() for s in ["publikum", "public"]):
+                    kode = v
+                    break
+
+        elif "contents" in var_id_lower or "statistikkvariabel" in var_id_lower:
+            # Ujusterte beholdninger
+            for v, t in zip(values, value_texts):
+                if any(s in (v + " " + t).lower() for s in ["ujustert", "beholdning"]):
+                    kode = v
+                    break
+
+        if kode:
+            params[f"valueCodes[{var_id}]"] = kode
+            logger.info("SSB 11599: %s=%s", var_id, kode)
+        elif values:
+            # Obligatorisk dimensjon — ta første kode
+            params[f"valueCodes[{var_id}]"] = values[0]
+            logger.info("SSB 11599: %s — ingen match, bruker %s", var_id, values[0])
 
     cache_fil = _cache_path(table_id)
     data = None
