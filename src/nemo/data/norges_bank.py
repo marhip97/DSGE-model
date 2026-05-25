@@ -219,7 +219,7 @@ def hent_styringsrente(bruk_cache: bool = True) -> pd.Series:
         Indeks: pd.Timestamp (siste dag i kvartal).
     """
     url = (
-        f"{NB_BASE_URL}/POLICY_RATE"
+        f"{NB_BASE_URL}/IR/B.KPRA.SD."
         f"?startPeriod={START_PERIOD}&format=sdmx-json&locale=no"
     )
     data = _hent_nb_api("POLICY_RATE", url, bruk_cache=bruk_cache)
