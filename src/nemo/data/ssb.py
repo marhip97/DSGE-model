@@ -201,6 +201,10 @@ def _parse_json_stat2(data: dict, contents_code: str) -> pd.Series:
     tid_idx = dims.index("Tid") if "Tid" in dims else None
 
     if contents_idx is None or tid_idx is None:
+        # Logg alle tilgjengelige dimensjoner for diagnose
+        alle_dims = {d: list(dimension.get(d, {}).get("category", {}).get("index", {}).keys())[:10]
+                     for d in dims}
+        logger.error("Mangler ContentsCode/Tid. Tilgjengelige dims: %s", alle_dims)
         raise ValueError(f"Forventet dimensjonene 'ContentsCode' og 'Tid' i {dims}")
 
     # Hent kategorier for ContentsCode og Tid
@@ -210,6 +214,14 @@ def _parse_json_stat2(data: dict, contents_code: str) -> pd.Series:
     # Finn posisjon til ønsket ContentsCode
     if contents_code not in contents_cats:
         tilgjengelig = ", ".join(contents_cats)
+        # Logg full dimensjonsstruktur for diagnose av tabellendringer
+        alle_dims = {d: list(dimension.get(d, {}).get("category", {}).get("index", {}).keys())[:15]
+                     for d in dims if d not in ("ContentsCode", "Tid")}
+        logger.error(
+            "ContentsCode '%s' ikke funnet. ContentsCode tilgjengelig: [%s]. "
+            "Andre dimensjoner: %s",
+            contents_code, tilgjengelig, alle_dims
+        )
         raise ValueError(
             f"ContentsCode '{contents_code}' ikke funnet. Tilgjengelig: {tilgjengelig}"
         )
