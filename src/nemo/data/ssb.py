@@ -146,17 +146,23 @@ def hent_ssb_tabell(
 
         except Exception as exc:
             siste_exc = exc
+            # Logg HTTP-statuskode og responskropp for diagnose
+            body = ""
+            try:
+                body = resp.text[:500]   # type: ignore[possibly-undefined]
+            except Exception:
+                pass
             if forsok < 3:
                 vent = 2 ** forsok   # 2s, 4s
                 logger.warning(
-                    "SSB API-kall feilet (forsøk %d/3) for tabell %s: %s. Venter %ds.",
-                    forsok, table_id, exc, vent
+                    "SSB API-kall feilet (forsøk %d/3) for tabell %s: %s | body: %s. Venter %ds.",
+                    forsok, table_id, exc, body, vent
                 )
                 time.sleep(vent)
             else:
                 logger.warning(
-                    "SSB API-kall feilet (forsøk 3/3) for tabell %s: %s. Prøver cache-fallback.",
-                    table_id, exc
+                    "SSB API-kall feilet (forsøk 3/3) for tabell %s: %s | body: %s. Prøver cache-fallback.",
+                    table_id, exc, body
                 )
 
     fallback = _find_latest_cache(table_id)
@@ -226,16 +232,8 @@ def _parse_json_stat2(data: dict, contents_code: str) -> pd.Series:
 
 
 def _lag_ssb_query(contents_codes: list[str], start_year: int = 2001) -> dict:
-    """Bygger SSB JSON-stat2 API-spørring. Tid-dimensjonen utelates for å få alle perioder."""
-    return {
-        "query": [
-            {
-                "code": "ContentsCode",
-                "selection": {"filter": "item", "values": contents_codes},
-            },
-        ],
-        "response": {"format": "json-stat2"},
-    }
+    """Bygger SSB JSON-stat2 API-spørring uten filtre — returnerer all data fra tabellen."""
+    return {"query": [], "response": {"format": "json-stat2"}}
 
 
 def hent_nasjonalregnskap(bruk_cache: bool = True) -> pd.DataFrame:
@@ -298,16 +296,7 @@ def hent_kpi(bruk_cache: bool = True) -> pd.Series:
     table_id = "03013"
 
     # Månedlige tidskoder
-    query = {
-        "query": [
-            {
-                "code": "ContentsCode",
-                "selection": {"filter": "item", "values": ["KPI"]},
-            },
-        ],
-        "response": {"format": "json-stat2"},
-    }
-
+    query = {"query": [], "response": {"format": "json-stat2"}}
     data = hent_ssb_tabell(table_id, query, bruk_cache=bruk_cache)
     s = _parse_json_stat2_maaned(data, "KPI")
 
@@ -336,15 +325,7 @@ def hent_kpi_jae(bruk_cache: bool = True) -> pd.Series:
     """
     table_id = "14706"  # erstatter 05327/10235 fra 10. februar 2026
 
-    query = {
-        "query": [
-            {
-                "code": "ContentsCode",
-                "selection": {"filter": "item", "values": ["KpiJAE"]},
-            },
-        ],
-        "response": {"format": "json-stat2"},
-    }
+    query = {"query": [], "response": {"format": "json-stat2"}}
 
     data = hent_ssb_tabell(table_id, query, bruk_cache=bruk_cache)
     s = _parse_json_stat2_maaned(data, "KpiJAE")
