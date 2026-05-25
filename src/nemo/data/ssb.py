@@ -27,6 +27,14 @@ logger = logging.getLogger(__name__)
 
 SSB_BASE_URL = "https://data.ssb.no/api/v0/no/table"
 
+# PxWeb v2 API — brukes for nasjonalregnskap (09190) fra og med NR23-revisjonen
+_SSB_PXWEB_V2 = "https://data.ssb.no/api/pxwebapi/v2/tables"
+
+# Bekreftet aggregat-koder i SSB tabell 09190 (NR23-revisjon, PxWeb v2)
+_NR_KODER = {
+    "bnp_fastland": "bnpb.nr23_9fn",
+}
+
 # Absolutt sti til data/raw/ relativt til dette modulet
 _REPO_ROOT = Path(__file__).parents[3]  # src/nemo/data -> repo root (3 nivåer opp... men src/ er under repo root)
 # Prøv begge mulige stier
@@ -252,10 +260,10 @@ def _lag_ssb_query(contents_codes: list[str], start_year: int = 2001) -> dict:
 
 def hent_nasjonalregnskap(bruk_cache: bool = True) -> pd.DataFrame:
     """
-    Henter kvartalsvise nasjonalregnskapsdata fra SSB tabell 09189.
+    Henter kvartalsvise nasjonalregnskapsdata fra SSB tabell 09190 (PxWeb v2).
 
-    Volumindekser (2020=100) for BNP fastland, privat konsum,
-    bruttoinvesteringer, eksport og import.
+    Bruker GET-kall med ContentsCode=Faste (faste 2023-priser, mill. kr).
+    Tabell 09190 = kvartalsvise tall; 09189 = årslige; 11721 = månedlige.
 
     Parametere
     ----------
@@ -268,95 +276,134 @@ def hent_nasjonalregnskap(bruk_cache: bool = True) -> pd.DataFrame:
         Kolonner: bnp_fastland, privat_konsum, bruttoinvesteringer,
                   eksport, import_ — indeks som pd.Timestamp (siste dag i kvartal).
     """
-    table_id = "09189"
-    query = _lag_ssb_query([])
+    table_id = "09190"
+    cache_fil = _cache_path(table_id)
 
-    data = hent_ssb_tabell(table_id, query, bruk_cache=bruk_cache)
+    if bruk_cache and cache_fil.exists():
+        logger.info("Leser SSB-tabell %s fra cache: %s", table_id, cache_fil)
+        with open(cache_fil, encoding="utf-8") as f:
+            return _parse_nr_ny_struktur(json.load(f))
 
-    # Prøv gammel struktur (ContentsCode = serienavn) først
-    gammel_map = {
-        "BNPfastland": "bnp_fastland",
-        "PK":          "privat_konsum",
-        "BINV":        "bruttoinvesteringer",
-        "EKSPORT":     "eksport",
-        "IMPORT":      "import_",
+    url = f"{_SSB_PXWEB_V2}/{table_id}/data"
+    params = {
+        "lang": "no",
+        "valueCodes[Makrost]": "*",           # alle aggregater, filtrer lokalt
+        "valueCodes[ContentsCode]": "Faste",  # faste 2023-priser (rene kvartalstall)
+        "valueCodes[Tid]": "top(200)",         # siste 200 kvartaler (> 50 år)
+        "outputFormat": "json-stat2",
     }
-    try:
-        serier = {}
-        for code, kolonne in gammel_map.items():
-            s = _parse_json_stat2(data, code)
-            s.index = [ssb_kode_til_dato(k) for k in s.index]
-            serier[kolonne] = s
-        df = pd.DataFrame(serier).sort_index()
-        logger.info("Nasjonalregnskap (gammel struktur) hentet: %d kvartaler", len(df))
-        return df
-    except ValueError:
-        pass
 
-    # Ny struktur (NR23-revisjon): ContentsCode er måletype, aggregat i annen dim
-    logger.info("Prøver ny 09189-struktur (ContentsCode=Volum, aggregat-dim matchet på label)")
-    return _parse_nr_ny_struktur(data)
+    logger.info("Henter SSB-tabell %s (PxWeb v2 GET): %s", table_id, url)
+    siste_exc: Exception | None = None
+    for forsok in range(1, 4):
+        try:
+            resp = requests.get(url, params=params, timeout=60)
+            resp.raise_for_status()
+            data = resp.json()
+            with open(cache_fil, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False)
+            logger.info("Cachet SSB-tabell %s → %s", table_id, cache_fil)
+            return _parse_nr_ny_struktur(data)
+        except Exception as exc:
+            siste_exc = exc
+            body = ""
+            try:
+                body = resp.text[:500]  # type: ignore[possibly-undefined]
+            except Exception:
+                pass
+            if forsok < 3:
+                vent = 2 ** forsok
+                logger.warning(
+                    "SSB PxWeb v2 feilet (forsøk %d/3) for %s: %s | body: %s. Venter %ds.",
+                    forsok, table_id, exc, body, vent,
+                )
+                time.sleep(vent)
+            else:
+                logger.warning(
+                    "SSB PxWeb v2 feilet (forsøk 3/3) for %s: %s | body: %s. Prøver cache.",
+                    table_id, exc, body,
+                )
+
+    fallback = _find_latest_cache(table_id)
+    if fallback is not None:
+        logger.info("Cache-fallback: %s", fallback)
+        with open(fallback, encoding="utf-8") as f:
+            return _parse_nr_ny_struktur(json.load(f))
+    raise RuntimeError(
+        f"SSB PxWeb v2 feilet (3 forsøk) og ingen cache for tabell {table_id}."
+    ) from siste_exc
 
 
 def _parse_nr_ny_struktur(data: dict) -> pd.DataFrame:
     """
-    Parser tabell 09189 etter NR23-revisjon der ContentsCode = måletype
-    (Priser/Faste/Volum/Endringer) og aggregatene er i en annen dimensjon.
+    Parser SSB nasjonalregnskap (tabell 09190) i NR23-struktur.
 
-    Matcher serier på norsk label-tekst — robust mot kodeendringer.
+    ContentsCode = måletype (Faste/Priser/Volum/Endringer),
+    aggregater i separat dimensjon (Makrost).
+    Brukes med PxWeb v2 GET-kall der ContentsCode=Faste er forhåndsfiltrert.
     """
     dims = data.get("id", [])
     sizes = data.get("size", [])
     values = data.get("value", [])
     dimension = data.get("dimension", {})
 
-    # Finn Tid-dimensjon
     if "Tid" not in dims:
-        raise ValueError(f"Fant ikke Tid-dimensjon i tabell 09189. Dims: {dims}")
+        raise ValueError(f"Fant ikke Tid-dimensjon. Dims: {dims}")
     tid_idx = dims.index("Tid")
     tid_cats = list(dimension["Tid"]["category"]["index"].keys())
 
-    # Finn ContentsCode-dimensjon og velg "Volum" (volumindeks)
     if "ContentsCode" not in dims:
-        raise ValueError(f"Fant ikke ContentsCode i tabell 09189. Dims: {dims}")
+        raise ValueError(f"Fant ikke ContentsCode. Dims: {dims}")
     cc_idx = dims.index("ContentsCode")
     cc_cats = list(dimension["ContentsCode"]["category"]["index"].keys())
-    volum_code = next((c for c in cc_cats if "olum" in c or "aste" in c), cc_cats[0])
+    # Foretrekk 'Faste' (faste priser) fremfor 'Volum' (årslig endring)
+    volum_code = next((c for c in cc_cats if "aste" in c), None) or \
+                 next((c for c in cc_cats if "olum" in c), cc_cats[0])
     volum_pos = cc_cats.index(volum_code)
-    logger.info("Bruker ContentsCode='%s' for volumindekser", volum_code)
+    logger.info("Bruker ContentsCode='%s'", volum_code)
 
-    # Finn aggregat-dimensjonen (den eneste dimensjonen som ikke er ContentsCode eller Tid)
     agg_dims = [d for d in dims if d not in ("ContentsCode", "Tid")]
     if not agg_dims:
         raise ValueError(f"Fant ingen aggregat-dimensjon i {dims}")
     agg_dim = agg_dims[0]
     agg_idx = dims.index(agg_dim)
-    agg_cats  = list(dimension[agg_dim]["category"]["index"].keys())
+    agg_cats = list(dimension[agg_dim]["category"]["index"].keys())
     agg_labels = {k: v for k, v in zip(
         agg_cats,
         dimension[agg_dim]["category"].get("label", {}).values()
     )}
     logger.info("Aggregat-dimensjon: '%s' med %d serier", agg_dim, len(agg_cats))
-    logger.info("Tilgjengelige koder og labels: %s", dict(list(agg_labels.items())[:20]))
+    logger.info("Alle tilgjengelige aggregater i '%s':", agg_dim)
+    for _k, _v in agg_labels.items():
+        logger.info("  %s: %s", _k, _v)
 
-    # Label-matching for de seriene vi trenger
-    label_map = {
-        "bnp_fastland":       ["fastland", "mainland", "bnp fast"],
-        "privat_konsum":      ["privat konsum", "husholdningenes konsum", "private consumption"],
-        "bruttoinvesteringer":["bruttoinvesteringer", "brutto realinvesteringer", "gross fixed"],
-        "eksport":            ["eksport", "export"],
-        "import_":            ["import"],
+    # Label-fallback for serier uten hardkodet kode
+    _label_fallback: dict[str, list[str]] = {
+        "privat_konsum":      ["konsum i husholdninger og ideelle", "konsum i husholdninger",
+                               "privat konsum"],
+        "bruttoinvesteringer":["bruttoinvestering i alt", "bruttoinvesteringer i alt"],
+        "eksport":            ["eksport i alt", "eksport"],
+        "import_":            ["import i alt", "import"],
+        # BNP Fastlands-Norge — bruker hardkodet kode fra _NR_KODER, label kun som fallback
+        "bnp_fastland":       ["bruttonasjonalprodukt fastlands", "bnp fastlands"],
     }
 
     def finn_kode(kolonne: str) -> str:
+        # 1) Direkte kodeoppslag (bekreftet av bruker)
+        hardkodet = _NR_KODER.get(kolonne)
+        if hardkodet and hardkodet in agg_cats:
+            logger.info("  '%s' → '%s' (hardkodet kode)", kolonne, hardkodet)
+            return hardkodet
+        # 2) Label-basert matching (fallback)
         for kode, label in agg_labels.items():
-            for soek in label_map[kolonne]:
+            for soek in _label_fallback.get(kolonne, []):
                 if soek.lower() in label.lower():
+                    logger.info("  Matchet '%s' → kode='%s', label='%s'", kolonne, kode, label)
                     return kode
-        tilgj = list(agg_labels.items())[:30]
         raise ValueError(
-            f"Fant ikke '{kolonne}' i aggregat-dim '{agg_dim}'. "
-            f"Tilgjengelige (kode: label): {tilgj}"
+            f"Fant ikke '{kolonne}' (hardkodet kode: {hardkodet!r}, "
+            f"label-søk: {_label_fallback.get(kolonne)}). "
+            f"Alle tilgjengelige aggregater: {list(agg_labels.items())}"
         )
 
     n = [sizes[i] for i in range(len(dims))]
