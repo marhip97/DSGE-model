@@ -37,6 +37,40 @@ rho_s=0 gjenoppretter ren UIP (bakoverkompatibel).
 
 ---
 
+## Kjøring 19 — chain_kj19_prod (2026-05-26)
+
+- **Test:** Fase 1B — AR(1)-glatting av RER i UIP (`rho_s` estimert), KPI-JAE
+- **Parametre:** 21 (rho_s ny), sigma_rp fast=0.006, kappa_M fast=0.030
+- **Startverdi:** kj18 posterior means + rho_s=0.40 (prior-mean)
+- **Trekk:** 200k produksjon + 20k burnin + 50k rekalibrering, seed=19
+- **Tid:** 77.4 min
+- **Konvergens:** 20/21 OK, max PSRF=1.312 (sigma_H), min ESS=330
+
+**Nøkkelresultater:**
+
+| Parameter | K&M   | kj18   | kj19   |
+|-----------|-------|--------|--------|
+| rho_s     | 0.0   | —      | **0.009** [0.002,0.018] |
+| psi_R     | 0.667 | 0.954  | 0.956  |
+| sigma_H   | 0.050 | 0.310  | 0.309  |
+| sigma_C   | 0.030 | 0.116  | 0.120  |
+| phi_I1    | 4.0   | 0.103  | 0.103  |
+| psi_P1    | 0.292 | 0.238  | 0.267  |
+
+**Diagnostikk rho_s:** Posterior mean = 0.009, std = 0.005, CI = [0.002, 0.018].
+Praktisk talt ved nedre prior-grense (0.001). Data avviser AR(1)-glatting fullstendig.
+
+**Konklusjon:** ❌ **Fase 1B mislyktes.** rho_s → 0 betyr at avviket IKKE skyldes
+manglende UIP-dynamikk. IRF-responser er identiske med kj18. BNP-overreaksjonen
+er strukturell — sannsynligvis kombinasjon av psi_R≈0.956 og phi_I1≈0.10.
+
+**Neste hypoteser (krever PE-eskalering):**
+1. Kalibrere phi_I1 fast = K&M=4.0 (svakt identifisert, kj14-erfaring)
+2. Diagnostisere identifikasjon av psi_R ved likelihood-profil
+3. Utvide estimeringsperiode med mer post-COVID data (2024–2025)
+
+---
+
 
 
 - **Test:** A — fjern i_3m_obs (13 obs)
