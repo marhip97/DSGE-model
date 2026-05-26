@@ -17,8 +17,27 @@ hindrer grense-atferd uten å utelukke høy renteglatting (rom til 0.97).
 **Fil:** `src/nemo/estimation/mcmc.py` linje ~179
 
 ---
+---
 
-## Kjøring 15 — chain_kj15_prod (2026-05-26)
+## Prior-endring — rho_s (2026-05-26, PE-godkjent Fase 1B)
+
+**Ny parameter:** `rho_s` — AR(1)-glatting av RER i UIP-ligningen  
+**Prior:** `Beta(2.0, 2.0, [0.001, 0.99])` — symmetrisk, senteret på 0.5, lb=0.001 fordi Beta(2,2)=0 ved x=0  
+**K&M-referanse:** Ikke i K&M (2019) — ren UIP er spesialtilfelle rho_s=0. Justiniano & Preston (2010) viser at AR(1) i UIP er nødvendig for å matche RER-persistens i data.
+
+**Begrunnelse:** kj18 (KPI-JAE) ga KPI q4-ratio 0.40× NB (OK ≥ 0.35×) men BNP q4-ratio 4.55× NB (mål: 0.8–1.5×). Uten dynamikk i UIP absorberer `sigma_H` og `sigma_C` overraskende store sjokk og driver BNP-overreaksjon. AR(1)-glatting demper den umiddelbare RER-responsen ved pengepolitikksjokk.
+
+**Modellendring:** `src/nemo/model/equations.py` ligning 15 (UIP):
+```
+rer_t = rho_s·rer_{t-1} + (1-rho_s)·[E_t[rer_{t+1}] - (i_D-π) + (i*-π*) + ε_rp + ...]
+```
+rho_s=0 gjenoppretter ren UIP (bakoverkompatibel).
+
+**Fil:** `src/nemo/estimation/mcmc.py` (PARAM_PRIORS), `src/nemo/model/equations.py` (ligning 15), `src/nemo/model/parameters.py`
+
+---
+
+
 
 - **Test:** A — fjern i_3m_obs (13 obs)
 - **Parametre:** 20, sigma_rp fast=0.006, kappa_M fast=0.030

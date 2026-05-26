@@ -324,24 +324,26 @@ def build_matrices(p=None):
     # BLOKK D: VALUTA OG HANDEL
     # ════════════════════════════════════════════════════════════════════════
  
-    # D1. UIP med pengemarkedspremie, gjeldselastisk premie og olje-valuta-kanal
-    # E[rer_{t+1}] = rer + (i_D - π) - (i* - π*) + ε_rp + ε_prem + φ_B·b_NW - φ_O·po
-    # φ_B·b_NW: gjeldselastisk ankerfeste (K&M §3.4, Tabell 8, PE-godkjent 2026-05-19)
-    # φ_O·po: direkte olje→valutakurs-kanal (PE-godkjent 2026-05-20):
-    #   høy oljepris → NOK-appresiering (RER ned) — kalibrert fra hist. NOK/olje-korr ~0.7
-    #   Hypotese: ε_rp absorberer denne kanalen når den mangler → sigma_rp=0.017 vs K&M 0.006
+    # D1. UIP med AR(1)-glatting, gjeldselastisk premie og olje-valuta-kanal
+    # Fase 1B (PE-godkjent 2026-05-26): delvis-justeringsform (Justiniano & Preston 2010)
+    #   rer_t = rho_s·rer_{t-1} + (1-rho_s)·[E_t[rer_{t+1}] - (i_D-π) + (i*-π*) + ε_rp + ...]
+    # rho_s=0 → ren UIP (bakoverkompatibel); rho_s>0 demper umiddelbar RER-respons.
+    # Mekanisme: høy rho_s reduserer BNP-overreaksjon ved pengepolitikk-sjokk.
     phi_O = p.phi_O
+    rho_s = getattr(p, 'rho_s', 0.0)
+    _w    = 1.0 - rho_s                 # vekt på UIP-forventningsledd
     G0[15, RER]       =  1.0
-    G0[15, I_D]       =  1.0
-    G0[15, PI]        = -1.0
-    G0[15, I_STAR]    = -1.0
-    G0[15, PI_STAR]   =  1.0
-    G0[15, EPS_PREM]  = -1.0   # pengemarkedspremie som UIP-skift
-    G0[15, B_NW]      =  phi_B # gjeldselastisk premie — φ_B=0.0016 (K&M Tabell 8)
-    G0[15, PO]        =  phi_O # olje-valuta-kanal — høy oljepris styrker NOK (RER ned)
-    Pi[15, RER]       =  1.0
-    Psi[15, E_rp]     =  1.0
-    Psi[15, E_prem]   =  1.0
+    G0[15, I_D]       =  _w
+    G0[15, PI]        = -_w
+    G0[15, I_STAR]    = -_w
+    G0[15, PI_STAR]   =  _w
+    G0[15, EPS_PREM]  = -_w
+    G0[15, B_NW]      =  _w * phi_B
+    G0[15, PO]        =  _w * phi_O
+    G1[15, RER]       =  rho_s          # lagget RER-ledd
+    Pi[15, RER]       =  _w
+    Psi[15, E_rp]     =  _w
+    Psi[15, E_prem]   =  _w
  
     # D2. Eksportetterspørsel (Armington, korrigert µ)
     G0[16, X]   =  1.0
@@ -878,13 +880,12 @@ def build_matrices_v4(p=None, theta_H: float = 0.05):
     G0[14, Q_K_E]  = -(1.0 - delta)
     G0[14, PI_E]  +=  1.0
 
-    # Ligning 15 (UIP): E_t[rer_{t+1}]
-    # A9b (PE-godkjent 2026-05-22): psi_UIP=0.02 bryter enhetsroten fra ren UIP.
-    # Ren UIP (koeff=1.0) gir companion eigenverdi λ=1.0 (enhetsrot) → BK ikke oppfylt.
-    # Med psi_UIP: (1+ψ)·rer_t = E_t[rer_{t+1}] + ... → eigenverdi 1+ψ≈1.02 > 1.001.
-    # Tolkning: 2% valutarisikopremie/ufullkommen kapitalbevegelighet (C3-kanal).
+    # Ligning 15 (UIP): AR(1)-glattet forventningsledd
+    # Fase 1B: RER_E-koeff skaleres med (1-rho_s) fordi v3 setter Pi[15,RER]=_w.
+    # psi_UIP=0.02 beholdes som sikkerhetsventil mot enhetsrot ved rho_s→0.
     psi_UIP = 0.02
-    G0[15, RER_E] = -1.0
+    _rho_s = getattr(p, 'rho_s', 0.0)
+    G0[15, RER_E] = -(1.0 - _rho_s)
     G0[15, RER]  += psi_UIP
 
     # ── Konsistenslikninger (rader 49–55): X_t = X_E_{t-1} + η_{X,t} ─────────
