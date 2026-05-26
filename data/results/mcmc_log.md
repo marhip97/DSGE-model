@@ -4,6 +4,52 @@ Loggføres per AGENTER.md-krav: alle MCMC-kjøringer skal dokumenteres her.
 
 ---
 
+## Prior-endring — psi_R (2026-05-26, PE-godkjent)
+
+**Fra:** `Beta(2.0, 2.0, [0.01, 0.990])`
+**Til:** `Beta(2.0, 3.0, [0.01, 0.970])`
+
+**Begrunnelse:** kj16 (KPI-JAE, 100k) drev psi_R til 0.987 — praktisk talt ved prior-grensen
+(0.990). Dette ga BNP q4 = −209% (NB: −45%) og sigma_H=0.321, sigma_C=0.111.
+Beta(2,3) er høyreskjev (penaliserer verdier nær 1) og redusert øvre grense til 0.970
+hindrer grense-atferd uten å utelukke høy renteglatting (rom til 0.97).
+
+**Fil:** `src/nemo/estimation/mcmc.py` linje ~179
+
+---
+
+## Kjøring 15 — chain_kj15_prod (2026-05-26)
+
+- **Test:** A — fjern i_3m_obs (13 obs)
+- **Parametre:** 20, sigma_rp fast=0.006, kappa_M fast=0.030
+- **Trekk:** 100k produksjon + 20k burnin, seed=15
+- **Konvergens:** 17/20 OK, max PSRF=1.449 (gamma_p), min ESS=155
+- **Nøkkelresultater:** psi_R=0.944, psi_P1=0.168, gamma_p=0.304
+- **B5 KPI q4-ratio:** 0.19× NB
+- **Beslutning A:** ❌ HJELPER IKKE (< 0.35×)
+
+## Kjøring 16 — chain_kj16_prod (2026-05-26)
+
+- **Test:** B — KPI-JAE (pi_core_obs) i stedet for total KPI
+- **Parametre:** 20, sigma_rp fast=0.006, kappa_M fast=0.030
+- **Trekk:** 100k produksjon + 20k burnin, seed=16
+- **Konvergens:** 20/20 OK, max PSRF=1.031, min ESS=258
+- **Nøkkelresultater:** psi_R=0.987 (!), psi_P1=0.298, sigma_H=0.321, sigma_C=0.111
+- **B5 KPI q4-ratio:** 0.42× NB, BNP q4=-209% (!!)
+- **Beslutning B:** ✅ KPI OK, men BNP ustabil → prior-justering psi_R for kj18
+
+## Kjøring 17 — chain_kj17_prod (2026-05-26)
+
+- **Test:** C — kun pre-COVID (75 kv, tom post-array)
+- **Parametre:** 20, sigma_rp fast=0.006, kappa_M fast=0.030
+- **Trekk:** 100k produksjon + 20k burnin, seed=17
+- **Konvergens:** 20/20 OK, max PSRF=1.054, min ESS=181
+- **Nøkkelresultater:** psi_R=0.941, psi_P1=0.164
+- **B5 KPI q4-ratio:** 0.19× NB
+- **Beslutning C:** ❌ HJELPER IKKE (< 0.35×)
+
+---
+
 ## Kjøring 1 — chain_fase2_reparam_prod (2026-05)
 - **Parametre:** 20 (inkl. phi_I1 fri)
 - **Trekk:** 200k × 2 kjeder

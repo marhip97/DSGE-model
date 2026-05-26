@@ -176,7 +176,10 @@ PARAM_PRIORS = {
     'sigma_H':  ('inv_gamma', 2.0, 0.0500, 1e-5, 1.0),
     # psi_R: kj11 viste likelihood-fall på 97 log-enheter med K&M=0.667 → data vil ha høy renteglatting.
     # Restores til estimering med utvidet øvre grense 0.990 (fra 0.92) — data trenger rom over 0.91.
-    'psi_R':   ('beta',   2.0, 2.0,  0.01, 0.990),
+    # PE-godkjent 2026-05-26 (kj18): Beta(2,3) og øvre grense 0.970.
+    # Begrunnelse: kj16 (KPI-JAE) drev psi_R til 0.987 (prior-grense) og BNP q4=-209%.
+    # Beta(2,3) er høyreskjev (penaliserer verdier nær 1) og ceiling 0.970 gir trygg margin.
+    'psi_R':   ('beta',   2.0, 3.0,  0.01, 0.970),
     'psi_P1':  ('normal', 0.29, 0.10, 0.05, 1.50),
     'psi_Y':   ('normal', 0.24, 0.05, 0.01, 0.80),
     # gamma_p: Calvo-prisindeksasjon i hybrid NK Phillips-kurve (PE-godkjent 2026-05-24).
