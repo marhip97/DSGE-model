@@ -1,0 +1,43 @@
+{
+  "n_production": 100000,
+  "burnin": 20000,
+  "acc_rate": 0.25679,
+  "final_scale": 0.9189292328298696,
+  "n_recalibrations": 5,
+  "recalib_log": [
+    {
+      "round": 0,
+      "psrf_max": 1.0656451626040575,
+      "ess_min": 57.9670075031106,
+      "scale_new": 3.0
+    },
+    {
+      "round": 1,
+      "psrf_max": 1.3515757988941675,
+      "ess_min": 31.305163573700668,
+      "scale_new": 3.187755648
+    },
+    {
+      "round": 2,
+      "psrf_max": 1.2589339410872702,
+      "ess_min": 33.93290975463131,
+      "scale_new": 2.176419984394558
+    },
+    {
+      "round": 3,
+      "psrf_max": 1.1062852519200441,
+      "ess_min": 48.66842889946039,
+      "scale_new": 1.647898935083265
+    },
+    {
+      "round": 4,
+      "psrf_max": 1.195397406772589,
+      "ess_min": 40.63023107468876,
+      "scale_new": 2.2560449845782484
+    }
+  ],
+  "psrf_final": 1.05431811700599,
+  "sigma_A_fixed": 0.006,
+  "use_reparam": false,
+  "ess_min": 181.13791436952278
+}

@@ -148,6 +148,7 @@ class Parameters:
     # Kalibrert fra historisk NOK/olje-korrelasjon ~0.7:
     # +10% oljepris → ~1.5% NOK-appresiering → phi_O ≈ 0.15
     phi_O    = 0.15       # (CAL) direkte olje→RER-kanal i UIP
+    rho_s    = 0.0        # (EST) AR(1)-glatting av RER i UIP; 0=ren UIP (Fase 1B)
 
     # Nasjonalregnskapsandeler (Norske data 2001–2019)
     # CY+IY+IHY+GY+XY-MY = 1.00 (Spor A5 rettelse, 2026-05-15)

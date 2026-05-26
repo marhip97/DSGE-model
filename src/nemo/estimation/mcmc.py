@@ -176,7 +176,10 @@ PARAM_PRIORS = {
     'sigma_H':  ('inv_gamma', 2.0, 0.0500, 1e-5, 1.0),
     # psi_R: kj11 viste likelihood-fall på 97 log-enheter med K&M=0.667 → data vil ha høy renteglatting.
     # Restores til estimering med utvidet øvre grense 0.990 (fra 0.92) — data trenger rom over 0.91.
-    'psi_R':   ('beta',   2.0, 2.0,  0.01, 0.990),
+    # PE-godkjent 2026-05-26 (kj18): Beta(2,3) og øvre grense 0.970.
+    # Begrunnelse: kj16 (KPI-JAE) drev psi_R til 0.987 (prior-grense) og BNP q4=-209%.
+    # Beta(2,3) er høyreskjev (penaliserer verdier nær 1) og ceiling 0.970 gir trygg margin.
+    'psi_R':   ('beta',   2.0, 3.0,  0.01, 0.970),
     'psi_P1':  ('normal', 0.29, 0.10, 0.05, 1.50),
     'psi_Y':   ('normal', 0.24, 0.05, 0.01, 0.80),
     # gamma_p: Calvo-prisindeksasjon i hybrid NK Phillips-kurve (PE-godkjent 2026-05-24).
@@ -193,7 +196,11 @@ PARAM_PRIORS = {
     # phi_PQ kj13: svakt identifisert [104,1089] → KPI 0.21× NB. Ikke estimer på nytt.
     # 'phi_PQ':  ('normal', 669.0, 300.0, 50.0, 2000.0),  # DEAKTIVERT etter kj13
     # kappa_M kj14: data vil ha LAVERE kappa_M (0.0175 < K&M=0.030) → KPI 0.13× NB. Ikke estimer på nytt.
-    # 'kappa_M': ('normal', 0.03, 0.03, 0.005, 0.20),   # DEAKTIVERT etter kj14
+    # 'kappa_M': ('normal', 0.03, 0.03, 0.005, 0.20),   # DEAKTIVERT etter kj13
+    # rho_s: AR(1)-glatting av RER i UIP (Fase 1B, PE-godkjent 2026-05-26).
+    # K&M har ren UIP (rho_s=0), men norske data har høyere RER-persistens.
+    # Beta(2,2) sentrer på 0.5, [0.001, 0.99]. lb=0.001 for å unngå Beta(2,2)=0 ved x=0.
+    'rho_s':  ('beta', 2.0, 2.0, 0.001, 0.99),
 }
 PARAM_NAMES = list(PARAM_PRIORS.keys())
 N_PARAMS    = len(PARAM_NAMES)
@@ -207,7 +214,7 @@ KM = {'rho_A':0.804,'rho_C':0.725,'rho_O':0.874,'rho_Ys':0.783,
       'sigma_O':0.079,'sigma_Ys':0.011,'sigma_rp':0.006,'sigma_i':0.0003,
       'sigma_P':0.003,'sigma_H':0.050,'psi_R':0.666,'psi_P1':0.292,
       'psi_Y':0.242,'h_c':0.938,'gamma_p':0.35,'phi_I1':4.0,'phi_I2':8.0,'phi_u':0.2192,
-      'phi_PQ':669.0,'kappa_M':0.03}
+      'phi_PQ':669.0,'kappa_M':0.03,'rho_s':0.01}
 
 def log_prior(theta):
     lp = 0.0
