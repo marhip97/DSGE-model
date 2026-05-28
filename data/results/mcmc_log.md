@@ -770,3 +770,27 @@ Med K&M-like phi_u og psi_R∈[0.90,0.968]: BNP∈[0.88,1.11]×✅.
 - 10k burnin (vs 20k), scale_init=0.81, seed=23, 200k produksjon
 
 **Forventet resultat:** psi_R→~0.95, BNP∈[0.8,1.5]×✅, KPI≥0.35×✅
+
+**Resultat kj23 (avbrutt manuelt 156k/200k, 2026-05-28):**
+- PSRF=1.01 (utmerket), ESS=404, acc=26.2% — teknisk konvergert
+- psi_R=0.9684 (prior-tak=0.970), phi_u=1.72 (8× K&M=0.219)
+- B5 (phi_I1=0.50 korrekt): **BNP=2.33× NB ❌**, KPI=0.92× NB ✅
+- Rotårsak: phi_u=1.72 (svakt identifisert fra makrodata) amplifier investeringsrespons
+  Med phi_u=K&M=0.219: BNP=1.10×✅, KPI=0.47×✅ (psi_R=0.968)
+- **Beslutning:** phi_u festes fast=K&M=0.2192 i kj24 (PE-godkjent 2026-05-28)
+
+---
+
+## kj24 — Forhåndsregistrering (2026-05-28)
+
+**Kjøring:** kj24 — phi_u fast=K&M=0.2192, warm start fra kj23 156k-posterior  
+**Formål:** Bekrefte B5 med phi_u kalibrert fra mikrodata (K&M Tabell 8).  
+**Spesifikasjon:**
+- N_PARAMS=17 (phi_u fjernet fra estimering)
+- phi_u fast=0.2192 (K&M Tabell 8, PE-godkjent 2026-05-28)
+- phi_I1 fast=0.50, sigma_A fast=0.006, rho_s fast=0.0
+- κ_P=0.0448, psi_R Beta(2,3,[0.01,0.970])
+- Startverdi: kj23 156k-posterior means (17 param, lp0=-3335)
+- 10k burnin, scale_init=0.75, seed=24, 200k produksjon
+
+**Forventet resultat:** BNP=1.10×✅, KPI=0.47×✅ (feasibility bekreftet med posterior means)

@@ -57,6 +57,11 @@ H_C_FIXED = 0.938
 # phi_I1 kalibreres fast — PE-godkjent 2026-05-26 (kj20-diagnose): sweep viser
 # phi_I1≈0.5 gir BNP-ratio 1.16× NB ([0.8,1.5]×). kj19 estimerte 0.103 (for lav → BNP-eksplosjon).
 PHI_I1_FIXED = 0.50
+# phi_u kalibreres fast — PE-godkjent 2026-05-28 (kj23-diagnose): posterior konvergerer til
+# phi_u=1.72 (8× K&M=0.2192). Med phi_I1=0.50 gir dette BNP=2.33× NB (mål [0.8,1.5]×).
+# K&M Tabell 8: phi_u=0.2192 kalibrert fra mikrodata (kapitalutnyttingselastisitet).
+# Svakt identifisert fra makroobservablene; fast på K&M-verdi som phi_I1 og sigma_A.
+PHI_U_FIXED = 0.2192
 # lambda_pi4: vekt på samtid π i hybrid Taylor-regel (0=ren E_t[π_{t+4}], 1=samtid)
 LAMBDA_PI4_FIXED = 0.0
 # psi_R: fryses til K&M=0.667 for kj21-diagnose — test om psi_R→0.956 er rotårsak
@@ -212,7 +217,10 @@ PARAM_PRIORS = {
     # 'phi_I1':  ('normal', 2.0,  2.0, 0.1,  15.0),  # DEAKTIVERT etter kj19 → fast=PHI_I1_FIXED
     'phi_I2':  ('normal', 8.0,  4.0, 0.5,  40.0),
     # Fase 2v2 (2026-05-15): kapitalutnyttelseselastisitet (Alt. A, K&M Tabell 8)
-    'phi_u':   ('normal', 0.22, 0.10, 0.01, 2.0),
+    # phi_u kj23: posterior=1.72 (8× K&M) → BNP=2.33× NB med phi_I1=0.50. Kalibreres fast=0.2192.
+    # Svakt identifisert fra makrodata; K&M Tabell 8 (mikrodata). PE-godkjent 2026-05-28.
+    # Exit-mulighet: gjenaktiver med Normal(0.22,0.10,[0.01,2.0]) ved behov.
+    # 'phi_u':   ('normal', 0.22, 0.10, 0.01, 2.0),  # DEAKTIVERT etter kj23 → fast=PHI_U_FIXED
     # phi_PQ kj13: svakt identifisert [104,1089] → KPI 0.21× NB. Ikke estimer på nytt.
     # 'phi_PQ':  ('normal', 669.0, 300.0, 50.0, 2000.0),  # DEAKTIVERT etter kj13
     # kappa_M kj14: data vil ha LAVERE kappa_M (0.0175 < K&M=0.030) → KPI 0.13× NB. Ikke estimer på nytt.
@@ -315,6 +323,7 @@ def log_posterior(theta, H, Sv, Y_pre, Y_post):
         setattr(Pt,'kappa_M',   KM['kappa_M'])    # fast K&M=0.030 — kj14 viste estimering forverrer KPI
         setattr(Pt,'rho_s',     0.0)              # fast=0 (ren UIP) — kj19: data avviste AR(1) UIP
         setattr(Pt,'phi_I1',    PHI_I1_FIXED)     # fast=0.50 — kj19 sweep (PE-godkjent 2026-05-26)
+        setattr(Pt,'phi_u',     PHI_U_FIXED)      # fast=0.2192 (K&M) — kj23: 1.72→BNP=2.33× (PE-godkjent 2026-05-28)
         setattr(Pt,'lambda_pi4',LAMBDA_PI4_FIXED) # pi4chain hybrid-vekt (ikke brukt i v3)
         use_pi4 = H.shape[1] == NZ_PI4
         if use_pi4:
