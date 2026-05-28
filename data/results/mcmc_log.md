@@ -103,6 +103,17 @@ Implementert i `build_matrices_pi4chain` (NZ=53), kjøring 21.
 
 ---
 
+## Parameterendring — sigma_A fryses (2026-05-28, PE-godkjent)
+
+**Fra:** estimert `Normal(0.010, 0.004, [0.002, 0.050])`
+**Til:** fast `SIGMA_A_FIXED = 0.006` (K&M-verdi)
+
+**Begrunnelse:** kj20 drev sigma_A→0.049 (tak=0.050, kun 1.2σ fra grensen) og phi_u→0.012 (gulv=0.010). Felles MCMC-forslag av alle 19 parametere ga 0% aksept i kj21 fordi minst én parameter alltid gikk utenfor grensene. sigma_A er svakt identifisert (K&M kaliberer fast=0.006). Resultat: N_PARAMS: 19→18.
+
+**build_Q:** sigma_A lagt til `_fixed`-oppslag (som sigma_rp).
+
+---
+
 ## Modellendring — pi4chain / A4b (2026-05-28, PE-godkjent)
 
 **Endring:** Taylor-regel endret fra samtid π_t til fremoverskuende E_t[π_{t+4}]

@@ -4,9 +4,11 @@ Kjøring 21 — A4b: fremoverskuende Taylor-regel E_t[π_{t+4}], KPI-JAE.
 Metodikk (PE-godkjent 2026-05-28):
   - K&M §2.13 mimicking rule: i_R = ψ_R·i_{t-1} + (1-ψ_R)·[ψ_P1·E_t[π_{t+4}] + ψ_Y·y + ...] + ε_i
   - lambda_pi4 fast=0.0 (ren E_t[π_{t+4}]) — build_matrices_pi4chain, NZ=53
+  - sigma_A fast=0.006 (PE-godkjent 2026-05-28) — kj20: sigma_A→0.049 (tak=0.050) → 0% aksept
   - phi_I1 fast=0.50 (kj20-PE-godkjent), rho_s fast=0.0 (ren UIP)
   - KPI-JAE (pi_core_obs) — build_H_pi4chain() (N_OBS×53)
-  - Startverdi: kj20 posterior means (19 overlappende parametere)
+  - Startverdi: kj20 posterior means (18 overlappende param, sigma_A utelatt)
+  - phi_u justert til K&M=0.22 (kj20: phi_u→0.012 ved gulvet)
   - 200k produksjon, seed=21
 
 Hypotese: samtid π_t i Taylor (kj18–kj20) svekker Taylor-prinsippet og driver
@@ -27,7 +29,7 @@ from nemo.estimation.mcmc import (
     PARAM_NAMES, N_PARAMS, KM,
     build_H_pi4chain, build_Sv, OBS_NAMES,
     adaptive_mcmc_with_monitoring, log_posterior,
-    SIGMA_RP_FIXED, PHI_I1_FIXED, LAMBDA_PI4_FIXED,
+    SIGMA_RP_FIXED, SIGMA_A_FIXED, PHI_I1_FIXED, LAMBDA_PI4_FIXED,
 )
 import pandas as pd
 
@@ -50,19 +52,22 @@ post = obs_df[obs_df.index >= '2022-01-01'][obs_kols].values
 print(f"Datafil: {datafil.name} (KPI-JAE)")
 print(f"Pre={len(pre)} kv  Post={len(post)} kv  Totalt={len(pre)+len(post)} kv")
 
-# ── Startverdi — kj20 posterior means (19 parametere) ────────────────────────
+# ── Startverdi — kj20 posterior means (18 overlappende parametere) ───────────
+# kj20 hadde 19 param (inkl. sigma_A); kj21 har 18 (sigma_A fryses fast=0.006)
 kj20_fil = rot / "data/results/chain_kj20_prod.npy"
-KJ20_FULL = PARAM_NAMES  # kj20 har samme 19 param som kj21
+KJ20_NAMES = ['rho_A','rho_C','rho_O','rho_Ys','rho_rp','rho_H',
+              'sigma_A','sigma_C','sigma_O','sigma_Ys','sigma_i','sigma_P','sigma_H',
+              'psi_R','psi_P1','psi_Y','gamma_p','phi_I2','phi_u']  # kj20: 19 param
 
 if kj20_fil.exists():
     print(f"\nLaster startverdi fra chain_kj20_prod.npy ...")
     kj20 = np.load(kj20_fil)
     n = kj20.shape[0]; half = kj20[n//2:]
-    kj20_means = {KJ20_FULL[i]: float(half[:,i].mean()) for i in range(len(KJ20_FULL))}
-    kj20_stds  = {KJ20_FULL[i]: float(half[:,i].std())  for i in range(len(KJ20_FULL))}
+    kj20_means = {KJ20_NAMES[i]: float(half[:,i].mean()) for i in range(len(KJ20_NAMES))}
+    kj20_stds  = {KJ20_NAMES[i]: float(half[:,i].std())  for i in range(len(KJ20_NAMES))}
     theta_start = np.array([kj20_means.get(n2, KM.get(n2, 0.5)) for n2 in PARAM_NAMES])
     post_std    = np.array([max(kj20_stds.get(n2, 0.05), 1e-4) for n2 in PARAM_NAMES])
-    print(f"  {N_PARAMS} parametere (phi_I1={PHI_I1_FIXED}, rho_s=0.0, lambda_pi4={LAMBDA_PI4_FIXED} — alle fast)")
+    print(f"  {N_PARAMS} parametere (sigma_A={SIGMA_A_FIXED} fast, phi_I1={PHI_I1_FIXED}, rho_s=0.0, lambda_pi4={LAMBDA_PI4_FIXED})")
 else:
     print("Advarsel: chain_kj20_prod.npy ikke funnet — bruker K&M startverdi")
     theta_start = np.array([KM.get(n2, 0.5) for n2 in PARAM_NAMES])
@@ -74,8 +79,16 @@ if theta_start[psi_R_idx] > 0.969:
     theta_start[psi_R_idx] = 0.950
     print(f"  psi_R justert til 0.950 (kj20: {kj20_means.get('psi_R',0):.4f} > 0.970)")
 
+# Korriger phi_u: kj20 konvergerte til gulvet (0.012 ≈ lb=0.010) → bruk K&M-startverdi
+phi_u_idx = PARAM_NAMES.index("phi_u")
+if theta_start[phi_u_idx] < 0.05:
+    theta_start[phi_u_idx] = KM.get('phi_u', 0.22)
+    post_std[phi_u_idx] = 0.05
+    print(f"  phi_u justert til {theta_start[phi_u_idx]:.3f} (kj20: {kj20_means.get('phi_u',0):.4f} ved gulvet)")
+
 print(f"\nKjøring 21: {N_PARAMS} parametere")
-print(f"  sigma_rp fast={SIGMA_RP_FIXED}  phi_I1 fast={PHI_I1_FIXED}  rho_s fast=0.0")
+print(f"  sigma_rp fast={SIGMA_RP_FIXED}  sigma_A fast={SIGMA_A_FIXED}")
+print(f"  phi_I1 fast={PHI_I1_FIXED}  rho_s fast=0.0")
 print(f"  lambda_pi4 fast={LAMBDA_PI4_FIXED}  (ren E_t[pi_{{t+4}}], NZ=53)")
 print(f"  psi_R prior: Beta(2,3,[0.01,0.970])")
 

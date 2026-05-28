@@ -181,7 +181,9 @@ PARAM_PRIORS = {
     'rho_H':   ('beta',     2.0,  0.5,  0.01, 0.9995),
     # PE-godkjent 2026-05-21 (A6): sigma_A fristilles. K&M Tabell 9 estimerer sigma_A.
     # Bayesiansk faktor sigma_A=0.012 vs 0.006: ~10^27. rho_A=0.39 i kj10 er identifikasjonsartefakt.
-    'sigma_A':  ('normal', 0.010, 0.004, 0.002, 0.050),
+    # PE-godkjent 2026-05-28 (kj21): sigma_A fryses igjen. kj20 drev sigma_A→0.049 (tak=0.050),
+    # og phi_u→0.012 (gulv=0.010), noe som ga 0% aksept i kj21. Svakt identifisert.
+    # 'sigma_A':  ('normal', 0.010, 0.004, 0.002, 0.050),  # DEAKTIVERT — kalibreres fast SIGMA_A_FIXED
     'sigma_C':  ('inv_gamma', 2.0, 0.0182, 1e-5, 0.5),
     'sigma_O':  ('inv_gamma', 2.0, 0.0475, 1e-5, 1.0),
     'sigma_Ys': ('inv_gamma', 2.0, 0.0067, 1e-5, 0.5),
@@ -256,10 +258,10 @@ def log_prior(theta):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def build_Q(theta):
-    # sigma_rp fast (SIGMA_RP_FIXED=0.006) — ikke i theta, bruker _fixed-oppslag.
+    # sigma_rp og sigma_A faste — ikke i theta, bruker _fixed-oppslag.
     smap = {E_A:'sigma_A',E_C:'sigma_C',E_P:'sigma_P',E_O:'sigma_O',
             E_Ys:'sigma_Ys',E_rp:'sigma_rp',E_i:'sigma_i',E_H:'sigma_H'}
-    _fixed = {'sigma_rp': SIGMA_RP_FIXED}
+    _fixed = {'sigma_rp': SIGMA_RP_FIXED, 'sigma_A': SIGMA_A_FIXED}
     Q = np.zeros((NE,NE))
     for idx,pn in smap.items():
         if pn in PARAM_NAMES:
@@ -304,12 +306,13 @@ def log_posterior(theta, H, Sv, Y_pre, Y_post):
     try:
         class Pt(Parameters): pass
         for i,n in enumerate(PARAM_NAMES): setattr(Pt,n,float(theta[i]))
-        setattr(Pt,'h_c',      H_C_FIXED)       # fast — PE-godkjent 2026-05-18 (C2 Alt A)
-        setattr(Pt,'sigma_rp', SIGMA_RP_FIXED)  # fast — PE-godkjent 2026-05-24 (kj10)
-        setattr(Pt,'kappa_M',  KM['kappa_M'])   # fast K&M=0.030 — kj14 viste estimering forverrer KPI
-        setattr(Pt,'rho_s',      0.0)              # fast=0 (ren UIP) — kj19: data avviste AR(1) UIP
-        setattr(Pt,'phi_I1',     PHI_I1_FIXED)    # fast=0.50 — kj19 sweep: BNP-ratio 1.16× (PE-godkjent 2026-05-26)
-        setattr(Pt,'lambda_pi4', LAMBDA_PI4_FIXED) # fast=0.0 (ren E_t[π_{t+4}]) — kj21 A4b
+        setattr(Pt,'h_c',       H_C_FIXED)        # fast — PE-godkjent 2026-05-18 (C2 Alt A)
+        setattr(Pt,'sigma_rp',  SIGMA_RP_FIXED)   # fast — PE-godkjent 2026-05-24 (kj10)
+        setattr(Pt,'sigma_A',   SIGMA_A_FIXED)    # fast=0.006 — PE-godkjent 2026-05-28 (kj20: tak-problem)
+        setattr(Pt,'kappa_M',   KM['kappa_M'])    # fast K&M=0.030 — kj14 viste estimering forverrer KPI
+        setattr(Pt,'rho_s',     0.0)              # fast=0 (ren UIP) — kj19: data avviste AR(1) UIP
+        setattr(Pt,'phi_I1',    PHI_I1_FIXED)     # fast=0.50 — kj19 sweep (PE-godkjent 2026-05-26)
+        setattr(Pt,'lambda_pi4',LAMBDA_PI4_FIXED) # fast=0.0 (ren E_t[π_{t+4}]) — kj21 A4b
         use_pi4 = H.shape[1] == NZ_PI4
         if use_pi4:
             G0,G1,Psi,Pi=build_matrices_pi4chain(Pt,theta_H=0.05)
