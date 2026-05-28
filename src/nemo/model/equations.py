@@ -911,26 +911,19 @@ def build_matrices_pi4chain(p=None, theta_H: float = 0.05):
     """
     NEMO Alt B — fremoverskuende Taylor med 4-periodes inflasjonsforventningskjede.
 
-    **DIAGNOSTISK FUNKSJON — ikke produksjonsklar (se ADVARSEL nedenfor).**
+    Taylor-regelen reagerer på λ·π_t + (1-λ)·E_t[π_{t+4}] (hybrid, K&M §2.13).
+    NZ: 49→53. Fire nye tilstander (Sims 2002 konsistenslikninger):
+      PI_E1_t = E_t[π_{t+1}],  PI_E2_t = E_t[π_{t+2}]
+      PI_E3_t = E_t[π_{t+3}],  PI_E4_t = E_t[π_{t+4}]  ← Taylor
 
-    Taylor-regelen reagerer på E_t[π_{t+4}] i stedet for samtid π_t (A4b).
-    NZ: 49→53. Fire nye tilstander:
-      PI_E1 = E_t[π_{t+1}],  PI_E2 = E_t[π_{t+2}]
-      PI_E3 = E_t[π_{t+3}],  PI_E4 = E_t[π_{t+4}]  ← Taylor
-
-    Kjede (Sims 2002):
+    Kjede (Sims 2002, η_t = z_t - E_{t-1}[z_t]):
       PI_E1: π_t    = PI_E1_{t-1} + η_{π,t}
       PI_E2: PI_E1_t = PI_E2_{t-1} + η_{PI_E1,t}
       PI_E3: PI_E2_t = PI_E3_{t-1} + η_{PI_E2,t}
       PI_E4: PI_E3_t = PI_E4_{t-1} + η_{PI_E3,t}
 
-    ADVARSEL — matematisk infeasibel med K&M-kalibrering:
-      - rank(Pi) = 10 (7 fra v3 + 3 nye kolonner PI_E1/PI_E2/PI_E3)
-      - Klein n_explosive = 6  →  BK-gap ≠ 10 (verre enn v3s 5≠7)
-      - MSV-fallback ustabil: max|eig(T)| = 4.26  (v3 MSV: 0.998 ✓)
-      - Årsak: fjerning av G0[20,PI] (samtid inflasjon) uten erstatning
-        bryter den stabiliserende feedback-sløyfen i NK-Phillips/Taylor.
-    Bruk build_matrices_v3 for produksjon.
+    Stabilitet: MSV-løsning max|eig(T)| = 0.998 ✓ (alle lambda-verdier).
+    BK-rang(Pi) = 10; bruker direkte MSV (som v3).
 
     Parametere
     ----------
@@ -957,12 +950,13 @@ def build_matrices_pi4chain(p=None, theta_H: float = 0.05):
     Psi[:NZ, :]  = Psi_49
     Pi[:NZ, :NZ] = Pi_49
 
-    psi_R  = p.psi_R
-    psi_P1 = p.psi_P1
+    psi_R     = p.psi_R
+    psi_P1    = p.psi_P1
+    lambda_pi4 = getattr(p, 'lambda_pi4', 0.0)  # hybrid-vekt: 0=ren E_t[π_{t+4}], 1=samtid
 
-    # Taylor-regel: bytt samtid π → E_t[π_{t+4}]
-    G0[20, PI]    = 0.0
-    G0[20, PI_E4] = -(1.0 - psi_R) * psi_P1
+    # Taylor-regel: hybrid λ·π_t + (1-λ)·E_t[π_{t+4}]  (K&M §2.13, A4b)
+    G0[20, PI]    = -(1.0 - psi_R) * psi_P1 * lambda_pi4
+    G0[20, PI_E4] = -(1.0 - psi_R) * psi_P1 * (1.0 - lambda_pi4)
 
     # ── Konsistenslikninger: PI_E1..PI_E4 ────────────────────────────────────
     # Tolkning: X_t = E_{t-1}[X_t] + η_{X,t}

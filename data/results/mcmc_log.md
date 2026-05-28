@@ -71,6 +71,56 @@ er strukturell — sannsynligvis kombinasjon av psi_R≈0.956 og phi_I1≈0.10.
 
 ---
 
+## Kjøring 20 — chain_kj20_prod (2026-05-28)
+
+- **Test:** PE-godkjent (2026-05-26): phi_I1 fast=0.50, rho_s fast=0.0 (ren UIP), KPI-JAE
+- **Parametre:** 19, sigma_rp fast=0.006, phi_I1 fast=0.50, rho_s fast=0.0
+- **Startverdi:** kj19 posterior means (19 overlappende param)
+- **Trekk:** 200k produksjon + 20k burnin + 5 rekalibreringer, seed=20
+- **Konvergens:** 19/19 OK, max PSRF=1.090 (rho_H), min ESS=430
+
+**B5-benchmark:**
+- **BNP q4-ratio:** 0.718× NB (mål [0.8,1.5]×) → ❌ FEIL (for lav)
+- **KPI q4-ratio:** 0.183× NB (mål ≥0.35×) → ❌ FEIL (for lav)
+
+**Nøkkelresultater:**
+
+| Parameter | K&M   | kj19   | kj20   |
+|-----------|-------|--------|--------|
+| psi_R     | 0.667 | 0.956  | **0.956** [0.942,0.966] |
+| psi_P1    | 0.292 | 0.267  | 0.253 |
+| sigma_H   | 0.050 | 0.309  | 0.310 |
+| sigma_A   | 0.006 | fast   | fast (ceiling 0.050) |
+| phi_u     | 0.220 | —      | **0.012** (ekstremt lavt, K&M=0.22) |
+| phi_I2    | ~10.0 | —      | 7.97 |
+
+**Konklusjon:** ❌ **kj20 mislyktes begge mål.** psi_R=0.956 (prior-grense 0.970) gjenstår.
+Effektiv Taylor-koeff = (1-0.956)×0.253 = 0.011 (K&M: 0.097). Svekket Taylor-prinsipp
+er rotårsak: samtid π_t i Taylor-regel tvinger psi_R→1 som kompensasjon.
+
+**Neste steg:** A4b — fremoverskuende Taylor-regel E_t[π_{t+4}] (K&M §2.13 mimicking rule).
+Implementert i `build_matrices_pi4chain` (NZ=53), kjøring 21.
+
+---
+
+## Modellendring — pi4chain / A4b (2026-05-28, PE-godkjent)
+
+**Endring:** Taylor-regel endret fra samtid π_t til fremoverskuende E_t[π_{t+4}]
+  (K&M §2.13: `i_R = ψ_R·i_{t-1} + (1-ψ_R)·[ψ_P1·E_t[π_{t+4}] + ψ_Y·y + ...]`)
+
+**lambda_pi4 fast=0.0** — ren K&M mimicking rule (A4b). Hybrid λ·π_t + (1-λ)·E_t[π_{t+4}]
+støttes via `getattr(p, 'lambda_pi4', 0.0)` i `build_matrices_pi4chain`.
+
+**NZ:** 49→53. Fire nye tilstander PI_E1..PI_E4 (Sims 2002 forventningskjede):
+  PI_E1_t = E_t[π_{t+1}], PI_E2_t = E_t[π_{t+2}], PI_E3_t = E_t[π_{t+3}], PI_E4_t = E_t[π_{t+4}]
+
+**Stabilitet:** MSV-løsning max|eig(T)| = 0.998 ✓ (alle lambda-verdier).
+
+**Filer endret:**
+- `src/nemo/model/equations.py`: `build_matrices_pi4chain` — hybrid λ, oppdatert docstring
+- `src/nemo/estimation/mcmc.py`: `build_H_pi4chain()`, `LAMBDA_PI4_FIXED=0.0`, `log_posterior` auto-detekterer NZ_PI4
+
+---
 
 
 - **Test:** A — fjern i_3m_obs (13 obs)

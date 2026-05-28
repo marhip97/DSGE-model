@@ -29,7 +29,7 @@ from scipy.linalg import (solve as sp_solve, cholesky, LinAlgError,
 from scipy.special import betaln, gammaln
 
 from nemo.model.equations import (
-    build_matrices_v3, NZ, NE,
+    build_matrices_v3, build_matrices_pi4chain, NZ, NZ_PI4, NE,
     Y, C, INV, X, M, PI, W, I_R, RER, S, PO, YS,
     Q_H, B_NW, C_NW, I_D, I_L_NW, L, MC,
     E_A, E_C, E_P, E_O, E_Ys, E_rp, E_i, E_H, E_phi_h
@@ -57,6 +57,9 @@ H_C_FIXED = 0.938
 # phi_I1 kalibreres fast — PE-godkjent 2026-05-26 (kj20-diagnose): sweep viser
 # phi_I1≈0.5 gir BNP-ratio 1.16× NB ([0.8,1.5]×). kj19 estimerte 0.103 (for lav → BNP-eksplosjon).
 PHI_I1_FIXED = 0.50
+# lambda_pi4: vekt på samtid π i hybrid Taylor-regel (0=ren E_t[π_{t+4}], 1=samtid)
+# kj21: fast=0.0 — ren K&M mimicking rule (PE-godkjent A4b 2026-05-28)
+LAMBDA_PI4_FIXED = 0.0
 
 # ══════════════════════════════════════════════════════════════════════════════
 # OBSERVASJONSLIKNING
@@ -152,6 +155,15 @@ def build_H_core() -> np.ndarray:
 def build_Sv_core() -> np.ndarray:
     """Målefeil-kovarians for KPI-JAE-test (identisk med build_Sv()). Test B (kj16)."""
     return build_Sv()
+
+
+def build_H_pi4chain() -> np.ndarray:
+    """Observasjonsmatrise for pi4chain (NZ_PI4=53 kolonner, identisk mapping som build_H)."""
+    H = np.zeros((N_OBS, NZ_PI4))
+    H[0,Y]=1.0; H[1,C]=1.0; H[2,INV]=1.0; H[3,X]=1.0; H[4,M]=1.0
+    H[5,PI]=4.0; H[6,W]=1.0; H[7,I_R]=4.0; H[8,I_R]=4.0; H[9,S]=1.0
+    H[10,PO]=1.0; H[11,YS]=1.0; H[12,Q_H]=1.0; H[13,B_NW]=1.0
+    return H
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -295,9 +307,14 @@ def log_posterior(theta, H, Sv, Y_pre, Y_post):
         setattr(Pt,'h_c',      H_C_FIXED)       # fast — PE-godkjent 2026-05-18 (C2 Alt A)
         setattr(Pt,'sigma_rp', SIGMA_RP_FIXED)  # fast — PE-godkjent 2026-05-24 (kj10)
         setattr(Pt,'kappa_M',  KM['kappa_M'])   # fast K&M=0.030 — kj14 viste estimering forverrer KPI
-        setattr(Pt,'rho_s',    0.0)              # fast=0 (ren UIP) — kj19: data avviste AR(1) UIP
-        setattr(Pt,'phi_I1',   PHI_I1_FIXED)    # fast=0.50 — kj19 sweep: BNP-ratio 1.16× (PE-godkjent 2026-05-26)
-        G0,G1,Psi,Pi=build_matrices_v3(Pt,theta_H=0.05)
+        setattr(Pt,'rho_s',      0.0)              # fast=0 (ren UIP) — kj19: data avviste AR(1) UIP
+        setattr(Pt,'phi_I1',     PHI_I1_FIXED)    # fast=0.50 — kj19 sweep: BNP-ratio 1.16× (PE-godkjent 2026-05-26)
+        setattr(Pt,'lambda_pi4', LAMBDA_PI4_FIXED) # fast=0.0 (ren E_t[π_{t+4}]) — kj21 A4b
+        use_pi4 = H.shape[1] == NZ_PI4
+        if use_pi4:
+            G0,G1,Psi,Pi=build_matrices_pi4chain(Pt,theta_H=0.05)
+        else:
+            G0,G1,Psi,Pi=build_matrices_v3(Pt,theta_H=0.05)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             T_n,R_n,d=bk_solve(G0,G1,Psi,Pi,verbose=False)
