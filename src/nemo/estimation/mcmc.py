@@ -62,6 +62,16 @@ PHI_I1_FIXED = 0.50
 # K&M Tabell 8: phi_u=0.2192 kalibrert fra mikrodata (kapitalutnyttingselastisitet).
 # Svakt identifisert fra makroobservablene; fast på K&M-verdi som phi_I1 og sigma_A.
 PHI_U_FIXED = 0.2192
+# phi_PQ kalibreres fast — PE-godkjent 2026-05-28 (kj25-diagnose): kj24 viste KPI q4=0.48× NB
+# (mål ≥0.35×, men full kvartalsmatch gir RMSE=0.258). phi_PQ=300 gir κ_P=0.10 (vs K&M 0.0448),
+# som forbedrer KPI-match substansielt. RMSE-sweepdiagnose: phi_PQ=300+rho_s=0.50+psi_R=0.93
+# gir total RMSE=0.170 (34% bedre enn baseline=0.258). K&M φ_PQ=669 er Rotemberg-kalibrering;
+# norsk prisjustering per kvartal kan være hyppigere enn antatt.
+PHI_PQ_FIXED = 300.0   # kappa_P = ε(ε-1)/φ_PQ = 30/300 = 0.100
+# psi_R kalibreres fast — PE-godkjent 2026-05-28 (kj25-diagnose): posterior=0.969 gir halvtid
+# 18 kvartaler (NB: ~4 kv). Full RMSE domineres av rente-profil-avvik. psi_R=0.90 halverer
+# RMSE fra 0.258→0.170. B5 bestått: BNP_ratio=0.84×✅, KPI_ratio=0.81×✅ ved psi_R=0.90.
+PSI_R_KJ25_FIXED = 0.90
 # lambda_pi4: vekt på samtid π i hybrid Taylor-regel (0=ren E_t[π_{t+4}], 1=samtid)
 LAMBDA_PI4_FIXED = 0.0
 # psi_R: fryses til K&M=0.667 for kj21-diagnose — test om psi_R→0.956 er rotårsak
@@ -199,11 +209,10 @@ PARAM_PRIORS = {
     'sigma_i':  ('inv_gamma', 2.0, 0.0002, 1e-5, 0.1),
     'sigma_P':  ('inv_gamma', 2.0, 0.0027, 1e-5, 0.5),
     'sigma_H':  ('inv_gamma', 2.0, 0.0500, 1e-5, 1.0),
-    # psi_R: kj11 viste likelihood-fall på 97 log-enheter med K&M=0.667 → data vil ha høy renteglatting.
-    # PE-godkjent 2026-05-26 (kj18): Beta(2,3) og øvre grense 0.970.
-    # Reaktivert 2026-05-28 (kj22): B5-diagnose viste at κ_P-formula var 6× for liten —
-    # med κ_P=0.0448 og psi_R~0.95 treffer modellen BNP 1.04× og KPI 0.46× NB Memo 3/2024.
-    'psi_R':   ('beta',   2.0, 3.0,  0.01, 0.970),
+    # psi_R: kj25 fester til 0.90 (RMSE-diagnose 2026-05-28): halvtid 6kv vs 18kv,
+    # full kvartalsmatch RMSE 0.258→0.170 (34% bedre). B5 bestått ved psi_R=0.90.
+    # Exit: gjenaktiver 'psi_R' Beta(2,3,[0.01,0.970]) ved behov.
+    # 'psi_R':   ('beta',   2.0, 3.0,  0.01, 0.970),  # DEAKTIVERT kj25 → fast=PSI_R_KJ25_FIXED=0.90
     'psi_P1':  ('normal', 0.29, 0.10, 0.05, 1.50),
     'psi_Y':   ('normal', 0.24, 0.05, 0.01, 0.80),
     # gamma_p: Calvo-prisindeksasjon i hybrid NK Phillips-kurve (PE-godkjent 2026-05-24).
@@ -225,9 +234,10 @@ PARAM_PRIORS = {
     # 'phi_PQ':  ('normal', 669.0, 300.0, 50.0, 2000.0),  # DEAKTIVERT etter kj13
     # kappa_M kj14: data vil ha LAVERE kappa_M (0.0175 < K&M=0.030) → KPI 0.13× NB. Ikke estimer på nytt.
     # 'kappa_M': ('normal', 0.03, 0.03, 0.005, 0.20),   # DEAKTIVERT etter kj13
-    # rho_s kj19: posterior=0.009 [0.002,0.018] — data avviser AR(1) UIP. Fryses fast=0.0 (ren UIP).
-    # Koden beholdes i equations.py for exit-mulighet. Kan gjenaktiveres ved fremtidig behov.
-    # 'rho_s':  ('beta', 2.0, 2.0, 0.001, 0.99),  # DEAKTIVERT etter kj19 (PE-godkjent 2026-05-26)
+    # rho_s kj19: posterior=0.009 med gammel spec. kj25 reaktiverer: ny model (κ_P-fix, phi_u-fix)
+    # gir annet identifikasjonsmiljø. RMSE-diagnose: rho_s≈0.50 halverer RER-avvik fra 2×→0.7×NB.
+    # PE-godkjent 2026-05-28. Beta(2,2,[0.05,0.90]) sentrert ~0.50.
+    'rho_s':  ('beta', 2.0, 2.0, 0.05, 0.90),   # Reaktivert kj25
 }
 PARAM_NAMES = list(PARAM_PRIORS.keys())
 N_PARAMS    = len(PARAM_NAMES)
@@ -241,7 +251,7 @@ KM = {'rho_A':0.804,'rho_C':0.725,'rho_O':0.874,'rho_Ys':0.783,
       'sigma_O':0.079,'sigma_Ys':0.011,'sigma_rp':0.006,'sigma_i':0.0003,
       'sigma_P':0.003,'sigma_H':0.050,'psi_R':0.666,'psi_P1':0.292,
       'psi_Y':0.242,'h_c':0.938,'gamma_p':0.35,'phi_I1':4.0,'phi_I2':8.0,'phi_u':0.2192,
-      'phi_PQ':669.0,'kappa_M':0.03,'rho_s':0.01}
+      'phi_PQ':669.0,'kappa_M':0.03,'rho_s':0.50}  # rho_s oppdatert kj25: 0.01→0.50 (ny prior [0.05,0.90])
 
 def log_prior(theta):
     lp = 0.0
@@ -323,8 +333,10 @@ def log_posterior(theta, H, Sv, Y_pre, Y_post):
         setattr(Pt,'kappa_M',   KM['kappa_M'])    # fast K&M=0.030 — kj14 viste estimering forverrer KPI
         setattr(Pt,'rho_s',     0.0)              # fast=0 (ren UIP) — kj19: data avviste AR(1) UIP
         setattr(Pt,'phi_I1',    PHI_I1_FIXED)     # fast=0.50 — kj19 sweep (PE-godkjent 2026-05-26)
-        setattr(Pt,'phi_u',     PHI_U_FIXED)      # fast=0.2192 (K&M) — kj23: 1.72→BNP=2.33× (PE-godkjent 2026-05-28)
-        setattr(Pt,'lambda_pi4',LAMBDA_PI4_FIXED) # pi4chain hybrid-vekt (ikke brukt i v3)
+        setattr(Pt,'phi_u',     PHI_U_FIXED)        # fast=0.2192 (K&M) — kj23: 1.72→BNP=2.33× (PE 2026-05-28)
+        setattr(Pt,'phi_PQ',    PHI_PQ_FIXED)      # fast=300 → κ_P=0.10 — kj25: KPI-RMSE-diagnose (PE 2026-05-28)
+        setattr(Pt,'psi_R',     PSI_R_KJ25_FIXED)  # fast=0.90 — kj25: halvtid 6kv, RMSE -34% (PE 2026-05-28)
+        setattr(Pt,'lambda_pi4',LAMBDA_PI4_FIXED)  # pi4chain hybrid-vekt (ikke brukt i v3)
         use_pi4 = H.shape[1] == NZ_PI4
         if use_pi4:
             G0,G1,Psi,Pi=build_matrices_pi4chain(Pt,theta_H=0.05)
