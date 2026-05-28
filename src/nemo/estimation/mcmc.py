@@ -54,6 +54,9 @@ PSI_R_FIXED = 0.667
 # 0.9995-grensen og dreper konsumkanalen (a3_W→0.006). K&M-verdi 0.938 gir
 # a3_W=0.032 og BNP-ratio 1.8× vs NB Memo 3/2024 (mot 6-8× med h_c estimert).
 H_C_FIXED = 0.938
+# phi_I1 kalibreres fast — PE-godkjent 2026-05-26 (kj20-diagnose): sweep viser
+# phi_I1≈0.5 gir BNP-ratio 1.16× NB ([0.8,1.5]×). kj19 estimerte 0.103 (for lav → BNP-eksplosjon).
+PHI_I1_FIXED = 0.50
 
 # ══════════════════════════════════════════════════════════════════════════════
 # OBSERVASJONSLIKNING
@@ -187,9 +190,10 @@ PARAM_PRIORS = {
     'gamma_p': ('beta',   3.0, 3.0,  0.0,  0.95),
     # h_c er fjernet fra estimering — kalibreres fast til H_C_FIXED=0.938 (PE-godkjent 2026-05-18, C2 Alt A).
     # Posterior traff alltid 0.9995-grensen og drepte konsumkanalen. K&M-verdi gjenoppretter a3_W=0.032.
-    # phi_I1 frigjort igjen (PE-godkjent 2026-05-20, kjøring 9): fase2v2 estimerte ~0.5 og traff NB BNP -0.447
-    # vs -0.450. Med phi_I1=4.0 fast ble BNP-responsen 0.4× NB (for liten). K&M=4.0 passer ikke norske data.
-    'phi_I1':  ('normal', 2.0,  2.0, 0.1,  15.0),
+    # phi_I1 kj20: sweep-diagnose viser phi_I1≈0.5 gir BNP-ratio 1.16× NB (mål [0.8,1.5]×).
+    # kj19 posterior: phi_I1→0.103 (for lav → BNP-eksplosjon). Kalibreres fast=0.50 (PE-godkjent 2026-05-26).
+    # Exit-mulighet: gjenaktiver med prior Normal(0.5,0.3,[0.1,2.0]) ved behov.
+    # 'phi_I1':  ('normal', 2.0,  2.0, 0.1,  15.0),  # DEAKTIVERT etter kj19 → fast=PHI_I1_FIXED
     'phi_I2':  ('normal', 8.0,  4.0, 0.5,  40.0),
     # Fase 2v2 (2026-05-15): kapitalutnyttelseselastisitet (Alt. A, K&M Tabell 8)
     'phi_u':   ('normal', 0.22, 0.10, 0.01, 2.0),
@@ -197,10 +201,9 @@ PARAM_PRIORS = {
     # 'phi_PQ':  ('normal', 669.0, 300.0, 50.0, 2000.0),  # DEAKTIVERT etter kj13
     # kappa_M kj14: data vil ha LAVERE kappa_M (0.0175 < K&M=0.030) → KPI 0.13× NB. Ikke estimer på nytt.
     # 'kappa_M': ('normal', 0.03, 0.03, 0.005, 0.20),   # DEAKTIVERT etter kj13
-    # rho_s: AR(1)-glatting av RER i UIP (Fase 1B, PE-godkjent 2026-05-26).
-    # K&M har ren UIP (rho_s=0), men norske data har høyere RER-persistens.
-    # Beta(2,2) sentrer på 0.5, [0.001, 0.99]. lb=0.001 for å unngå Beta(2,2)=0 ved x=0.
-    'rho_s':  ('beta', 2.0, 2.0, 0.001, 0.99),
+    # rho_s kj19: posterior=0.009 [0.002,0.018] — data avviser AR(1) UIP. Fryses fast=0.0 (ren UIP).
+    # Koden beholdes i equations.py for exit-mulighet. Kan gjenaktiveres ved fremtidig behov.
+    # 'rho_s':  ('beta', 2.0, 2.0, 0.001, 0.99),  # DEAKTIVERT etter kj19 (PE-godkjent 2026-05-26)
 }
 PARAM_NAMES = list(PARAM_PRIORS.keys())
 N_PARAMS    = len(PARAM_NAMES)
@@ -292,6 +295,8 @@ def log_posterior(theta, H, Sv, Y_pre, Y_post):
         setattr(Pt,'h_c',      H_C_FIXED)       # fast — PE-godkjent 2026-05-18 (C2 Alt A)
         setattr(Pt,'sigma_rp', SIGMA_RP_FIXED)  # fast — PE-godkjent 2026-05-24 (kj10)
         setattr(Pt,'kappa_M',  KM['kappa_M'])   # fast K&M=0.030 — kj14 viste estimering forverrer KPI
+        setattr(Pt,'rho_s',    0.0)              # fast=0 (ren UIP) — kj19: data avviste AR(1) UIP
+        setattr(Pt,'phi_I1',   PHI_I1_FIXED)    # fast=0.50 — kj19 sweep: BNP-ratio 1.16× (PE-godkjent 2026-05-26)
         G0,G1,Psi,Pi=build_matrices_v3(Pt,theta_H=0.05)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
