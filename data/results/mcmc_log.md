@@ -114,6 +114,30 @@ Implementert i `build_matrices_pi4chain` (NZ=53), kjøring 21.
 
 ---
 
+## Diagnoseendring — psi_R fryses (2026-05-28, PE-godkjent)
+
+**Fra:** estimert `Beta(2.0, 3.0, [0.01, 0.970])`
+**Til:** fast `PSI_R_FIXED = 0.667` (K&M-kalibrering)
+
+**Begrunnelse:** pi4chain (A4b) mislyktes — sigma_i→0 (degenerert modus, se under).
+Direkte diagnose: kj21 tester om psi_R→0.956 (alle kj18-20) er rotårsak til
+KPI q4-ratio 0.183× NB. Effektiv Taylor-koeff: (1-0.956)×0.253=0.011 (kj20)
+vs (1-0.667)×psi_P1 (kj21, psi_P1 fritt). N_PARAMS: 18→17.
+
+---
+
+## A4b/pi4chain mislyktes (2026-05-28)
+
+pi4chain (lambda=0) ga degenererte moduser i to forsøk (kj21a og kj21b):
+- kj21a (sigma_A estimert): 0% aksept fra start (sigma_A=0.049 ved tak=0.050 + phi_u=0.012 ved gulv=0.010)
+- kj21b (sigma_A fast): MCMC fant modus ved (psi_R=0.966, sigma_i≈0, lp=-2526), men 0% aksept fra denne posisjonen (sigma_i ved nedre grense 1e-5)
+
+Rotårsak: med ren E_t[π_{t+4}] og uten samtid π i Taylor-regelen mister sigma_i identifikasjon → kollapser til 0 (degenerert modus). Standard MCMC med normalforslag klarer ikke å utforske et slikt degenerert landskap.
+
+Alternativ pi4chain (lambda>0) vurderes for fremtidige kjøringer etter kj21-diagnosen.
+
+---
+
 ## Modellendring — pi4chain / A4b (2026-05-28, PE-godkjent)
 
 **Endring:** Taylor-regel endret fra samtid π_t til fremoverskuende E_t[π_{t+4}]

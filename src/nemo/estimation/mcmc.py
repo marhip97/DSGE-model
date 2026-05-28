@@ -58,8 +58,11 @@ H_C_FIXED = 0.938
 # phi_I1≈0.5 gir BNP-ratio 1.16× NB ([0.8,1.5]×). kj19 estimerte 0.103 (for lav → BNP-eksplosjon).
 PHI_I1_FIXED = 0.50
 # lambda_pi4: vekt på samtid π i hybrid Taylor-regel (0=ren E_t[π_{t+4}], 1=samtid)
-# kj21: fast=0.0 — ren K&M mimicking rule (PE-godkjent A4b 2026-05-28)
 LAMBDA_PI4_FIXED = 0.0
+# psi_R: fryses til K&M=0.667 for kj21-diagnose — test om psi_R→0.956 er rotårsak
+# til KPI q4-ratio 0.183× NB. Fjern PSI_R_FIXED og reaktiver 'psi_R' i PARAM_PRIORS
+# dersom kj21 viser at K&M-kalibrering er OK.
+PSI_R_FIXED = 0.667
 
 # ══════════════════════════════════════════════════════════════════════════════
 # OBSERVASJONSLIKNING
@@ -192,11 +195,10 @@ PARAM_PRIORS = {
     'sigma_P':  ('inv_gamma', 2.0, 0.0027, 1e-5, 0.5),
     'sigma_H':  ('inv_gamma', 2.0, 0.0500, 1e-5, 1.0),
     # psi_R: kj11 viste likelihood-fall på 97 log-enheter med K&M=0.667 → data vil ha høy renteglatting.
-    # Restores til estimering med utvidet øvre grense 0.990 (fra 0.92) — data trenger rom over 0.91.
     # PE-godkjent 2026-05-26 (kj18): Beta(2,3) og øvre grense 0.970.
-    # Begrunnelse: kj16 (KPI-JAE) drev psi_R til 0.987 (prior-grense) og BNP q4=-209%.
-    # Beta(2,3) er høyreskjev (penaliserer verdier nær 1) og ceiling 0.970 gir trygg margin.
-    'psi_R':   ('beta',   2.0, 3.0,  0.01, 0.970),
+    # PE-godkjent 2026-05-28 (kj21-diagnose): fryses til PSI_R_FIXED=0.667 for å teste om
+    # psi_R→0.956 er rotårsaken til KPI q4-ratio 0.183× NB. Reaktiver ved behov.
+    # 'psi_R':   ('beta',   2.0, 3.0,  0.01, 0.970),  # DEAKTIVERT kj21-diagnose
     'psi_P1':  ('normal', 0.29, 0.10, 0.05, 1.50),
     'psi_Y':   ('normal', 0.24, 0.05, 0.01, 0.80),
     # gamma_p: Calvo-prisindeksasjon i hybrid NK Phillips-kurve (PE-godkjent 2026-05-24).
@@ -309,10 +311,11 @@ def log_posterior(theta, H, Sv, Y_pre, Y_post):
         setattr(Pt,'h_c',       H_C_FIXED)        # fast — PE-godkjent 2026-05-18 (C2 Alt A)
         setattr(Pt,'sigma_rp',  SIGMA_RP_FIXED)   # fast — PE-godkjent 2026-05-24 (kj10)
         setattr(Pt,'sigma_A',   SIGMA_A_FIXED)    # fast=0.006 — PE-godkjent 2026-05-28 (kj20: tak-problem)
+        setattr(Pt,'psi_R',     PSI_R_FIXED)      # fast=0.667 (K&M) — kj21-diagnose (PE-godkjent 2026-05-28)
         setattr(Pt,'kappa_M',   KM['kappa_M'])    # fast K&M=0.030 — kj14 viste estimering forverrer KPI
         setattr(Pt,'rho_s',     0.0)              # fast=0 (ren UIP) — kj19: data avviste AR(1) UIP
         setattr(Pt,'phi_I1',    PHI_I1_FIXED)     # fast=0.50 — kj19 sweep (PE-godkjent 2026-05-26)
-        setattr(Pt,'lambda_pi4',LAMBDA_PI4_FIXED) # fast=0.0 (ren E_t[π_{t+4}]) — kj21 A4b
+        setattr(Pt,'lambda_pi4',LAMBDA_PI4_FIXED) # pi4chain hybrid-vekt (ikke brukt i v3)
         use_pi4 = H.shape[1] == NZ_PI4
         if use_pi4:
             G0,G1,Psi,Pi=build_matrices_pi4chain(Pt,theta_H=0.05)
