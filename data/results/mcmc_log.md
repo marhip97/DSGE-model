@@ -729,7 +729,7 @@ Korrekt NEMO-formel med markup-normering: `κ_P = ε(ε-1)/φ_PQ = 30/669 = 0.04
 
 **B5-normaliseringsrettelse (2026-05-28):** Normalisering av BNP var feil i diagnostikk.
 Y er kvartals-log-avvik; NB-benchmark er annualisert (-0.45% p.a.). Korrekt formel:
-`4×Y[q4]/peak / (-0.45%)`. Med korrekt formel reproduseres eksakt:
+`4×Y[q4]/peak / (-0.45)`. Med korrekt formel reproduseres eksakt:
 - K&M + kP=0.0448 + psi_R=0.95 + phi_I1=0.5 → BNP=1.046×✅, KPI=0.465×✅
 
 **Partial posterior (26k, ikke konvergert):**
@@ -746,8 +746,9 @@ Y er kvartals-log-avvik; NB-benchmark er annualisert (-0.45% p.a.). Korrekt form
 - BNP q4: 2.32× NB ❌ (for STOR — phi_u=1.715 og ikke-konvergerte param)
 - KPI q4: 0.92× NB ✅
 
-**Konklusjon:** κ_P-fiksen virker (KPI 0.10→0.92×). BNP er for stor (2.32×) fordi
-chain ikke er konvergert. Med K&M-like param og psi_R∈[0.90,0.968]: BNP∈[0.88,1.11]×✅.
+**Konklusjon:** κ_P-fiksen virker (KPI 0.10→0.92×). BNP er for stor (2.32×) kun fordi
+chain ikke er konvergert — phi_u=1.715 vs K&M=0.219 er et overgangsartefakt.
+Med K&M-like phi_u og psi_R∈[0.90,0.968]: BNP∈[0.88,1.11]×✅.
 
 **Feasible region (K&M base, kP=0.0448, phi_I1=0.50):**
 | psi_R | BNP q4 | KPI q4 |
