@@ -347,7 +347,7 @@ Neste steg: undersøk rente-persistens og rho_A=0.086 (potensielt MPK-problem).
 ### Nøkkelresultater kjøring 10
 
 | Parameter | Kj10  | Kj9   | K&M   | Endring |
-|-----------|-------|-------|-------|---------|
+|-----------|-------|-------|-------|----------|
 | rho_A     | **0.390** [0.21,0.57] | 0.086 | 0.950 | ↑ 4.5× — TFP-kanal åpnet |
 | phi_I1    | **0.105** [0.10,0.12] | 0.205 | 4.0   | ↓ halvert, nær kalibrert |
 | sigma_rp  | 0.014 [0.012,0.017]   | 0.013 | 0.006 | uendret |
@@ -683,10 +683,12 @@ Avbrutt etter diagnostisk analyse avdekket rotårsak: se kj22-diagnose nedenfor.
 Korrekt NEMO-formel med markup-normering: `κ_P = ε(ε-1)/φ_PQ = 30/669 = 0.0448`.  
 φ_PQ=669 beholdes uendret fra K&M Tabell 8. Kun formelstruktur korrigeres.
 
-**Verifikasjon (B5-sweep):**
-- κ_P=0.0448 (skale=6), phi_I1=0.5, psi_R=0.950: BNP=1.043×✅, KPI=0.465×✅
-- κ_P=0.0448, phi_I1=0.5, psi_R=0.900: BNP=0.878×✅, KPI=0.398×✅
-- κ_P=0.0448, phi_I1=0.5, psi_R=0.667: BNP=0.349×❌ (psi_R→0.95 nødvendig)
+**Verifikasjon (B5-sweep, korrekt annualisert formel):**
+- κ_P=0.0448, phi_I1=0.5, psi_R=0.950, K&M base: BNP=1.046×✅, KPI=0.465×✅
+- κ_P=0.0448, phi_I1=0.5, psi_R=0.900, K&M base: BNP=0.875×✅, KPI=0.396×✅
+- κ_P=0.0448, phi_I1=0.5, psi_R=0.667, K&M base: BNP=0.334×❌ (psi_R→0.95 nødvendig)
+
+**Feasible region (phi_I1=0.50, K&M base):** psi_R∈[0.90, 0.968] → begge mål oppnås.
 
 **Implementert:** `kappa_P()` og `kappa_W()` endret til `ε(ε-1)/φ` i `parameters.py`.  
 φ_PQ=669, φ_W=666.92 uendret (K&M Tabell 8). 89/89 tester bestått.
@@ -717,3 +719,53 @@ Korrekt NEMO-formel med markup-normering: `κ_P = ε(ε-1)/φ_PQ = 30/669 = 0.04
 
 **Forventet resultat:** psi_R→~0.95, BNP q4-ratio ~1.04×✅, KPI q4-ratio ~0.46×✅  
 **Mål:** BNP q4 ∈ [0.8,1.5]× NB OG KPI q4 ≥ 0.35× NB
+
+---
+
+## kj22 — Avbrutt av container (2026-05-28)
+
+**Kjøring:** kj22 — avbrutt etter 26k/200k produksjonstrekk (container timeout ~46 min)  
+**Partial chain:** `data/results/chain_kj22_prod_partial.npy` (26k trekk)
+
+**B5-normaliseringsrettelse (2026-05-28):** Normalisering av BNP var feil i diagnostikk.
+Y er kvartals-log-avvik; NB-benchmark er annualisert (-0.45% p.a.). Korrekt formel:
+`4×Y[q4]/peak / (-0.45%)`. Med korrekt formel reproduseres eksakt:
+- K&M + kP=0.0448 + psi_R=0.95 + phi_I1=0.5 → BNP=1.046×✅, KPI=0.465×✅
+
+**Partial posterior (26k, ikke konvergert):**
+
+| Parameter | kj22 (26k) | K&M   | Note |
+|-----------|-----------|-------|------|
+| psi_R     | 0.968 (pri-tak) | 0.667 | ved grense 0.970 |
+| psi_P1    | 0.328     | 0.292 | nær K&M |
+| phi_u     | 1.715     | 0.219 | 8× K&M — ikke konvergert |
+| rho_C     | 0.068     | 0.725 | ekstremt lav — ikke konvergert |
+| rho_H     | 0.979     | 0.694 | nær prior-tak |
+
+**B5 med korrekt formel (26k-posterior):**
+- BNP q4: 2.32× NB ❌ (for STOR — phi_u=1.715 og ikke-konvergerte param)
+- KPI q4: 0.92× NB ✅
+
+**Konklusjon:** κ_P-fiksen virker (KPI 0.10→0.92×). BNP er for stor (2.32×) fordi
+chain ikke er konvergert. Med K&M-like param og psi_R∈[0.90,0.968]: BNP∈[0.88,1.11]×✅.
+
+**Feasible region (K&M base, kP=0.0448, phi_I1=0.50):**
+| psi_R | BNP q4 | KPI q4 |
+|-------|--------|--------|
+| 0.90  | 0.875×✅ | 0.396×✅ |
+| 0.95  | 1.046×✅ | 0.465×✅ |
+| 0.968 | 1.113×✅ | 0.492×✅ |
+
+---
+
+## kj23 — Forhåndsregistrering (2026-05-28)
+
+**Kjøring:** kj23 — identisk med kj22, ny seed, warm-start fra kj22 26k-posterior  
+**Formål:** Fullføre kjøring avbrutt av container. Bekrefte BNP og KPI treffer mål.  
+**Spesifikasjon:**
+- Identisk med kj22: κ_P=0.0448, psi_R Beta(2,3,[0.01,0.970]), phi_I1=0.50 fast
+- sigma_A fast=0.006, rho_s fast=0.0, N_PARAMS=18
+- Startverdi: kj22 26k-posterior means (varm start — lp=-2658, nær modus)
+- 10k burnin (vs 20k), scale_init=0.81, seed=23, 200k produksjon
+
+**Forventet resultat:** psi_R→~0.95, BNP∈[0.8,1.5]×✅, KPI≥0.35×✅
