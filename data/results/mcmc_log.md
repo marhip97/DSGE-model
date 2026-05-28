@@ -794,3 +794,13 @@ Med K&M-like phi_u og psi_R∈[0.90,0.968]: BNP∈[0.88,1.11]×✅.
 - 10k burnin, scale_init=0.75, seed=24, 200k produksjon
 
 **Forventet resultat:** BNP=1.10×✅, KPI=0.47×✅ (feasibility bekreftet med posterior means)
+
+**Resultat kj24 — FULLFØRT (2026-05-28, 63.3 min):**
+- Konvergens: 17/17 OK, max PSRF=1.007, min ESS=607, acc=25.4% ✅
+- **BNP q4 = 1.112× NB ✅** (mål: [0.8, 1.5]×)
+- **KPI q4 = 0.513× NB ✅** (mål: ≥ 0.35×)
+- B5-BENCHMARK BESTÅTT — begge mål oppfylt simultaneously
+- Nøkkelparametere: psi_R=0.9688 (prior-tak), phi_I2=8.29, psi_Y=0.348, psi_P1=0.298
+- sigma_H=0.338 (6× K&M), rho_H=0.989 (nær 1.0) — boligmarked absorberer mye
+- phi_u=0.2192 (fast, K&M) — løste B5-problemet fra kj23 (2.33→1.11×)
+- Filer: chain_kj24_prod.npy, _lp.npy, _meta.json, _posterior.json
