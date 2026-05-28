@@ -196,9 +196,9 @@ PARAM_PRIORS = {
     'sigma_H':  ('inv_gamma', 2.0, 0.0500, 1e-5, 1.0),
     # psi_R: kj11 viste likelihood-fall på 97 log-enheter med K&M=0.667 → data vil ha høy renteglatting.
     # PE-godkjent 2026-05-26 (kj18): Beta(2,3) og øvre grense 0.970.
-    # PE-godkjent 2026-05-28 (kj21-diagnose): fryses til PSI_R_FIXED=0.667 for å teste om
-    # psi_R→0.956 er rotårsaken til KPI q4-ratio 0.183× NB. Reaktiver ved behov.
-    # 'psi_R':   ('beta',   2.0, 3.0,  0.01, 0.970),  # DEAKTIVERT kj21-diagnose
+    # Reaktivert 2026-05-28 (kj22): B5-diagnose viste at κ_P-formula var 6× for liten —
+    # med κ_P=0.0448 og psi_R~0.95 treffer modellen BNP 1.04× og KPI 0.46× NB Memo 3/2024.
+    'psi_R':   ('beta',   2.0, 3.0,  0.01, 0.970),
     'psi_P1':  ('normal', 0.29, 0.10, 0.05, 1.50),
     'psi_Y':   ('normal', 0.24, 0.05, 0.01, 0.80),
     # gamma_p: Calvo-prisindeksasjon i hybrid NK Phillips-kurve (PE-godkjent 2026-05-24).
@@ -311,7 +311,7 @@ def log_posterior(theta, H, Sv, Y_pre, Y_post):
         setattr(Pt,'h_c',       H_C_FIXED)        # fast — PE-godkjent 2026-05-18 (C2 Alt A)
         setattr(Pt,'sigma_rp',  SIGMA_RP_FIXED)   # fast — PE-godkjent 2026-05-24 (kj10)
         setattr(Pt,'sigma_A',   SIGMA_A_FIXED)    # fast=0.006 — PE-godkjent 2026-05-28 (kj20: tak-problem)
-        setattr(Pt,'psi_R',     PSI_R_FIXED)      # fast=0.667 (K&M) — kj21-diagnose (PE-godkjent 2026-05-28)
+        # psi_R reaktivert 2026-05-28 (kj22): κ_P-fix løser KPI-problemet uten å fryse psi_R
         setattr(Pt,'kappa_M',   KM['kappa_M'])    # fast K&M=0.030 — kj14 viste estimering forverrer KPI
         setattr(Pt,'rho_s',     0.0)              # fast=0 (ren UIP) — kj19: data avviste AR(1) UIP
         setattr(Pt,'phi_I1',    PHI_I1_FIXED)     # fast=0.50 — kj19 sweep (PE-godkjent 2026-05-26)

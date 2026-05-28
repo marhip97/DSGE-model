@@ -644,3 +644,76 @@ DSGE-rammeverket — ikke en modellparameter-feil. Rotårsakene er trolig:
 1.00× ved q8 i kj14). KPI-timing er bedret av gamma_p. Amplitude er svak men
 konsistent med norsk data. Gå til neste analysetrinn.
 **Ikke gjenta Steg A eller B** — begge er grundig testet og dokumentert.
+
+---
+
+## kj21 — Diagnose: psi_R fast=K&M=0.667 (2026-05-28, avbrutt)
+
+**Kjøring:** kj21 — diagnostisk, v3, KPI-JAE  
+**Formål:** Test om psi_R→0.956 er rotårsak til KPI q4-ratio 0.183× NB (kj20)  
+**Spesifikasjon:** psi_R fast=0.667 (K&M), sigma_A fast=0.006, phi_I1 fast=0.5, N_PARAMS=17  
+**Resultat (70k/200k, avbrutt):** PSRF=1.01, ESS=269, acc=23%  
+
+| Parameter | Posterior | K&M |
+|-----------|-----------|-----|
+| psi_P1    | 0.077     | 0.292 |
+| psi_R (fast) | 0.667  | 0.667 |
+| rho_C     | 0.076     | 0.725 |
+| sigma_H   | 0.313     | 0.050 |
+| phi_u     | 1.676     | 0.219 |
+
+**B5-resultat (delvis posterior):**
+- BNP q4: 0.925× NB ✅ (mål [0.8,1.5]×)
+- KPI q4: 0.098× NB ❌ (mål ≥0.35×)
+
+**Konklusjon:** Hypotesen **motbevist** — selv med psi_R=0.667 (K&M) trekker data psi_P1 ned til 0.077. 
+Effektiv Taylor-inflasjonskoeffisient: (1-0.667)×0.077 = 0.026 (vs K&M=0.097). 
+Dataene kompenserer ved å redusere psi_P1 i stedet for å øke psi_R. 
+Avbrutt etter diagnostisk analyse avdekket rotårsak: se kj22-diagnose nedenfor.
+
+---
+
+## Rotårsak-diagnose: kappa_P-formel 6× for liten (2026-05-28)
+
+**Funn:** B5-benchmark ved K&M-kalibrering (alle K&M-verdier) gir:
+- BNP q4: 0.344× NB ❌
+- KPI q4: 0.067× NB ❌ (KPI er 15× for liten)
+
+**Rotårsak:** `kappa_P = (ε-1)/φ_PQ = 5/669 = 0.0075` — NKPC-helling er 6× for flat.  
+Korrekt NEMO-formel med markup-normering: `κ_P = ε(ε-1)/φ_PQ = 30/669 = 0.0448`.  
+φ_PQ=669 beholdes uendret fra K&M Tabell 8. Kun formelstruktur korrigeres.
+
+**Verifikasjon (B5-sweep):**
+- κ_P=0.0448 (skale=6), phi_I1=0.5, psi_R=0.950: BNP=1.043×✅, KPI=0.465×✅
+- κ_P=0.0448, phi_I1=0.5, psi_R=0.900: BNP=0.878×✅, KPI=0.398×✅
+- κ_P=0.0448, phi_I1=0.5, psi_R=0.667: BNP=0.349×❌ (psi_R→0.95 nødvendig)
+
+**Implementert:** `kappa_P()` og `kappa_W()` endret til `ε(ε-1)/φ` i `parameters.py`.  
+φ_PQ=669, φ_W=666.92 uendret (K&M Tabell 8). 89/89 tester bestått.
+
+---
+
+## Prior-endring — psi_R reaktivert (2026-05-28, PE-fullmakt)
+
+**Fra:** DEAKTIVERT (kj21-diagnose, PSI_R_FIXED=0.667)  
+**Til:** `Beta(2.0, 3.0, [0.01, 0.970])` (samme som kj18)
+
+**Begrunnelse:** Med κ_P=0.0448 er KPI-kanalen sterk nok til at psi_R~0.95 (som data konsekvent foretrekker) gir KPI≥0.35×. Å fryse psi_R er ikke lenger nødvendig.
+
+---
+
+## kj22 — Forhåndsregistrering (2026-05-28)
+
+**Kjøring:** kj22 — produksjonskjøring, v3, KPI-JAE, κ_P-fix  
+**Formål:** Første kjøring med korrigert NKPC-helling. Test om BNP og KPI begge treffer B5-benchmark.  
+**Spesifikasjon:**
+- κ_P = 0.0448 (ε(ε-1)/φ_PQ — ny formel), κ_W = 0.0449
+- psi_R fri, Beta(2,3,[0.01,0.970])
+- sigma_A fast=0.006, phi_I1 fast=0.5, rho_s fast=0.0
+- N_PARAMS=18
+- v3-matriser (NZ=49), KPI-JAE
+- Startverdi: K&M-defaults
+- 200k produksjon, seed=22
+
+**Forventet resultat:** psi_R→~0.95, BNP q4-ratio ~1.04×✅, KPI q4-ratio ~0.46×✅  
+**Mål:** BNP q4 ∈ [0.8,1.5]× NB OG KPI q4 ≥ 0.35× NB
