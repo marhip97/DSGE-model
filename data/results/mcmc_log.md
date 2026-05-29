@@ -6,7 +6,7 @@
 
 ### Prioritert rekkefølge
 
-**Steg 1 — kj31 evaluering (automatisk)**
+**Steg 1 — kj31 evaluering (FULLFØRT ✅)**
 Når kj31 er ferdig: beregn PSRF, ESS, B5, RMSE.
 - Hvis PSRF < 1.10 for alle 20 param: kj31 er Fase 0.5-baseline → loggfør og gå til Steg 2.
 - Hvis PSRF > 1.10 for noen: vurder om det er B5/RMSE-kritiske param → avgjøres autonomt.
@@ -260,6 +260,68 @@ phi_I1=0.50 og phi_H1=60.73 frosset. build_matrices_v3 (NZ=49).
 ### Forventet resultat
 Med kun 13 effektivt fri parametere burde PSRF < 1.10 og ESS > 200 være oppnåelig.
 psi_R vil fortsatt treffe ~0.99 (historisk mønster), men B5 er BESTÅTT med phi_I1=0.50.
+
+---
+
+## Resultater kj31 (117k trekk, avkortet ved container timeout — 2026-05-29)
+
+**Merk:** Prosessen ble avbrutt ved 117k/200k trekk (container timeout). Kjeden var
+fullt konvergens-god (PSRF=1.01 ved 110k) og partial chain er statistisk gyldig.
+
+**Konvergens (partial chain, 117k trekk):**
+| Kriterium | Verdi | Terskel | Status |
+|-----------|-------|---------|--------|
+| PSRF_max  | **1.006** | < 1.10 | ✅ BESTÅTT |
+| ESS_min   | **478** | > 200 | ✅ BESTÅTT |
+| Akseptrate | 0.180 | 0.15–0.40 | ✅ |
+| OK / totalt | **20/20** | 20/20 | ✅ FULLSTENDIG KONVERGENS |
+
+**Data-fit:**
+| Mål | Verdi | Terskel | Status |
+|-----|-------|---------|--------|
+| RMSE (alle) | **0.0599** | < 0.118 | ✅ |
+| RMSE pre    | 0.0614 | — | — |
+| RMSE post   | 0.0531 | — | — |
+
+**B5-benchmark (posterior mean):**
+| Variabel | kj31 ratio | Mål | Status |
+|----------|-----------|-----|--------|
+| BNP q4   | **1.2019×** | 0.8–1.5× | ✅ |
+| KPI q4   | **0.5528×** | ≥ 0.35× | ✅ |
+
+**Posterior mean — alle 20 parametere:**
+| Parameter | kj31 mean | kj31 std | [5%, 95%] | K&M | PSRF |
+|-----------|----------|----------|-----------|-----|------|
+| rho_A | 0.1455 | 0.0611 | [0.062, 0.261] | 0.804 | 1.002 |
+| rho_C | 0.2330 | 0.0591 | [0.152, 0.343] | 0.725 | 1.001 |
+| rho_O | 0.2379 | 0.0555 | [0.159, 0.341] | 0.874 | 1.003 |
+| rho_Ys | 0.3386 | 0.0788 | [0.219, 0.476] | 0.783 | 1.002 |
+| rho_rp | 0.6542 | 0.1456 | [0.397, 0.874] | 0.737 | 1.003 |
+| rho_H | **0.9650** | 0.0168 | [0.934, 0.985] | 0.694 | 1.006 |
+| sigma_C | 0.1093 | 0.0085 | [0.096, 0.124] | 0.030 | 1.004 |
+| sigma_O | 0.1520 | 0.0122 | [0.133, 0.173] | 0.079 | 1.001 |
+| sigma_Ys | 0.0173 | 0.0014 | [0.015, 0.020] | 0.011 | 1.001 |
+| sigma_i | 0.0003 | 0.0000 | [0.000, 0.000] | 0.0003 | 1.000 |
+| sigma_P | 0.0065 | 0.0006 | [0.006, 0.007] | 0.003 | 1.005 |
+| sigma_H | 0.3397 | 0.0301 | [0.294, 0.392] | 0.050 | 1.001 |
+| psi_R | **0.9894** | 0.0004 | [0.989, 0.990] | 0.666 | 1.005 |
+| psi_P1 | 0.3107 | 0.0973 | [0.151, 0.473] | 0.292 | 1.003 |
+| psi_Y | 0.2951 | 0.0479 | [0.215, 0.373] | 0.242 | 1.004 |
+| gamma_p | 0.1699 | 0.0930 | [0.049, 0.344] | 0.350 | 1.004 |
+| phi_I1 | **0.4998** | 0.0010 | [0.498, 0.501] | 12.54 | 1.000 |
+| phi_I2 | 67.918 | 40.401 | [9.457, 140.6] | 165.7 | 1.002 |
+| rho_s | 0.0548 | 0.0034 | [0.051, 0.061] | — | 1.003 |
+| phi_H1 | 60.730 | 0.001 | [60.73, 60.73] | 60.73 | 1.002 |
+
+**Konklusjon:**
+kj31 er **Fase 0.5-baseline** — alle tre mål bestått: PSRF ✅ B5 ✅ RMSE ✅.
+Neste: kj32 (psi_R-identifikasjonstest) og rho_A-diagnose (sweep).
+
+**Åpne spørsmål:**
+1. psi_R=0.9894 — real data-signal eller identifikasjonsproblem? → kj32
+2. phi_I1=0.50 (frosset) — bør dokumenteres som modellfunn via LL-sweep
+3. rho_A=0.145 (K&M=0.804) — svakt identifisert, posteriorkredibilitetsintervall bredt
+4. rho_H=0.965 — høyt, men konvergens god. Sensitivitetstest mot kj32-prior?
 
 ---
 
