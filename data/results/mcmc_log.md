@@ -914,3 +914,42 @@ Uten Z_t-komponenten topper vår rente ved q0 (umiddelbart), mens NB topper ved 
 - Vent på kj25 resultater — rho_s posterior avgjørende
 - Hvis rho_s≈0.45-0.65 og RMSE<0.20: kj25 er suksess
 - For strukturell forbedring: utforsk persistent monetærpolitikk-sjokk (Z_t) med PE-godkjenning
+
+---
+
+## Sandkasse 2 — Persistent monetærpolitikk-sjokk Z_t (2026-05-28, PE fullmakt)
+
+**Hypotese (fra GEORG Staff Memo 15/2025):**
+GEORG har Z_t = λ_Z·Z_{t-1} (λ_Z=0.75) som persistent politikk-komponent.
+Vår modell har bare sigma_i·ε_i (ren overraskelse). Kanskje Z_t gir bedre rateprofil?
+
+**Implementering:**
+- Ny tilstandsvariabel Z_MP (indeks 49), ny sjokk E_Z (indeks 13)
+- Taylor-regel utvidet: G0[I_R, Z_MP] = -1.0 (Z_t påvirker i_R)
+- Z_t = rho_Z·Z_{t-1} + sigma_Z·ε_Z
+- Sigma_i·ε_i fjernet og erstattet av Z_t
+
+**Nøkkelfunn (med kj24 posterior mean som testparametere):**
+
+| psi_R | rho_Z | RMSE | B5-Y | B5-PI | Rente q1-q3 |
+|---|---|---|---|---|---|
+| 0.90 | — (kj25) | 0.118 | 0.806× ✅ | 0.685× ✅ | — |
+| 0.85 | 0.05 | **0.099** | 0.810× ✅ | 0.653× ✅ | [1.00, 0.87, 0.70] ≈ NB! |
+| 0.85 | 0.10 | 0.106 | 0.859× ✅ | 0.688× ✅ | [1.00, 0.92, 0.75] |
+| 0.80 | 0.15 | 0.110 | 0.791× ❌ | 0.644× ✅ | — |
+| 0.74 | 0.30 | 0.128 | 0.829× ✅ | 0.677× ✅ | [1.00, 0.99, 0.76] |
+
+**Betingelse for fallende rente (ikke hump): psi_R + rho_Z < 1**
+
+**Resultat med kj25 posterior:**
+- psi_R=0.85, rho_Z=0.05, kj25 params: RMSE=0.121, B5-Y=0.688× ❌
+- psi_R=0.90, ingen Z_t, kj25 params: RMSE=0.118, B5-Y=0.806× ✅
+→ Z_t + kj25 params er margint DÅRLIGERE — kj25 param ble optimert for psi_R=0.90
+
+**Konklusjon:**
+1. Z_t med rho_Z=0.05 og psi_R=0.85 kan forbedre RMSE til 0.099, men krever ny MCMC
+2. kj25 (RMSE=0.118) er fortsatt beste produksjonsresultat uten ny estimering
+3. Anbefaler **kj26: psi_R=0.85 fast, Z_t (rho_Z fri eller fast=0.05)**
+4. rho_Z<<1 er nesten ekvivalent med sigma_i direkte — gir ny grad av frihet for B5
+
+**PE-godkjenning påkrevd for kj26:** NZ 49→50, NE 13→14
