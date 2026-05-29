@@ -9,8 +9,8 @@
 | Kjøring | Status | PSRF | B5 | RMSE(Kalman) | RMSE(16pt NB) |
 |---------|--------|------|----|--------------|---------------|
 | kj31    | ✅ Baseline | 1.006 | ✅ by4=1.20× | 0.060 | 0.353 |
-| kj32    | 🔄 Kjører | — | — | — | forventes ~0.35 |
-| kj33    | 📋 Planlagt | — | — | — | mål ~0.200 |
+| kj32    | ⚠️ Fullført (PSRF❌) | 1.236 | ✅ by4=1.44× | — | 0.398 |
+| kj33    | 🔄 Kjører | — | — | — | mål ~0.200 |
 
 ### Prioritert rekkefølge
 
@@ -461,6 +461,59 @@ by4 å falle under 0.8× basert på monoton sammenheng.
 - kj33: phi_I1=Normal(0.50, 0.001) + psi_R=Normal(0.88, 0.005, [0.84, 0.92])
   → Avveining: estimert phi_I1 (kj31) vs NB-kalibrert psi_R
   → Exitstrategi: kj31 (data-drevet) er referanselinjen
+
+---
+
+## Resultater kj32 (200k trekk, fullført 2026-05-29)
+
+**Spesifikasjon:** phi_I1=0.40 (LL-optimal, frosset) + psi_R Beta(2,2,[0.85,0.999])
+
+**Konvergens:**
+| Kriterium | Verdi | Terskel | Status |
+|-----------|-------|---------|--------|
+| PSRF_max | 1.236 (psi_P1) | < 1.10 | ❌ |
+| ESS_min  | 424   | > 4 000 | ❌ |
+| Konv/totalt | 17/20 | 20/20 | ⚠️ |
+| acc | 0.285 | 0.15–0.40 | ✅ |
+
+**Problematiske param (PSRF>1.10):** rho_O (1.103), rho_Ys (1.143), psi_P1 (1.236)
+- Ny feil: psi_P1 (Taylor-regel inflasjonskoeff) — ikke problematisk i kj31
+- Trolig: phi_I1=0.40 endrer parameterkorrelasjoner og destabiliserer psi_P1-identifikasjon
+
+**Nøkkelposteriorer:**
+| Parameter | kj32 mean | kj32 std | kj31 mean | K&M | PSRF |
+|-----------|----------|----------|----------|-----|------|
+| psi_R | **0.9974** | 0.0008 | 0.9894 | 0.666 | 1.006 ✓ |
+| phi_I1 | 0.3994 | 0.0010 | 0.4998 | 12.54 | 1.002 ✓ |
+| psi_P1 | 0.3267 | 0.0901 | 0.3107 | 0.381 | 1.236 ❌ |
+| rho_O | 0.2374 | 0.0538 | 0.2379 | 0.874 | 1.103 ❌ |
+| rho_Ys | 0.3152 | 0.0623 | 0.3386 | 0.783 | 1.143 ❌ |
+| rho_H | 0.9421 | 0.0153 | 0.9650 | 0.694 | 1.017 ✓ |
+| rho_s | 0.0556 | 0.0039 | 0.0548 | — | 1.018 ✓ |
+
+**B5-benchmark (posterior mean):**
+| Variabel | kj32 | kj31 | NB-target | Status |
+|----------|------|------|-----------|--------|
+| BNP q4 (by4) | **1.44×** | 1.20× | 0.8–1.5× | ✅ (nær øvre grense) |
+| KPI q4 (bpi4) | **0.636×** | 0.553× | ≥ 0.35× | ✅ |
+
+**Multi-kvartal NB-benchmark (posterior mean):**
+| Var | q4 modell | q4 NB | q8 modell | q8 NB | Status |
+|-----|-----------|-------|-----------|-------|--------|
+| I_R | 0.990 | 0.600 | 0.977 | 0.200 | ❌❌ |
+| RER | −0.924 | −0.400 | — | −0.200 | ❌ |
+| Y | −0.647 | −0.450 | — | −0.350 | ⚠️ |
+
+**RMSE(16pt NB) = 0.398** — FORVERRET fra kj31 (0.353). Årsak: psi_R→0.9974 (enda høyere enn 0.9894 i kj31).
+
+**Viktigste funn:**
+1. **psi_R=0.9974** — data driver psi_R mot grensen (0.999) selv med phi_I1=0.40
+2. **Bredere B5-sone hjalp ikke** — LL presser fortsatt psi_R oppover; by4=1.44× (nær grensen 1.5×)
+3. **Multi-kvartal benchmark forverret** — høyere psi_R → renten avtar enda saktere → RMSE opp
+4. **psi_P1 konvergensfeil** — phi_I1=0.40 endrer modellgeometrien og destabiliserer Taylor-regel
+
+**Konklusjon:** kj32 bekrefter boundary-identifikasjonsproblemet. Dokumenteringsformål oppfylt.
+Baseline forblir kj31. **kj33 (NB-kalibrert psi_R=0.88) er neste og prioriterte steg.**
 
 ---
 
