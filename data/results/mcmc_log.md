@@ -4,6 +4,37 @@ Loggføres per AGENTER.md-krav: alle MCMC-kjøringer skal dokumenteres her.
 
 ---
 
+## Prior-endring — kj26 (2026-05-29, PE fullmakt)
+
+### Endring 1: φ_I1 korrigert til K&M
+**Fra:** `PHI_I1_FIXED = 0.50` (fast siden kj20)
+**Til:** `PHI_I1_KJ26_FIXED = 12.54` (K&M, nemo_complete_documentation_2019.pdf s.59)
+**Begrunnelse:** φ_I1=0.50 er 25× lavere enn K&M=12.54. Oppdaget ved gjennomgang av komplett K&M-dokumentasjon. φ_I1 styrer kostnad ved å avvike fra steady-state investeringsnivå; for lav verdi gir volatile investeringer og BNP-overreaksjon på pengepolitikk.
+
+### Endring 2: φ_PQ korrigert til K&M
+**Fra:** `PHI_PQ_FIXED = 300.0` (κ_P=0.100)
+**Til:** `PHI_PQ_KJ26_FIXED = 669.0` (κ_P=0.0448, K&M, nemo_complete_documentation_2019.pdf s.59)
+**Begrunnelse:** φ_PQ=300 er 2× lavere enn K&M=669. Flatere Phillips-kurve i K&M.
+
+### Endring 3: psi_R reaktivert som estimert parameter
+**Prior:** `Beta(2.0, 2.0, [0.50, 0.95])` — sentrert ~0.73, tillater K&M-verdi 0.666
+**K&M-referanse:** Mimicking rule ω_R=0.6663 (nemo_complete_documentation_2019.pdf s.60)
+**Begrunnelse:** Med K&M φ_I1=12.54 (tregere investeringer) er B5-grensen for psi_R ukjent. MCMC bestemmer.
+
+### Endring 4: rho_s genuint estimert (bug-fix)
+**Fra:** kj25 hadde `setattr(Pt,'rho_s', 0.0)` i log_posterior — rho_s var alltid 0 i likelihood. Posterior rho_s=0.684 var prior-dominert, ikke data-drevet.
+**Til:** Linjen fjernet — kj26 estimerer rho_s genuint fra data.
+**Prior uendret:** `Beta(2.0, 2.0, [0.05, 0.90])`
+
+### Endring 5: phi_I2 prior åpnet
+**Fra:** `Normal(8.0, 4.0, [0.5, 40.0])` — K&M=165.66 ikke i priorens støtte
+**Til:** `Normal(50.0, 50.0, [1.0, 400.0])` — lar data velge mellom kj25-estimat (~12) og K&M (166)
+
+### N_PARAMS: 17→18 (psi_R reaktivert)
+### Startverdi: kj25 posterior means + psi_R=0.74, lp=-3935.01 ✓
+
+---
+
 ## Prior-endring — psi_R (2026-05-26, PE-godkjent)
 
 **Fra:** `Beta(2.0, 2.0, [0.01, 0.990])`

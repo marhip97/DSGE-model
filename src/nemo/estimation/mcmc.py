@@ -72,6 +72,13 @@ PHI_PQ_FIXED = 300.0   # kappa_P = ε(ε-1)/φ_PQ = 30/300 = 0.100
 # 18 kvartaler (NB: ~4 kv). Full RMSE domineres av rente-profil-avvik. psi_R=0.90 halverer
 # RMSE fra 0.258→0.170. B5 bestått: BNP_ratio=0.84×✅, KPI_ratio=0.81×✅ ved psi_R=0.90.
 PSI_R_KJ25_FIXED = 0.90
+# kj26 — K&M-korreksjon (PE-godkjent 2026-05-29):
+# nemo_complete_documentation_2019.pdf avdekket at φ_I1=0.50 er 25× for lav vs K&M=12.54,
+# og φ_PQ=300 er 2× for lav vs K&M=669. Disse korrigeres i kj26 for å eliminere systematisk feil.
+# Dessuten: rho_s=0 hardkoding i log_posterior (linje 334) gjorde at kj25 aldri estimerte rho_s
+# fra data (posterior var prior-dominert). kj26 fjerner dette og estimerer rho_s genuint.
+PHI_I1_KJ26_FIXED = 12.54   # K&M Tabell 8 (complete doc. s.59): kj25 brukte 0.50 (25× for lav)
+PHI_PQ_KJ26_FIXED = 669.0   # K&M Tabell 8 (complete doc. s.59): kj25 brukte 300 (2× for lav)
 # lambda_pi4: vekt på samtid π i hybrid Taylor-regel (0=ren E_t[π_{t+4}], 1=samtid)
 LAMBDA_PI4_FIXED = 0.0
 # psi_R: fryses til K&M=0.667 for kj21-diagnose — test om psi_R→0.956 er rotårsak
@@ -209,10 +216,10 @@ PARAM_PRIORS = {
     'sigma_i':  ('inv_gamma', 2.0, 0.0002, 1e-5, 0.1),
     'sigma_P':  ('inv_gamma', 2.0, 0.0027, 1e-5, 0.5),
     'sigma_H':  ('inv_gamma', 2.0, 0.0500, 1e-5, 1.0),
-    # psi_R: kj25 fester til 0.90 (RMSE-diagnose 2026-05-28): halvtid 6kv vs 18kv,
-    # full kvartalsmatch RMSE 0.258→0.170 (34% bedre). B5 bestått ved psi_R=0.90.
-    # Exit: gjenaktiver 'psi_R' Beta(2,3,[0.01,0.970]) ved behov.
-    # 'psi_R':   ('beta',   2.0, 3.0,  0.01, 0.970),  # DEAKTIVERT kj25 → fast=PSI_R_KJ25_FIXED=0.90
+    # psi_R: kj25 festet til 0.90. kj26 reaktiverer: med φ_I1=12.54 (K&M) er investeringene
+    # mye tregere og B5-grensen for psi_R kan ligge lavere. Beta(2,2,[0.50,0.95]) sentrert ~0.73.
+    # K&M mimicking rule: ω_R=0.6663. K&M Taylor rule: ikke spesifisert; estimeres.
+    'psi_R':   ('beta',   2.0, 2.0, 0.50, 0.95),   # Reaktivert kj26: K&M=0.666, fri med K&M φ_I1
     'psi_P1':  ('normal', 0.29, 0.10, 0.05, 1.50),
     'psi_Y':   ('normal', 0.24, 0.05, 0.01, 0.80),
     # gamma_p: Calvo-prisindeksasjon i hybrid NK Phillips-kurve (PE-godkjent 2026-05-24).
@@ -224,7 +231,9 @@ PARAM_PRIORS = {
     # kj19 posterior: phi_I1→0.103 (for lav → BNP-eksplosjon). Kalibreres fast=0.50 (PE-godkjent 2026-05-26).
     # Exit-mulighet: gjenaktiver med prior Normal(0.5,0.3,[0.1,2.0]) ved behov.
     # 'phi_I1':  ('normal', 2.0,  2.0, 0.1,  15.0),  # DEAKTIVERT etter kj19 → fast=PHI_I1_FIXED
-    'phi_I2':  ('normal', 8.0,  4.0, 0.5,  40.0),
+    # phi_I2: kj25 prior Normal(8,4,[0.5,40]) truncerte K&M=165.66. kj26 åpner prioren:
+    # Normal(50,50,[1,400]) lar data velge mellom kj25-estimat (~12) og K&M (166).
+    'phi_I2':  ('normal', 50.0, 50.0, 1.0, 400.0),
     # Fase 2v2 (2026-05-15): kapitalutnyttelseselastisitet (Alt. A, K&M Tabell 8)
     # phi_u kj23: posterior=1.72 (8× K&M) → BNP=2.33× NB med phi_I1=0.50. Kalibreres fast=0.2192.
     # Svakt identifisert fra makrodata; K&M Tabell 8 (mikrodata). PE-godkjent 2026-05-28.
@@ -250,8 +259,9 @@ KM = {'rho_A':0.804,'rho_C':0.725,'rho_O':0.874,'rho_Ys':0.783,
       'rho_rp':0.737,'rho_H':0.694,'sigma_A':0.006,'sigma_C':0.030,
       'sigma_O':0.079,'sigma_Ys':0.011,'sigma_rp':0.006,'sigma_i':0.0003,
       'sigma_P':0.003,'sigma_H':0.050,'psi_R':0.666,'psi_P1':0.292,
-      'psi_Y':0.242,'h_c':0.938,'gamma_p':0.35,'phi_I1':4.0,'phi_I2':8.0,'phi_u':0.2192,
-      'phi_PQ':669.0,'kappa_M':0.03,'rho_s':0.50}  # rho_s oppdatert kj25: 0.01→0.50 (ny prior [0.05,0.90])
+      'psi_Y':0.242,'h_c':0.938,'gamma_p':0.35,
+      'phi_I1':12.54,'phi_I2':165.66,'phi_u':0.2192,  # K&M complete doc. s.59: phi_I1=12.54, phi_I2=165.66
+      'phi_PQ':669.0,'kappa_M':0.03,'rho_s':0.50}  # rho_s: K&M startverdi 0.50 (ikke i K&M, Justiniano&Preston)
 
 def log_prior(theta):
     lp = 0.0
@@ -331,12 +341,12 @@ def log_posterior(theta, H, Sv, Y_pre, Y_post):
         setattr(Pt,'sigma_A',   SIGMA_A_FIXED)    # fast=0.006 — PE-godkjent 2026-05-28 (kj20: tak-problem)
         # psi_R reaktivert 2026-05-28 (kj22): κ_P-fix løser KPI-problemet uten å fryse psi_R
         setattr(Pt,'kappa_M',   KM['kappa_M'])    # fast K&M=0.030 — kj14 viste estimering forverrer KPI
-        setattr(Pt,'rho_s',     0.0)              # fast=0 (ren UIP) — kj19: data avviste AR(1) UIP
-        setattr(Pt,'phi_I1',    PHI_I1_FIXED)     # fast=0.50 — kj19 sweep (PE-godkjent 2026-05-26)
-        setattr(Pt,'phi_u',     PHI_U_FIXED)        # fast=0.2192 (K&M) — kj23: 1.72→BNP=2.33× (PE 2026-05-28)
-        setattr(Pt,'phi_PQ',    PHI_PQ_FIXED)      # fast=300 → κ_P=0.10 — kj25: KPI-RMSE-diagnose (PE 2026-05-28)
-        setattr(Pt,'psi_R',     PSI_R_KJ25_FIXED)  # fast=0.90 — kj25: halvtid 6kv, RMSE -34% (PE 2026-05-28)
-        setattr(Pt,'lambda_pi4',LAMBDA_PI4_FIXED)  # pi4chain hybrid-vekt (ikke brukt i v3)
+        # rho_s: kj25 satte alltid 0.0 her (feil) → prior-dominert posterior. kj26 estimerer genuint.
+        # psi_R: kj25 satte PSI_R_KJ25_FIXED=0.90. kj26 estimerer fra data med K&M phi_I1=12.54.
+        setattr(Pt,'phi_I1',    PHI_I1_KJ26_FIXED)  # K&M=12.54 — kj25=0.50 var 25× for lav (K&M dok. s.59)
+        setattr(Pt,'phi_u',     PHI_U_FIXED)          # fast=0.2192 (K&M) — kj23: 1.72→BNP=2.33× (PE 2026-05-28)
+        setattr(Pt,'phi_PQ',    PHI_PQ_KJ26_FIXED)   # K&M=669 — kj25=300 var 2× for lav (K&M dok. s.59)
+        setattr(Pt,'lambda_pi4',LAMBDA_PI4_FIXED)     # pi4chain hybrid-vekt (ikke brukt i v3)
         use_pi4 = H.shape[1] == NZ_PI4
         if use_pi4:
             G0,G1,Psi,Pi=build_matrices_pi4chain(Pt,theta_H=0.05)
