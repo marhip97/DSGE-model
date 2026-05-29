@@ -2,6 +2,42 @@
 
 ---
 
+## Arbeidsplan etter kj31 (PE fullmakt 2026-05-29)
+
+### Prioritert rekkefølge
+
+**Steg 1 — kj31 evaluering (automatisk)**
+Når kj31 er ferdig: beregn PSRF, ESS, B5, RMSE.
+- Hvis PSRF < 1.10 for alle 20 param: kj31 er Fase 0.5-baseline → loggfør og gå til Steg 2.
+- Hvis PSRF > 1.10 for noen: vurder om det er B5/RMSE-kritiske param → avgjøres autonomt.
+
+**Steg 2 — psi_R-identifikasjonstest (kj32)**
+psi_R=0.9895 treffer øvre grense i alle kjøringer kj26–kj31.
+Spørsmål: er dette et reelt data-signal eller identifikasjonsproblem?
+Test: kj32 med informativ prior Beta(7,3,[0.50,0.95]) → mode=0.75≈K&M.
+- Hvis kj32 gir PSRF<1.10 og B5 BESTÅTT: prior-betinget B5 er robust → dokumenter.
+- Hvis kj32 B5 FEILER: psi_R-beta og phi_I1=0.50 er i konflikt ved mode=0.75 → Steg 3.
+- Exitstrategi: kj31 er baseline; kj32 er informasjonssøkende, ikke produksjon.
+
+**Steg 3 — phi_I1 frislipp (kj33, betinget)**
+Kun hvis kj32 B5 passerer:
+phi_I1: Normal(0.50, 0.05, [0.30, 0.80]) — la data justere rundt 0.50 med std=0.05.
+Formål: dokumentere at phi_I1=0.50 ikke er et frihetsgrads-artefakt, men et dataresultat.
+Exitstrategi: tilbake til kj31-frysingen hvis phi_I1 drifter utenfor B5-intervall.
+
+**Steg 4 — rho_A-diagnose**
+rho_A=0.091 (K&M=0.804) er mistenkelig lav — nær hvit støy for teknologisjokk.
+Mulige årsaker: (a) modellspesifikasjon, (b) datasignal, (c) identifikasjonsartefakt.
+Diagnose: sweep rho_A ∈ {0.09, 0.30, 0.60, 0.80} med fastholdte øvrige parametere,
+beregn LL og B5 for hvert punkt.
+
+### Priorvalg-prinsipp (PE fullmakt)
+- Alle prior-overrides via `prior_overrides`-dict — global PARAM_PRIORS uendret.
+- Exitstrategi bevares: kj31 er referanselinje.
+- Strukturelle modellendringer (NZ, NE, observasjonssett) krever eksplisitt PE-godkjenning.
+
+---
+
 ## Prior-endringer — kj28 (2026-05-29, PE fullmakt)
 
 ### Kontekst
