@@ -11,13 +11,40 @@ Når kj31 er ferdig: beregn PSRF, ESS, B5, RMSE.
 - Hvis PSRF < 1.10 for alle 20 param: kj31 er Fase 0.5-baseline → loggfør og gå til Steg 2.
 - Hvis PSRF > 1.10 for noen: vurder om det er B5/RMSE-kritiske param → avgjøres autonomt.
 
-**Steg 2 — psi_R-identifikasjonstest (kj32)**
+**Steg 2 — psi_R-identifikasjonstest + LL-optimal phi_I1 (kj32)**
 psi_R=0.9895 treffer øvre grense i alle kjøringer kj26–kj31.
 Spørsmål: er dette et reelt data-signal eller identifikasjonsproblem?
 Test: kj32 med informativ prior Beta(7,3,[0.50,0.95]) → mode=0.75≈K&M.
 - Hvis kj32 gir PSRF<1.10 og B5 BESTÅTT: prior-betinget B5 er robust → dokumenter.
 - Hvis kj32 B5 FEILER: psi_R-beta og phi_I1=0.50 er i konflikt ved mode=0.75 → Steg 3.
 - Exitstrategi: kj31 er baseline; kj32 er informasjonssøkende, ikke produksjon.
+
+---
+
+## Analytiske funn — psi_R og phi_I1 (2026-05-29, etter kj31)
+
+### psi_R-identifikasjon: grenseidentifikasjonsproblem
+LL-sweep (kj31 posterior, psi_R ∈ [0.666, 0.999]):
+  - LL monotont stigende: ΔLL = +1224 fra K&M=0.666 til 0.999
+  - Ingen indre maksimum — data vil ha psi_R→1.0
+  - psi_R=0.9894 er **constrained MLE** (bundet av øvre grense 0.99)
+
+### B5-betingelse: psi_R ≥ 0.88 med phi_I1=0.50
+  Sweepresultat (ved kj31 posterior, phi_I1=0.50):
+  - psi_R=0.666 (K&M): by4=0.329 ❌
+  - psi_R=0.85:         by4=0.723 ❌
+  - psi_R=0.88:         by4=0.811 ✅ (laveste B5-passerende verdi)
+  - psi_R=0.989:        by4=1.200 ✅
+
+### 2D LL-sweep: phi_I1 × psi_R
+  Optimalt B5-passerende hjørne: phi_I1=0.40 + psi_R=0.999
+  - LL=-3222 (ΔLL≈+37 vs kj31: phi_I1=0.50, psi_R=0.989→LL≈-3279)
+  - by4=1.444 ✅ (nær øvre B5-grense 1.5)
+
+  phi_I1=0.30 + psi_R≥0.989: by4>1.5 — B5 FEILER (overshoots)
+  phi_I1=0.10: best LL men by4≥2.4 — B5 FEILER alltid
+
+  → phi_I1=0.40 er constrained MLE over B5-passeringsrommet
 
 **Steg 3 — phi_I1 frislipp (kj33, betinget)**
 Kun hvis kj32 B5 passerer:
