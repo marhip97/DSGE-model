@@ -2,6 +2,36 @@
 
 ---
 
+## Prior-endringer — kj28 (2026-05-29, PE fullmakt)
+
+### Kontekst
+kj27 (Alt B) PSRF=1.59, B5 by4=0.457× (fortsatt under 0.8×). LL-sweep viste:
+- phi_I1=0.30: LL=-3235, by4=1.40× ✓ | phi_I1=0.50: LL=-3287, by4=1.01× ✓
+- phi_I1=12.54 (K&M): LL=-3262, by4=0.40× ✗
+Data foretrekker phi_I1∈[0.30, 0.75] som OG passer B5. phi_I1 reaktiveres.
+
+### Endring 1: phi_I1 reaktivert (N_PARAMS 19→20)
+**Fra:** fast PHI_I1_KJ26_FIXED=12.54 (kj26/kj27)
+**Til:** Normal(2.0, 5.0, [0.1, 25.0]) estimert
+**Startverdi:** 0.50 (by4=1.01× ved psi_R=0.989)
+**K&M:** 12.54 — dekkes av prior (2.5σ fra mean)
+
+### Endring 2: rho_H prior fikset
+**Fra:** Beta(2.0, 0.5, [0.01, 0.9995]) — mode ved 0.9995, drev rho_H→0.965 (kj26)
+**Til:** Beta(5.0, 3.0, [0.30, 0.95]) — mode=0.667, ≈K&M=0.694
+**Begrunnelse:** kj27 viste rho_H kollapset til 0.147 (bimodal med phi_H1).
+Ny prior forhindrer kollaps og forankrer rho_H nær K&M.
+
+### Endring 3: phi_H1 prior strammet
+**Fra:** Normal(60.73, 40.0, [0.5, 200.0]) — svært bred, bimodal
+**Til:** Normal(60.73, 5.0, [30.0, 100.0]) — stram rundt K&M
+**Begrunnelse:** kj27 viste phi_H1 oscillerte 42↔160 (bimodal med rho_H). Stram prior eliminerer dette.
+
+### Startverdi kj28
+lp_start=-3319.74 ✓  B5 ved start: by4=1.014×, bpi4=0.488 ✓ (B5 PASSER allerede!)
+
+---
+
 ## Prior-endringer + strukturell endring — kj27 (2026-05-29, PE fullmakt Alt B)
 
 ### Kontekst

@@ -227,7 +227,7 @@ PARAM_PRIORS = {
     'rho_O':   ('beta',     2.0,  0.5,  0.01, 0.9995),
     'rho_Ys':  ('beta',     2.0,  0.5,  0.01, 0.9995),
     'rho_rp':  ('beta',     2.0,  0.5,  0.01, 0.9995),
-    'rho_H':   ('beta',     2.0,  0.5,  0.01, 0.9995),
+    'rho_H':   ('beta',     5.0,  3.0,  0.30, 0.95),   # kj28: fikset fra Beta(2,0.5) → mode=0.667≈K&M=0.694
     # PE-godkjent 2026-05-21 (A6): sigma_A fristilles. K&M Tabell 9 estimerer sigma_A.
     # Bayesiansk faktor sigma_A=0.012 vs 0.006: ~10^27. rho_A=0.39 i kj10 er identifikasjonsartefakt.
     # PE-godkjent 2026-05-28 (kj21): sigma_A fryses igjen. kj20 drev sigma_A→0.049 (tak=0.050),
@@ -253,10 +253,11 @@ PARAM_PRIORS = {
     'gamma_p': ('beta',   3.0, 3.0,  0.0,  0.95),
     # h_c er fjernet fra estimering — kalibreres fast til H_C_FIXED=0.938 (PE-godkjent 2026-05-18, C2 Alt A).
     # Posterior traff alltid 0.9995-grensen og drepte konsumkanalen. K&M-verdi gjenoppretter a3_W=0.032.
-    # phi_I1 kj20: sweep-diagnose viser phi_I1≈0.5 gir BNP-ratio 1.16× NB (mål [0.8,1.5]×).
-    # kj19 posterior: phi_I1→0.103 (for lav → BNP-eksplosjon). Kalibreres fast=0.50 (PE-godkjent 2026-05-26).
-    # Exit-mulighet: gjenaktiver med prior Normal(0.5,0.3,[0.1,2.0]) ved behov.
-    # 'phi_I1':  ('normal', 2.0,  2.0, 0.1,  15.0),  # DEAKTIVERT etter kj19 → fast=PHI_I1_FIXED
+    # phi_I1 kj28: reaktivert (PE fullmakt 2026-05-29). kj19 estimerte 0.103 (BNP-eksplosjon) med v3.
+    # Med Alt B (NZ=51) er lavere phi_I1 stabilt. LL-sweep viser: phi_I1=0.3→LL=-3235 (best);
+    # phi_I1=12.54→LL=-3262. B5-passing region: phi_I1∈[0.30,0.75] med psi_R≈0.99.
+    # Prior Normal(2.0,5.0,[0.1,25]) — dekker K&M=12.54 og B5-passing 0.3-0.75.
+    'phi_I1':  ('normal', 2.0,  5.0,  0.1, 25.0),   # kj28: reaktivert (var DEAKTIVERT etter kj19)
     # phi_I2: kj25 prior Normal(8,4,[0.5,40]) truncerte K&M=165.66. kj26 åpner prioren:
     # Normal(50,50,[1,400]) lar data velge mellom kj25-estimat (~12) og K&M (166).
     'phi_I2':  ('normal', 50.0, 50.0, 1.0, 400.0),
@@ -277,7 +278,7 @@ PARAM_PRIORS = {
     # K&M Tabell 8: 60.73. phi_H1-sweep viser at K&M-verdi gir BNP q4=0.33× (mål 0.8×).
     # Med φ_I1=12.54 mangler vår forenklede modell NB-kanalene — phi_H1 estimeres for å
     # la data avgjøre kompensasjonsgraden. Prior Normal(60.73, 40, [0.5, 200]) — bredt.
-    'phi_H1': ('normal', 60.73, 40.0, 0.5, 200.0),  # kj27: ny estimert param (Alt B)
+    'phi_H1': ('normal', 60.73,  5.0, 30.0, 100.0),  # kj28: strammet fra (40,[0.5,200]) → eliminerer bimodal
 }
 PARAM_NAMES = list(PARAM_PRIORS.keys())
 N_PARAMS    = len(PARAM_NAMES)
@@ -395,7 +396,8 @@ def log_posterior(theta, H, Sv, Y_pre, Y_post, build_fn=None, prior_overrides=No
         setattr(Pt,'sigma_rp',  SIGMA_RP_FIXED)   # fast — PE-godkjent 2026-05-24 (kj10)
         setattr(Pt,'sigma_A',   SIGMA_A_FIXED)    # fast=0.006 — PE-godkjent 2026-05-28 (kj20: tak-problem)
         setattr(Pt,'kappa_M',   KM['kappa_M'])    # fast K&M=0.030 — kj14 viste estimering forverrer KPI
-        setattr(Pt,'phi_I1',    PHI_I1_KJ26_FIXED)  # K&M=12.54 — kj25=0.50 var 25× for lav
+        if 'phi_I1' not in PARAM_NAMES:
+            setattr(Pt,'phi_I1',    PHI_I1_KJ26_FIXED)  # fast K&M=12.54 hvis ikke estimert
         setattr(Pt,'phi_u',     PHI_U_FIXED)
         setattr(Pt,'phi_PQ',    PHI_PQ_KJ26_FIXED)  # K&M=669
         setattr(Pt,'lambda_pi4',LAMBDA_PI4_FIXED)
