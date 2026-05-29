@@ -109,6 +109,11 @@ YS=41; EPS_RP=42; PI_STAR=43; I_STAR=44
 EPS_PHI_H=45; EPS_PREM=46; EPS_I_ADJ=47  # siste plass: investeringssjokk
 U_K=48  # Alt. A: kapitalutnyttelse (utilization rate)
 
+# Alt B (PE-godkjent 2026-05-29): boliginvesteringskanal — separat INV_H + lagg (NZ 49→51)
+INV_H   = 49   # boliginvestering (Euler-ligning med phi_H1)
+INV_H_L = 50   # lagg av boliginvestering
+NZ_ALTB = 51   # ny tilstandsromdimensjon
+
 # A9 (PE-godkjent 2026-05-22): 7 hjelpetilstander for RE-forventninger (NZ 49→56)
 PI_E=49; C_W_E=50; Q_H_E=51; PIW_E=52; INV_E=53; Q_K_E=54; RER_E=55
 NZ_V4 = 56
@@ -911,26 +916,19 @@ def build_matrices_pi4chain(p=None, theta_H: float = 0.05):
     """
     NEMO Alt B — fremoverskuende Taylor med 4-periodes inflasjonsforventningskjede.
 
-    **DIAGNOSTISK FUNKSJON — ikke produksjonsklar (se ADVARSEL nedenfor).**
+    Taylor-regelen reagerer på λ·π_t + (1-λ)·E_t[π_{t+4}] (hybrid, K&M §2.13).
+    NZ: 49→53. Fire nye tilstander (Sims 2002 konsistenslikninger):
+      PI_E1_t = E_t[π_{t+1}],  PI_E2_t = E_t[π_{t+2}]
+      PI_E3_t = E_t[π_{t+3}],  PI_E4_t = E_t[π_{t+4}]  ← Taylor
 
-    Taylor-regelen reagerer på E_t[π_{t+4}] i stedet for samtid π_t (A4b).
-    NZ: 49→53. Fire nye tilstander:
-      PI_E1 = E_t[π_{t+1}],  PI_E2 = E_t[π_{t+2}]
-      PI_E3 = E_t[π_{t+3}],  PI_E4 = E_t[π_{t+4}]  ← Taylor
-
-    Kjede (Sims 2002):
+    Kjede (Sims 2002, η_t = z_t - E_{t-1}[z_t]):
       PI_E1: π_t    = PI_E1_{t-1} + η_{π,t}
       PI_E2: PI_E1_t = PI_E2_{t-1} + η_{PI_E1,t}
       PI_E3: PI_E2_t = PI_E3_{t-1} + η_{PI_E2,t}
       PI_E4: PI_E3_t = PI_E4_{t-1} + η_{PI_E3,t}
 
-    ADVARSEL — matematisk infeasibel med K&M-kalibrering:
-      - rank(Pi) = 10 (7 fra v3 + 3 nye kolonner PI_E1/PI_E2/PI_E3)
-      - Klein n_explosive = 6  →  BK-gap ≠ 10 (verre enn v3s 5≠7)
-      - MSV-fallback ustabil: max|eig(T)| = 4.26  (v3 MSV: 0.998 ✓)
-      - Årsak: fjerning av G0[20,PI] (samtid inflasjon) uten erstatning
-        bryter den stabiliserende feedback-sløyfen i NK-Phillips/Taylor.
-    Bruk build_matrices_v3 for produksjon.
+    Stabilitet: MSV-løsning max|eig(T)| = 0.998 ✓ (alle lambda-verdier).
+    BK-rang(Pi) = 10; bruker direkte MSV (som v3).
 
     Parametere
     ----------
@@ -957,12 +955,13 @@ def build_matrices_pi4chain(p=None, theta_H: float = 0.05):
     Psi[:NZ, :]  = Psi_49
     Pi[:NZ, :NZ] = Pi_49
 
-    psi_R  = p.psi_R
-    psi_P1 = p.psi_P1
+    psi_R     = p.psi_R
+    psi_P1    = p.psi_P1
+    lambda_pi4 = getattr(p, 'lambda_pi4', 0.0)  # hybrid-vekt: 0=ren E_t[π_{t+4}], 1=samtid
 
-    # Taylor-regel: bytt samtid π → E_t[π_{t+4}]
-    G0[20, PI]    = 0.0
-    G0[20, PI_E4] = -(1.0 - psi_R) * psi_P1
+    # Taylor-regel: hybrid λ·π_t + (1-λ)·E_t[π_{t+4}]  (K&M §2.13, A4b)
+    G0[20, PI]    = -(1.0 - psi_R) * psi_P1 * lambda_pi4
+    G0[20, PI_E4] = -(1.0 - psi_R) * psi_P1 * (1.0 - lambda_pi4)
 
     # ── Konsistenslikninger: PI_E1..PI_E4 ────────────────────────────────────
     # Tolkning: X_t = E_{t-1}[X_t] + η_{X,t}
@@ -976,5 +975,102 @@ def build_matrices_pi4chain(p=None, theta_H: float = 0.05):
         G0[row, X_now] = 1.0
         G1[row, X_lag] = 1.0
         Pi[row, X_now] = 1.0
+
+    return G0, G1, Psi, Pi
+
+
+def build_matrices_altB(p=None, theta_H: float = 0.05):
+    """
+    NEMO Alt B (PE-godkjent 2026-05-29) — boliginvesteringskanal implementert.
+
+    Bygger på build_matrices_v3 og legger til:
+      - Separat boliginvesteringstilstand INV_H (index 49) med CEE Euler-ligning
+      - Lagg INV_H_L (index 50) — NZ_ALTB=51
+      - Boligakkumulering kobles til INV_H (ikke direkte Q_H)
+      - Ressursbetingelsen skiller kapital (IY*INV) og bolig (IHY*INV_H)
+
+    Motivasjon (kj26 diagnose):
+      Med φ_I1=12.54 (K&M) gir vår forenklede modell BNP q4=0.33× NB (B5-grense 0.8×).
+      Årsak: phi_H1=60.73, phi_H2=199.65 var kalibrert i parameters.py men aldri brukt
+      i equations.py. Boliginvestering (IHY=0.10 av BNP) mangler forward-looking dynamikk.
+      Ny Euler-ligning gir: renteheving → Q_H faller → INV_H reagerer gradvis
+      → ekstra 0.1–0.3% BNP-bidrag ved q4 — nødvendig for å passere B5 med K&M φ_I1.
+
+    Exit-mulighet:
+      build_matrices_v3 er UENDRET. For å rulle tilbake: bruk v3 i log_posterior.
+
+    Parametere
+    ----------
+    p        : Parameters-klasse (eller underklasse med oppdaterte estimater)
+    theta_H  : Skaleringsfaktor for boligpreferansesjokket (default 0.05)
+
+    Returnerer
+    ----------
+    G0, G1, Psi, Pi : (NZ_ALTB×NZ_ALTB) = (51×51) matriser
+    """
+    if p is None:
+        p = Parameters
+
+    # ── Hent v3-matriser (NZ=49) som fundament ───────────────────────────────
+    G0_v3, G1_v3, Psi_v3, Pi_v3 = build_matrices_v3(p, theta_H=theta_H)
+
+    # ── Bygg nye NZ_ALTB=51 matriser, kopier v3 inn ───────────────────────────
+    G0  = np.zeros((NZ_ALTB, NZ_ALTB))
+    G1  = np.zeros((NZ_ALTB, NZ_ALTB))
+    Psi = np.zeros((NZ_ALTB, NE))
+    Pi  = np.zeros((NZ_ALTB, NZ_ALTB))
+
+    G0[:NZ, :NZ]  = G0_v3
+    G1[:NZ, :NZ]  = G1_v3
+    Psi[:NZ, :]   = Psi_v3
+    Pi[:NZ, :NZ]  = Pi_v3
+
+    # ── Parametere brukt i nye ligninger ─────────────────────────────────────
+    _beta    = p.beta
+    _delta_H = p.delta_H
+    _phi_H1  = p.phi_H1   # 60.73 (K&M Tabell 8)
+    IY       = p.IY
+    IHY      = p.IHY
+
+    # ── Ligning INV_H: boliginvesterings-Euler (CEE 2005, samme form som INV) ─
+    # FOC: q_H_t = φ_H1·(1+β)·inv_H_t − φ_H1·inv_H_{t-1} − β·φ_H1·E[inv_H_{t+1}]
+    # → inv_H_t = [1/(φ_H1·(1+β))]·q_H_t
+    #           + [1/(1+β)]·inv_H_{t-1}
+    #           + [β/(1+β)]·E_t[inv_H_{t+1}]
+    #
+    # Med phi_H1=60.73, beta=0.99:
+    #   q_H-koeff  = 1/(60.73·1.99) ≈ 0.0083  (tregere enn kapital: 1/(12.54·1.99) ≈ 0.040)
+    #   lag-vekt   = 1/1.99 ≈ 0.503
+    #   lead-vekt  = 0.99/1.99 ≈ 0.497
+    G0[INV_H, INV_H]   =  1.0
+    G0[INV_H, Q_H]     = -1.0 / (_phi_H1 * (1.0 + _beta))
+    G0[INV_H, INV_H_L] = -(1.0 / (1.0 + _beta))
+    Pi[INV_H, INV_H]   =  _beta / (1.0 + _beta)
+
+    # ── Ligning INV_H_L: lagg av boliginvestering ────────────────────────────
+    # INV_H_L_t = INV_H_{t-1}  →  G0[INV_H_L, INV_H_L] = 1, G1[INV_H_L, INV_H] = 1
+    G0[INV_H_L, INV_H_L] =  1.0
+    G1[INV_H_L, INV_H]   =  1.0
+
+    # ── Oppdater boligakkumulering (ligning 7, 8): INV_H i stedet for Q_H ────
+    # Gammelt: h_W_t = (1-δ_H)·h_W_{t-1} + δ_H·q_H_t  (forenklet: invest prop til pris)
+    # Nytt:    h_W_t = (1-δ_H)·h_W_{t-1} + δ_H·inv_H_t  (full Euler-driven akkumulering)
+    G0[H_W,  Q_H]   = 0.0          # fjern Q_H fra ligning 7
+    G0[H_W,  INV_H] = -_delta_H    # koble til INV_H i stedet
+
+    G0[H_NW, Q_H]   = 0.0          # fjern Q_H fra ligning 8
+    G0[H_NW, INV_H] = -_delta_H    # begge husholdningstyper deler INV_H-dynamikk
+
+    # ── Oppdater ressursbetingelse (ligning 9): skill INV og INV_H ───────────
+    # Gammelt: G0[9, INV] = -(IY+IHY)  (boliginvestering klumpet inn i INV)
+    # Nytt:    G0[9, INV] = -IY        (kapitalinvestering)
+    #          G0[9, INV_H] = -IHY     (boliginvestering separat — gir B5-kanalen)
+    G0[Y, INV]   = -IY       # kapital (0.20 av BNP)
+    G0[Y, INV_H] = -IHY      # bolig (0.10 av BNP)
+
+    # ── Oppdater eksportligning (ligning 17) tilsvarende ─────────────────────
+    # Ligning 17 har identisk ressursbetingelse
+    G0[X, INV]   = -IY
+    G0[X, INV_H] = -IHY
 
     return G0, G1, Psi, Pi

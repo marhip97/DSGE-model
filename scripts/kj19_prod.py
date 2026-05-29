@@ -41,14 +41,18 @@ if not datafil.exists():
     )
 
 obs_df = pd.read_csv(datafil, index_col=0, parse_dates=True)
-pi_kol = 'pi_core_obs'
-obs_kols = [pi_kol if k == 'pi_obs' else k for k in OBS_NAMES]
+
+PI_OBS_COL = "pi_core_obs"
+if PI_OBS_COL not in obs_df.columns:
+    raise ValueError(f"Kolonne {PI_OBS_COL} mangler i {datafil.name}")
+
+obs_kols = [PI_OBS_COL if k == 'pi_obs' else k for k in OBS_NAMES]
 pre  = obs_df[obs_df.index <= '2019-12-31'][obs_kols].values
 post = obs_df[obs_df.index >= '2022-01-01'][obs_kols].values
 
 print(f"Datafil: {datafil.name} (KPI-JAE)")
 print(f"Pre={len(pre)} kv  Post={len(post)} kv  Totalt={len(pre)+len(post)} kv")
-print(f"pi-observasjon: {pi_kol}")
+print(f"pi-observasjon: {PI_OBS_COL}")
 
 # ── Startverdi — kj18 posterior means + rho_s=0.40 ───────────────────────────
 kj18_fil = rot / "data/results/chain_kj18_prod.npy"
@@ -60,15 +64,28 @@ if kj18_fil.exists():
     kj18 = np.load(kj18_fil)
     kj18_means = {PARAM_NAMES_KJ18[i]: float(kj18[:, i].mean())
                   for i in range(len(PARAM_NAMES_KJ18))}
-    theta0 = np.array([
+    kj18_stds  = {PARAM_NAMES_KJ18[i]: float(kj18[:, i].std())
+                  for i in range(len(PARAM_NAMES_KJ18))}
+    theta_start = np.array([
         kj18_means.get(n, KM.get(n, 0.5)) if n != 'rho_s' else 0.40
+        for n in PARAM_NAMES
+    ])
+    post_std = np.array([
+        max(kj18_stds.get(n, 0.05), 1e-4) if n != 'rho_s' else 0.10
         for n in PARAM_NAMES
     ])
     print(f"  rho_s startverdi: 0.40 (prior-mean, ny parameter)")
 else:
     print("Advarsel: chain_kj18_prod.npy ikke funnet — bruker K&M + rho_s=0.40")
-    theta0 = np.array([KM.get(n, 0.5) if n != 'rho_s' else 0.40
-                       for n in PARAM_NAMES])
+    theta_start = np.array([KM.get(n, 0.5) if n != 'rho_s' else 0.40
+                             for n in PARAM_NAMES])
+    post_std = np.array([0.05] * N_PARAMS)
+
+# Korriger psi_R hvis over ny prior-grense (0.970)
+psi_R_idx = PARAM_NAMES.index("psi_R")
+if theta_start[psi_R_idx] > 0.969:
+    theta_start[psi_R_idx] = 0.950
+    print(f"  psi_R startverdi justert til 0.950 (kj18 hadde {kj18_means.get('psi_R',0):.4f} > 0.970)")
 
 print(f"\nKjøring 19: {N_PARAMS} parametere")
 print(f"  sigma_rp fast={SIGMA_RP_FIXED}  kappa_M fast=0.03")
@@ -78,34 +95,31 @@ print(f"  psi_R prior: Beta(2,3,[0.01,0.970])  (PE-godkjent 2026-05-26)")
 print(f"\nStartverdier:")
 for i, n in enumerate(PARAM_NAMES):
     src = "kj18" if n != 'rho_s' else "prior-mean"
-    print(f"  {n:12s}: {theta0[i]:.4f}  ({src})")
+    print(f"  {n:12s}: {theta_start[i]:.4f}  std={post_std[i]:.4f}  ({src})")
 
 # ── Sjekk startverdi ──────────────────────────────────────────────────────────
 H  = build_H()
 Sv = build_Sv()
-lp0 = log_posterior(theta0, H, Sv, pre, post)
+lp0 = log_posterior(theta_start, H, Sv, pre, post)
 print(f"\nStartverdi log-posterior: {lp0:.2f}")
 if not np.isfinite(lp0):
     raise ValueError(f"Startverdi gir ikke-endelig lp={lp0}. Sjekk data og parametre.")
 
 # ── MCMC ──────────────────────────────────────────────────────────────────────
-utfil = str(rot / "data/results/chain_kj19_prod")
-print(f"\nLagrer til: {utfil}*")
+save_pref = str(rot / "data/results/chain_kj19_prod")
+print(f"\nLagrer til: {save_pref}*")
 print(f"Starter kjøring 19 (200k produksjon + 20k burnin) ...")
 print()
 
-_, _, meta = adaptive_mcmc_with_monitoring(
-    theta0       = theta0,
-    H            = H,
-    Sv           = Sv,
-    Y_pre        = pre,
-    Y_post       = post,
-    n_production = 200_000,
-    n_burnin     = 20_000,
-    seed         = 19,
-    outfile      = utfil,
-    run_id       = "kj19",
-    km_ref       = KM,
+chain, lp_vec, meta = adaptive_mcmc_with_monitoring(
+    Y_pre=pre, Y_post=post, H=H, Sv=Sv,
+    theta_init=theta_start, post_std_init=post_std,
+    n_production=200_000, burnin=20_000, adapt_every=500,
+    check_every=10_000, max_recalib=5,
+    psrf_thr=1.10, ess_pct_thr=0.02,
+    scale_init=0.676, seed=19, verbose=True,
+    save_prefix=save_pref,
+    use_reparam=False,
 )
 
 print(f"\nKjøring 19 fullført.")

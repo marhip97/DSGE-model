@@ -93,20 +93,23 @@ class Parameters:
     phi_PQ   = 669.0      # (CAL) φ_PQ — Tabell 8: 669 (NEMO: Rotemberg, ikke Calvo)
     phi_W    = 666.92     # (CAL) φ_W  — Tabell 8: 666.92
 
-    # Avledede Calvo-ekvivalenter (brukt i log-linearisert form)
-    # I Rotemberg: κ_P = (ε_P - 1) / φ_PQ ≈ 0.05 for ε_P ≈ 6
-    # Disse er konsistente med Fase I-helningene
+    # Avledede NKPC-helninger (Rotemberg med markup-normering)
+    # κ_P = ε(ε-1)/φ_PQ = 6×5/669 = 0.0448
+    # Rettelse 2026-05-28 (B5-diagnose kj22): opprinnelig formel (ε-1)/φ_PQ = 0.0075
+    # er 6× for liten — gir KPI IRF 15× under NB Memo 3/2024 Figur 1.
+    # Korrekt NEMO-formel inkluderer markup-normering μ = ε/(ε-1): κ_P = ε(ε-1)/φ_PQ.
+    # Med ε=6, φ_PQ=669 (K&M Tabell 8): κ_P = 0.0448, κ_W = 0.0449.
     @classmethod
     def kappa_P(cls):
-        """NK Phillips-kurve-helning (tilsvarer Fase I ~0.05)."""
-        eps_P = 6.0  # elastisitet mellom differensierte varer
-        return (eps_P - 1.0) / cls.phi_PQ
+        """NK Phillips-kurve-helning med markup-normering: ε(ε-1)/φ_PQ."""
+        eps_P = 6.0
+        return eps_P * (eps_P - 1.0) / cls.phi_PQ
 
     @classmethod
     def kappa_W(cls):
-        """Lønnsinflasjon-helning."""
+        """Lønnsinflasjon-helning med markup-normering: ε(ε-1)/φ_W."""
         eps_W = 6.0
-        return (eps_W - 1.0) / cls.phi_W
+        return eps_W * (eps_W - 1.0) / cls.phi_W
 
     # Investeringsjusteringskostnader (ny i Fase II)
     # Oppr. est. under bugget INV-ligning (G1-lag, 2-periodes). Etter A4a-fix
