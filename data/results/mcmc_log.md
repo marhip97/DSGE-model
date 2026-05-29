@@ -193,6 +193,38 @@ Beta(5,3) er konsentrert nok til å hindre boundary-vandrering, men bred nok til
 
 ---
 
+## Prior-endringer — kj31 (2026-05-29, PE fullmakt)
+
+### Kontekst
+kj30 oscillerte PSRF=1.09↔1.19 med ESS=26–50 (behov: 200). Diagnostikk:
+Beta(5,3) prior-fix hjalp PSRF (fra kj29 maks 1.362 → kj30 stabilisert ~1.1),
+men ESS-problemet er strukturelt: rho_A/C/O/Ys/rp er svakt identifisert.
+Posteriorflaten er flat og korrelert i rho_*-rommet — MH-sampler kan ikke
+oppnå ESS>200 for disse parameterne uten reparametrisering.
+
+### Endring: rho_A/C/O/Ys/rp frosset ved K&M-verdier (via prior_overrides)
+**Begrunnelse:** K&M (2019) Tabell 1, side 15 — estimert på norske data.
+Prosjektets referansemodell er K&M-parameterisering (CLAUDE.md).
+Svak identifikasjon i rho_*-rommet gir ingen informasjon utover K&M-prioren.
+**Prior for hvert rho_*:** Normal(K&M, 0.001, [K&M-0.05, K&M+0.05])
+  - rho_A  = 0.804: Normal(0.804, 0.001, [0.754, 0.854])
+  - rho_C  = 0.725: Normal(0.725, 0.001, [0.675, 0.775])
+  - rho_O  = 0.874: Normal(0.874, 0.001, [0.824, 0.924])
+  - rho_Ys = 0.783: Normal(0.783, 0.001, [0.733, 0.833])
+  - rho_rp = 0.737: Normal(0.737, 0.001, [0.687, 0.787])
+**N_PARAMS=20 uendret** — parametre frosset via tight prior, ikke fjernet.
+**Effektivt fri:** rho_H, sigma_*, psi_R, psi_P1, psi_Y, gamma_p, phi_I2, rho_s (13).
+**Kun prior_overrides — global PARAM_PRIORS uendret.**
+
+### Beholdt fra kj30/kj29
+phi_I1=0.50 og phi_H1=60.73 frosset. build_matrices_v3 (NZ=49).
+
+### Forventet resultat
+Med kun 13 effektivt fri parametere burde PSRF < 1.10 og ESS > 200 være oppnåelig.
+psi_R vil fortsatt treffe ~0.99 (historisk mønster), men B5 er BESTÅTT med phi_I1=0.50.
+
+---
+
 Loggføres per AGENTER.md-krav: alle MCMC-kjøringer skal dokumenteres her.
 
 ---
