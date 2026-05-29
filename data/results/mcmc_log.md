@@ -39,6 +39,58 @@ avgjøre nødvendig kompensasjonsgrad. Prior er bred og sentrert på K&M-verdi.
 ### H-matrise: build_H_altB (14×51) — dinv_obs mappes til IY*INV + IHY*INV_H
 ### Startverdi: kj26 posterior means + phi_H1=60.73 (K&M), lp=-3404.38 ✓
 
+### Resultater kj27 (200k trekk, fullført 2026-05-29)
+
+**Konvergens:**
+| Kriterium | Verdi | Terskel | Status |
+|-----------|-------|---------|--------|
+| PSRF_max | 1.594 | < 1.10 | ❌ IKKE KONVERGENS |
+| ESS_min | 214 | > 4 000 (2%×200k) | ❌ |
+| Akseptrate | 0.278 | 0.15–0.40 | ✅ |
+
+**Data-fit:**
+| Mål | Verdi | Terskel | Status |
+|-----|-------|---------|--------|
+| RMSE (Kalman) | 0.059 | < 0.118 | ✅ Forbedret fra kj26 |
+| Log-likelihood | −3271 | (høyere=bedre) | — |
+
+**B5-benchmark (posterior mean, build_matrices_altB):**
+| Variabel | kj27-ratio | kj26-ratio | NB-target | Status |
+|----------|-----------|-----------|-----------|--------|
+| BNP q4 | **45.6×** | 0.33× | 0.8–1.5× | ❌ Massiv overskyting |
+| KPI q4 | **31.7×** | 0.26× | ≥ 0.35× | ❌ |
+
+**Posterior mean (utvalgte parametere):**
+| Parameter | kj27 mean | kj27 std | kj26 mean | K&M |
+|-----------|----------|----------|----------|-----|
+| psi_R | 0.9893 | 0.0005 | 0.9486 | 0.666 |
+| phi_H1 | 94.75 | 29.80 | — (ikke estimert) | 60.73 |
+| rho_H | 0.147 | 0.079 | 0.965 | 0.700 |
+| phi_I2 | 65.83 | 39.53 | 64.5 | — |
+| rho_s | 0.055 | 0.003 | 0.055 | — |
+
+**Diagnose:**
+
+1. **psi_R=0.9893 treffer nytt tak (0.99).** Halveringstid ~65 kvartaler = 16 år. B5-ratio
+   skyter fra 0.33× (kj26, psi_R=0.9486) til 45.6× (kj27, psi_R=0.9893). psi_R og
+   B5-kriteriet er i fundamental konflikt: data krever høy renteglatting, men høy
+   renteglatting gir divergent IRF-integral.
+
+2. **phi_H1/rho_H bimodal posterior.** Kjeden veksler mellom Mode A (phi_H1~120–160,
+   rho_H~0.07) og Mode B (phi_H1~42–50, rho_H~0.17–0.31). Disse er nær-likelihood-
+   ekvivalente — data kan ikke skille høy boliginvesteringskostnad fra høy AR(1)-persistens.
+   Kilde til PSRF=1.59.
+
+3. **RMSE=0.059 er lovende.** Alt B-struktur forbedrer data-fit vesentlig (0.059 vs
+   kj26-benchmark 0.118). Strukturen er riktig retning, men psi_R-problemet må løses.
+
+**Konklusjon:** kj27 FEILET B5 og konvergens. Strukturell diagnose komplett.
+
+**Anbefalt neste steg (kj28):**
+- psi_R: informativ prior Beta(5, 2, [0.70, 0.95]) — sentrerer ~0.91, blokkerer >0.95
+- rho_H: sterk prior eller fast kalibrering (0.965 fra K&M) for å løse bimodalt problem
+- Alt B-struktur beholdes — RMSE-forbedringen er reell
+
 ---
 
 Loggføres per AGENTER.md-krav: alle MCMC-kjøringer skal dokumenteres her.
