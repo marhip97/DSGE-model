@@ -149,7 +149,7 @@ phi_I1=0.50 er beste kompromiss mellom data-fit og B5-kriteriet.
 ### Startverdi kj29
 lp_start=-3399.52 ✓  B5 ved start: by4=1.0302×, bpi4=0.4728 ✓ (B5 PASSER allerede!)
 
-### Resultater kj29 (200k trekk, produksjon pågår)
+### Resultater kj29 (200k trekk, fullført)
 
 **Konvergens (rekalibrering):**
 - Runde 4: PSRF=1.096 (nær!) ESS=46 — problemer: rho_A/C/O/Ys/rp/rho_H
@@ -162,6 +162,8 @@ rho_C/O/Ys/rp har Beta(2,0.5,[0.01,0.9995]) — mode ved øvre grense (0.9995).
 Beta(2,0.5) med β<1: PDF ubegrenset ved x=1 → mode ved x=1. Fører til grense-treff og
 dårlig blanding. rho_A=Beta(2,2) er OK, men alle 5 rho_*-parametre er i problemlisten.
 ESS=44 (behov: 200) indikerer høy autokorrelasjon — posteriorlaten er flat i disse retningene.
+
+**B5** (posterior mean): ikke beregnet — ikke-konvergert kjede, brukes kun som warm-start.
 
 **Konklusjon:** kj29 IKKE konvergens. Resultater brukes som warm-start for kj30.
 
@@ -222,6 +224,57 @@ phi_I1=0.50 og phi_H1=60.73 frosset. build_matrices_v3 (NZ=49).
 ### Forventet resultat
 Med kun 13 effektivt fri parametere burde PSRF < 1.10 og ESS > 200 være oppnåelig.
 psi_R vil fortsatt treffe ~0.99 (historisk mønster), men B5 er BESTÅTT med phi_I1=0.50.
+
+---
+
+## Resultater kj30 (200k trekk, fullført 2026-05-29)
+
+**Konvergens:**
+| Kriterium | Verdi | Terskel | Status |
+|-----------|-------|---------|--------|
+| PSRF_max  | 1.695 (rho_A) | < 1.10 | ❌ (3/20 feiler) |
+| ESS_min   | 245 | > 4 000 (2%×200k) | ❌ |
+| Akseptrate | 0.188 | 0.15–0.40 | ✅ |
+| OK / totalt | 17/20 | 20/20 | ⚠️ Nesten |
+
+**Problemer (3):** rho_A (1.695), rho_H (1.202), sigma_C (1.118)
+**Konvergerte:** psi_R (1.002), phi_I1 (1.003), rho_C/O/Ys/rp (1.004–1.034) ✓
+
+**Data-fit:**
+| Mål | Verdi | Terskel | Status |
+|-----|-------|---------|--------|
+| RMSE (Kalman) | **0.0598** | < 0.118 | ✅ |
+| RMSE pre | 0.0613 | — | — |
+| RMSE post | 0.0530 | — | — |
+| Log-likelihood | ~-3287 | — | — |
+
+**B5-benchmark (posterior mean):**
+| Variabel | kj30 ratio | Mål | Status |
+|----------|-----------|-----|--------|
+| BNP q4   | **1.2022×** | 0.8–1.5× | ✅ |
+| KPI q4   | **0.5541×** | ≥ 0.35× | ✅ |
+
+**Posterior mean (utvalgte parametere):**
+| Parameter | kj30 mean | kj30 std | K&M | PSRF |
+|-----------|----------|----------|-----|------|
+| psi_R | 0.9895 | 0.0004 | 0.666 | 1.002 ✓ |
+| phi_I1 | 0.4997 | 0.0010 | 12.54 | 1.003 ✓ |
+| rho_A | 0.0910 | 0.0571 | 0.804 | 1.695 ❌ |
+| rho_C | 0.2290 | 0.0553 | 0.725 | 1.034 ✓ |
+| rho_O | 0.2396 | 0.0510 | 0.874 | 1.010 ✓ |
+| rho_Ys | 0.3460 | 0.0741 | 0.783 | 1.019 ✓ |
+| rho_rp | 0.6521 | 0.1412 | 0.737 | 1.004 ✓ |
+| rho_H | 0.9150 | 0.0191 | 0.694 | 1.202 ❌ |
+| sigma_H | 0.3485 | 0.0277 | 0.050 | 1.022 ✓ |
+| rho_s | 0.0557 | 0.0038 | — | 1.034 ✓ |
+
+**Diagnose kj30:**
+- Beta(5,3) fix virket for rho_C/O/Ys/rp: ESS=816–3306, PSRF=1.004–1.034 ✓
+- rho_A PSRF=1.695: Beta(2,2) ikke tilstrekkelig — posteriorverdi 0.091 langt fra K&M=0.804
+- rho_H PSRF=1.202: posterior=0.915 traff øvre grense 0.95 — grensetreff → PSRF
+- Neste steg (kj31): rho_A→Beta(5,3,[0.01,0.99]), rho_H utvidet til [0.30,0.99]
+
+**Konklusjon:** kj30 B5 ✅ og RMSE ✅ men PSRF ❌ (rho_A/H). Brukes som warm-start for kj31.
 
 ---
 
