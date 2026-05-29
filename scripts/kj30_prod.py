@@ -128,10 +128,21 @@ if theta_start[rho_H_idx] < 0.30 or theta_start[rho_H_idx] > 0.95:
     theta_start[rho_H_idx] = 0.694
     post_std[rho_H_idx]    = 0.08
 
-# rho_C/O/Ys/rp: ny prior [0.10, 0.99]
-for idx, lo, hi in [(rho_C_idx, 0.10, 0.99), (rho_O_idx, 0.10, 0.99),
-                    (rho_Ys_idx, 0.10, 0.99), (rho_rp_idx, 0.10, 0.99)]:
-    theta_start[idx] = np.clip(theta_start[idx], lo, hi)
+# rho_C/O/Ys/rp: ny prior [0.10, 0.99] — Beta(5,3) mode=0.667
+# NB: kj29 drev rho_C/O til ~0.05 (utenfor ny range). Bruk K&M startverdi
+# heller enn å klippe til grensen (grense → x=0 → logpdf=-inf).
+RHO_OVERRIDES = {
+    rho_C_idx:  (0.10, 0.99, KM.get('rho_C',  0.725)),
+    rho_O_idx:  (0.10, 0.99, KM.get('rho_O',  0.874)),
+    rho_Ys_idx: (0.10, 0.99, KM.get('rho_Ys', 0.783)),
+    rho_rp_idx: (0.10, 0.99, KM.get('rho_rp', 0.737)),
+}
+for idx, (lo, hi, km_val) in RHO_OVERRIDES.items():
+    v = theta_start[idx]
+    if v <= lo or v >= hi:
+        # Utenfor ny prior-grense — bruk K&M-verdi (innenfor [0.10, 0.99])
+        theta_start[idx] = np.clip(km_val, lo + 1e-4, hi - 1e-4)
+        post_std[idx]    = 0.10
 
 if theta_start[phi_I2_idx] < 1.0:
     theta_start[phi_I2_idx] = 64.5
