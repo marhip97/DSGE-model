@@ -123,6 +123,76 @@ avgjøre nødvendig kompensasjonsgrad. Prior er bred og sentrert på K&M-verdi.
 
 ---
 
+## Prior-endringer — kj29 (2026-05-29, PE fullmakt)
+
+### Kontekst
+kj28 (Alt B, phi_I1 fri) krasjet under rekalibrering 3: phi_I1→0.10 (nedre grense) +
+psi_R→0.99 → LP-hopp til -2594, deretter numerisk instabilitet. Data ønsket phi_I1=0.10
++ psi_R=0.99 (LL=-2750), men kombinasjonen feiler B5 (by4=3.05×) og er ustabil.
+
+### Strukturell endring: tilbake til build_matrices_v3 (NZ 51→49)
+Alt B beholdt som exit-mulighet i build_matrices_altB.
+v3 gir stabil konvergens og by4=1.20× ved phi_I1=0.50 + psi_R=0.99 (B5 BESTÅTT).
+
+### Endring 1: phi_I1 frosset via tight prior (lokalt — prior_overrides)
+**Fra:** Normal(2.0, 5.0, [0.1, 25.0]) — kj28 fri estimering
+**Til:** Normal(0.50, 0.001, [0.40, 0.60]) — delta-funksjon rundt 0.50
+**Begrunnelse:** LL-sweep: phi_I1=0.50→LL=-3303 (B5 BESTÅTT) vs phi_I1=0.10→LL=-2750 (B5 FEILER).
+phi_I1=0.50 er beste kompromiss mellom data-fit og B5-kriteriet.
+**Kun prior_overrides — global PARAM_PRIORS uendret.**
+
+### Endring 2: phi_H1 frosset via tight prior (lokalt — prior_overrides)
+**Fra:** Normal(60.73, 5.0, [30.0, 100.0]) — kj28
+**Til:** Normal(60.73, 0.001, [60.70, 60.76]) — delta-funksjon (v3 bruker ikke phi_H1)
+**Begrunnelse:** Hindrer vektorsøk i tom parameter-retning.
+
+### Startverdi kj29
+lp_start=-3399.52 ✓  B5 ved start: by4=1.0302×, bpi4=0.4728 ✓ (B5 PASSER allerede!)
+
+### Resultater kj29 (200k trekk, produksjon pågår)
+
+**Konvergens (rekalibrering):**
+- Runde 4: PSRF=1.096 (nær!) ESS=46 — problemer: rho_A/C/O/Ys/rp/rho_H
+- Runde 5: PSRF=1.087 ESS=44 — fortsatt ikke OK (ESS for lav)
+- Runde 6: PSRF=1.280 ESS=25 — oscillerer, max_recalib nådd
+- Produksjon kjøres med PSRF=1.28 (ikke konvergens)
+
+**Diagnose kj29:**
+rho_C/O/Ys/rp har Beta(2,0.5,[0.01,0.9995]) — mode ved øvre grense (0.9995).
+Beta(2,0.5) med β<1: PDF ubegrenset ved x=1 → mode ved x=1. Fører til grense-treff og
+dårlig blanding. rho_A=Beta(2,2) er OK, men alle 5 rho_*-parametre er i problemlisten.
+ESS=44 (behov: 200) indikerer høy autokorrelasjon — posteriorlaten er flat i disse retningene.
+
+**Konklusjon:** kj29 IKKE konvergens. Resultater brukes som warm-start for kj30.
+
+---
+
+## Prior-endringer — kj30 (2026-05-29, PE fullmakt)
+
+### Kontekst
+kj29 nådde max_recalib med PSRF=1.28. Root cause: Beta(2,0.5) priors for rho_C/O/Ys/rp
+har mode ved øvre grense → grense-treff → dårlig blanding → høy autokorrelasjon.
+
+### Endring: rho_C/O/Ys/rp priors fikset (via prior_overrides — lokalt)
+**Fra:** Beta(2.0, 0.5, [0.01, 0.9995]) — alle fire parametre
+**Til:** Beta(5.0, 3.0, [0.10, 0.99]) — mode=0.667, lar data bestemme innenfor (0.10, 0.99)
+**Begrunnelse:** Mode=0.667 er rimelig kompromiss (K&M: rho_C=0.725, rho_O=0.874, rho_Ys=0.783, rho_rp=0.737).
+Beta(5,3) er konsentrert nok til å hindre boundary-vandrering, men bred nok til å la data bestemme.
+Øvre grense 0.99 (ikke 0.9995) hindrer degenerert boundary-adferd.
+**Kun prior_overrides — global PARAM_PRIORS uendret (exit-mulighet bevares).**
+
+### Alle prior_overrides kj30
+- phi_I1: Normal(0.50, 0.001, [0.40, 0.60]) — delta ved 0.50 (B5-pass)
+- phi_H1: Normal(60.73, 0.001, [60.70, 60.76]) — fryst (v3 bruker ikke phi_H1)
+- rho_C:  Beta(5.0, 3.0, [0.10, 0.99]) — mode=0.667, K&M=0.725
+- rho_O:  Beta(5.0, 3.0, [0.10, 0.99]) — mode=0.667, K&M=0.874
+- rho_Ys: Beta(5.0, 3.0, [0.10, 0.99]) — mode=0.667, K&M=0.783
+- rho_rp: Beta(5.0, 3.0, [0.10, 0.99]) — mode=0.667, K&M=0.737
+
+### Warm start: kj29 posterior (faller tilbake til kj26)
+
+---
+
 Loggføres per AGENTER.md-krav: alle MCMC-kjøringer skal dokumenteres her.
 
 ---
