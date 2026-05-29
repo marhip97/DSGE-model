@@ -1,39 +1,45 @@
 """
-Kjøring 31 — v3 + rho_A/C/O/Ys/rp frosset ved K&M + phi_I1=0.50 frosset.
+Kjøring 31 — v3 + targeted rho_A/H prior-fix (kj30 residual convergence).
 
-Endringer fra kj30 (oscillerende PSRF=1.09–1.19, ESS=26–50 — svak identifikasjon):
+Endringer fra kj30 (max PSRF=1.695 — rho_A + rho_H feiler):
 
-  DIAGNOSE: rho_A/C/O/Ys/rp er svakt identifiserte i DSGE-modellen.
-    Kalman-filteret observerer lineære kombinasjoner av sjokk; det er
-    vanskelig å skille f.eks. høy rho_C*sigma_C fra høy rho_O*sigma_O.
-    Posteriorflaten er flat og korrelert i rho_*-rommet.
-    Uansett prior (Beta(2,0.5) eller Beta(5,3)): ESS≈40–50 (behov: 200).
-    Resultatet er at PSRF oscillerer 1.09↔1.19 uten konvergens.
+  DIAGNOSE kj30 (200k, 17/20 OK):
+    Beta(5,3) fix fra kj30 virket for rho_C/O/Ys/rp:
+      rho_C: ESS=816, PSRF=1.034 ✓ (K&M=0.725, posterior=0.229)
+      rho_O: ESS=1140, PSRF=1.010 ✓ (K&M=0.874, posterior=0.240)
+      rho_Ys: ESS=1250, PSRF=1.019 ✓ (K&M=0.783, posterior=0.346)
+      rho_rp: ESS=3306, PSRF=1.004 ✓ (K&M=0.737, posterior=0.652)
+    Gjenstående problemer:
+      rho_A: PSRF=1.695 — Beta(2,2,[0.01,0.9995]) ikke fikset i kj30.
+             Posterior=0.091, K&M=0.804 (data foretrekker mye lavere).
+      rho_H: PSRF=1.202 — posterior=0.915 treffer øvre grense 0.95.
+             Beta(5,3,[0.30,0.95]) → kjede spretter fra grensen.
 
-  FIX: Frys rho_A/C/O/Ys/rp ved K&M-verdier via tight Normal priors.
-    Forankring: K&M (2019) estimerer disse på norske data (Tabell 1, side 15).
-    Verdiene er:
-      rho_A  = 0.804  (Technology shock)
-      rho_C  = 0.725  (Consumption preference)
-      rho_O  = 0.874  (Oil price)
-      rho_Ys = 0.783  (Foreign output)
-      rho_rp = 0.737  (Risk premium)
-    Prior: Normal(K&M, 0.001, [K&M-0.05, K&M+0.05]) — praktisk delta-funksjon.
-    Justifikasjon: PROSJEKTPLAN.md — K&M-parameterisering er referansen.
-    Kun prior_overrides — global PARAM_PRIORS uendret.
+  FIX 1: rho_A — Beta(5,3,[0.01,0.99]) via prior_overrides
+    Fra: Beta(2,2,[0.01,0.9995]) — flat, mode=0.5, lar kjede vandre bredt
+    Til: Beta(5,3,[0.01,0.99]) — mode=0.667, konsentrert, øvre grense 0.99
+    Merk: data foretrekker rho_A≈0.09, langt fra K&M=0.804. Prioren er
+    informatise nok til å hindre boundary-adferd men bred nok til å la
+    data dominere.
 
-  Effektiv dimensjon: 20 param (N_PARAMS=20), men 7 effektivt frosset
-    (phi_I1, phi_H1, rho_A, rho_C, rho_O, rho_Ys, rho_rp).
-    Frie: rho_H, sigma_*, psi_R, psi_P1, psi_Y, gamma_p, phi_I2, rho_s (13 fri).
+  FIX 2: rho_H — Beta(5,2,[0.30,0.99]) via prior_overrides
+    Fra: Beta(5,3,[0.30,0.95]) — mode=0.667, øvre grense 0.95
+    Til: Beta(5,2,[0.30,0.99]) — mode=0.80, øvre grense 0.99
+    kj30: rho_H posterior=0.915 traff 0.95-grensen → PSRF=1.202.
+    Ny prior: mode=0.80 (nær kj30 posterior), tillater 0.30–0.99.
+    Note: Beta(5,2) mode = (5-1)/(5+2-2) = 4/5 = 0.80.
 
   BEHOLDT FRA kj30:
-    phi_I1=0.50, phi_H1=60.73 frosset via tight prior
+    rho_C/O/Ys/rp: Beta(5,3,[0.10,0.99]) — allerede konvergerte ✓
+    phi_I1=0.50, phi_H1=60.73 frosset
     build_matrices_v3 (NZ=49)
-    rho_H: Beta(5,3,[0.30,0.95])
 
-  Warm start: kj30 posterior → kj29 → kj26 → K&M fallback.
+  Effektivt fri: rho_A, rho_C, rho_O, rho_Ys, rho_rp, rho_H,
+                 sigma_*, psi_R, psi_P1, psi_Y, gamma_p, phi_I2, rho_s (18 fri)
 
-  Mål: B5 BESTÅTT OG RMSE < 0.118 OG PSRF < 1.10 OG ESS/n > 0.02
+  Warm start: kj30 posterior.
+
+  Mål: B5 BESTÅTT OG RMSE < 0.118 OG PSRF < 1.10 (alle 20 parametere)
   Lagres til: data/results/chain_kj31_prod*
 """
 
@@ -75,29 +81,25 @@ print(f"Pre={len(pre)} kv  Post={len(post)} kv")
 H  = build_H()
 Sv = build_Sv()
 
-# ── K&M-verdier for frosne rho-parametere (Tabell 1, K&M 2019) ──────────────
-RHO_KM = {
-    'rho_A':  KM['rho_A'],   # 0.804
-    'rho_C':  KM['rho_C'],   # 0.725
-    'rho_O':  KM['rho_O'],   # 0.874
-    'rho_Ys': KM['rho_Ys'],  # 0.783
-    'rho_rp': KM['rho_rp'],  # 0.737
-}
-
-# ── prior_overrides: rho_A/C/O/Ys/rp frosset + phi_I1/H1 frosset ─────────────
+# ── prior_overrides ───────────────────────────────────────────────────────────
 PHI_I1_KJ31 = 0.50
 PHI_H1_KJ31 = 60.73
 prior_overrides = {
-    'phi_I1': ('normal', PHI_I1_KJ31, 0.001, 0.40, 0.60),
+    # Frosne (fra kj29)
+    'phi_I1': ('normal', PHI_I1_KJ31, 0.001,  0.40,  0.60),
     'phi_H1': ('normal', PHI_H1_KJ31, 0.001, 60.70, 60.76),
+    # kj30-fix (virket — beholdes)
+    'rho_C':  ('beta', 5.0, 3.0, 0.10, 0.99),
+    'rho_O':  ('beta', 5.0, 3.0, 0.10, 0.99),
+    'rho_Ys': ('beta', 5.0, 3.0, 0.10, 0.99),
+    'rho_rp': ('beta', 5.0, 3.0, 0.10, 0.99),
+    # Ny kj31-fix
+    'rho_A':  ('beta', 5.0, 3.0, 0.01, 0.99),  # Beta(2,2)→Beta(5,3), øvre 0.9995→0.99
+    'rho_H':  ('beta', 5.0, 2.0, 0.30, 0.99),  # Beta(5,3,[0.30,0.95])→Beta(5,2,[0.30,0.99])
 }
-for name, km_val in RHO_KM.items():
-    prior_overrides[name] = ('normal', km_val, 0.001,
-                             round(km_val - 0.05, 3),
-                             round(km_val + 0.05, 3))
 
 # ── Warm start: kj30 → kj29 → kj26 → K&M fallback ──────────────────────────
-print(f"\nN_PARAMS = {N_PARAMS}  (7 frosset: rho_A/C/O/Ys/rp + phi_I1 + phi_H1)")
+print(f"\nN_PARAMS = {N_PARAMS}  (phi_I1 + phi_H1 frosset; alle rho via prior_overrides)")
 
 theta_start = None
 post_std    = None
@@ -132,30 +134,36 @@ if theta_start is None:
     theta_start[PARAM_NAMES.index('phi_H1')] = PHI_H1_KJ31
     post_std = np.array([0.05]*N_PARAMS)
 
-# ── Sett frosne rho-verdier eksplisitt ved K&M ────────────────────────────────
-for name, km_val in RHO_KM.items():
-    i = PARAM_NAMES.index(name)
-    theta_start[i] = km_val
-    post_std[i]    = 0.001
-
-# ── Juster øvrige startverdier ────────────────────────────────────────────────
+# ── Juster startverdier til prior-grenser ────────────────────────────────────
+rho_A_idx  = PARAM_NAMES.index('rho_A')
 rho_H_idx  = PARAM_NAMES.index('rho_H')
 phi_I2_idx = PARAM_NAMES.index('phi_I2')
 
-if theta_start[rho_H_idx] < 0.30 or theta_start[rho_H_idx] > 0.95:
-    theta_start[rho_H_idx] = 0.694; post_std[rho_H_idx] = 0.08
+# rho_A: ny prior [0.01, 0.99] — kj30 posterior=0.091, innenfor grense
+theta_start[rho_A_idx] = np.clip(theta_start[rho_A_idx], 0.011, 0.989)
+
+# rho_H: ny prior [0.30, 0.99] — kj30 posterior=0.915, innenfor ny grense ✓
+if theta_start[rho_H_idx] < 0.30 or theta_start[rho_H_idx] > 0.99:
+    theta_start[rho_H_idx] = 0.915; post_std[rho_H_idx] = 0.02
+
+# rho_C/O/Ys/rp: behold kj30 posterior men klipp til [0.10, 0.99]
+for n, lo, hi in [('rho_C',0.10,0.99),('rho_O',0.10,0.99),
+                  ('rho_Ys',0.10,0.99),('rho_rp',0.10,0.99)]:
+    idx = PARAM_NAMES.index(n)
+    v = theta_start[idx]
+    if v <= lo or v >= hi:
+        theta_start[idx] = KM.get(n, 0.5); post_std[idx] = 0.10
 
 if theta_start[phi_I2_idx] < 1.0:
     theta_start[phi_I2_idx] = 64.5; post_std[phi_I2_idx] = 20.0
 
 # ── Rapporter ─────────────────────────────────────────────────────────────────
-print(f"\nKjøring 31: {N_PARAMS} param (v3, NZ=49) — 7 frosset, 13 fri")
-for name, km_val in RHO_KM.items():
-    print(f"  {name:8s} = {km_val:.4f} (frosset Normal({km_val:.3f},0.001), K&M Tabell 1)")
-print(f"  phi_I1   = {theta_start[PARAM_NAMES.index('phi_I1')]:.4f} (frosset Normal(0.50,0.001))")
-print(f"  phi_H1   = {theta_start[PARAM_NAMES.index('phi_H1')]:.4f} (fryst)")
-print(f"  rho_H    = {theta_start[rho_H_idx]:.4f}  (fri, Beta(5,3,[0.30,0.95]))")
-print(f"  psi_R    = {theta_start[PARAM_NAMES.index('psi_R')]:.4f}  (fri, Beta(2,2,[0.50,0.99]))")
+print(f"\nKjøring 31: {N_PARAMS} param (v3, NZ=49)")
+print(f"  rho_A  = {theta_start[rho_A_idx]:.4f}  (Beta(5,3,[0.01,0.99]) — ny fra kj31)")
+print(f"  rho_H  = {theta_start[rho_H_idx]:.4f}  (Beta(5,2,[0.30,0.99]) — utvidet øvre grense)")
+print(f"  phi_I1 = {theta_start[PARAM_NAMES.index('phi_I1')]:.4f} (frosset Normal(0.50,0.001))")
+print(f"  phi_H1 = {theta_start[PARAM_NAMES.index('phi_H1')]:.4f} (fryst)")
+print(f"  psi_R  = {theta_start[PARAM_NAMES.index('psi_R')]:.4f}  (Beta(2,2,[0.50,0.99]))")
 
 print(f"\nStartverdier:")
 for i, n in enumerate(PARAM_NAMES):
