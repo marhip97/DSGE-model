@@ -29,8 +29,9 @@ from scipy.linalg import (solve as sp_solve, cholesky, LinAlgError,
 from scipy.special import betaln, gammaln
 
 from nemo.model.equations import (
-    build_matrices_v3, build_matrices_pi4chain, NZ, NZ_PI4, NE,
-    Y, C, INV, X, M, PI, W, I_R, RER, S, PO, YS,
+    build_matrices_v3, build_matrices_pi4chain, build_matrices_altB,
+    NZ, NZ_PI4, NZ_ALTB, NE,
+    Y, C, INV, INV_H, X, M, PI, W, I_R, RER, S, PO, YS,
     Q_H, B_NW, C_NW, I_D, I_L_NW, L, MC,
     E_A, E_C, E_P, E_O, E_Ys, E_rp, E_i, E_H, E_phi_h
 )
@@ -191,6 +192,29 @@ def build_H_pi4chain() -> np.ndarray:
     return H
 
 
+def build_H_altB() -> np.ndarray:
+    """
+    Observasjonsmatrise for Alt B (NZ_ALTB=51 kolonner).
+
+    Endringer fra build_H (NZ=49):
+    - dinv_obs (rad 2): mappes til IY*INV + IHY*INV_H (vektet total investering)
+      IY=0.20, IHY=0.10 → INV-vekt=2/3, INV_H-vekt=1/3
+    - Alle andre rader identiske med build_H
+    """
+    from nemo.model.parameters import Parameters as _P
+    IY  = _P.IY   # 0.20
+    IHY = _P.IHY  # 0.10
+    tot = IY + IHY
+    H = np.zeros((N_OBS, NZ_ALTB))
+    H[0,Y]=1.0; H[1,C]=1.0
+    H[2, INV]   = IY  / tot   # kapitalandel av total investering
+    H[2, INV_H] = IHY / tot   # boligandel av total investering
+    H[3,X]=1.0; H[4,M]=1.0
+    H[5,PI]=4.0; H[6,W]=1.0; H[7,I_R]=4.0; H[8,I_R]=4.0; H[9,S]=1.0
+    H[10,PO]=1.0; H[11,YS]=1.0; H[12,Q_H]=1.0; H[13,B_NW]=1.0
+    return H
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # PARAMETERE OG PRIOR
 # sigma_A er fjernet fra estimering — kalibreres fast
@@ -219,7 +243,9 @@ PARAM_PRIORS = {
     # psi_R: kj25 festet til 0.90. kj26 reaktiverer: med φ_I1=12.54 (K&M) er investeringene
     # mye tregere og B5-grensen for psi_R kan ligge lavere. Beta(2,2,[0.50,0.95]) sentrert ~0.73.
     # K&M mimicking rule: ω_R=0.6663. K&M Taylor rule: ikke spesifisert; estimeres.
-    'psi_R':   ('beta',   2.0, 2.0, 0.50, 0.95),   # Reaktivert kj26: K&M=0.666, fri med K&M φ_I1
+    # psi_R kj27: tak hevet fra 0.95→0.99. kj26 traff 0.9486 (std=0.001) — klart prior-tak.
+    # Med K&M φ_I1=12.54 trenger modellen høy renteglattning for tilstrekkelig BNP-transmisjon.
+    'psi_R':   ('beta',   2.0, 2.0, 0.50, 0.99),   # kj27: utvidet fra [0.50,0.95] (PE-godkjent 2026-05-29)
     'psi_P1':  ('normal', 0.29, 0.10, 0.05, 1.50),
     'psi_Y':   ('normal', 0.24, 0.05, 0.01, 0.80),
     # gamma_p: Calvo-prisindeksasjon i hybrid NK Phillips-kurve (PE-godkjent 2026-05-24).
@@ -247,6 +273,11 @@ PARAM_PRIORS = {
     # gir annet identifikasjonsmiljø. RMSE-diagnose: rho_s≈0.50 halverer RER-avvik fra 2×→0.7×NB.
     # PE-godkjent 2026-05-28. Beta(2,2,[0.05,0.90]) sentrert ~0.50.
     'rho_s':  ('beta', 2.0, 2.0, 0.05, 0.90),   # Reaktivert kj25
+    # phi_H1 kj27 (Alt B, PE-godkjent 2026-05-29): boliginvesteringsjusteringskost.
+    # K&M Tabell 8: 60.73. phi_H1-sweep viser at K&M-verdi gir BNP q4=0.33× (mål 0.8×).
+    # Med φ_I1=12.54 mangler vår forenklede modell NB-kanalene — phi_H1 estimeres for å
+    # la data avgjøre kompensasjonsgraden. Prior Normal(60.73, 40, [0.5, 200]) — bredt.
+    'phi_H1': ('normal', 60.73, 40.0, 0.5, 200.0),  # kj27: ny estimert param (Alt B)
 }
 PARAM_NAMES = list(PARAM_PRIORS.keys())
 N_PARAMS    = len(PARAM_NAMES)
@@ -261,12 +292,18 @@ KM = {'rho_A':0.804,'rho_C':0.725,'rho_O':0.874,'rho_Ys':0.783,
       'sigma_P':0.003,'sigma_H':0.050,'psi_R':0.666,'psi_P1':0.292,
       'psi_Y':0.242,'h_c':0.938,'gamma_p':0.35,
       'phi_I1':12.54,'phi_I2':165.66,'phi_u':0.2192,  # K&M complete doc. s.59: phi_I1=12.54, phi_I2=165.66
-      'phi_PQ':669.0,'kappa_M':0.03,'rho_s':0.50}  # rho_s: K&M startverdi 0.50 (ikke i K&M, Justiniano&Preston)
+      'phi_PQ':669.0,'kappa_M':0.03,'rho_s':0.50,
+      'phi_H1':60.73}  # K&M Tabell 8: boliginvesteringsjusteringskost.
 
-def log_prior(theta):
+def log_prior(theta, overrides=None):
+    """
+    Log-prior. overrides: valgfri dict {param_name: spec_tuple} som erstatter
+    PARAM_PRIORS lokalt — uten å endre global PARAM_PRIORS (exit-mulighet).
+    """
+    priors = PARAM_PRIORS if overrides is None else {**PARAM_PRIORS, **overrides}
     lp = 0.0
     for i, name in enumerate(PARAM_NAMES):
-        x = theta[i]; spec = PARAM_PRIORS[name]; lb,ub = spec[-2],spec[-1]
+        x = theta[i]; spec = priors[name]; lb,ub = spec[-2],spec[-1]
         if x < lb or x > ub: return -np.inf
         pt = spec[0]
         if pt == 'beta':
@@ -330,8 +367,26 @@ def kalman_hull(T_mat, R_mat, H, Q, Sv, Y_pre, Y_post):
     ll2=_kf_block(T_mat,R_mat,H,Q,Sv,Y_post)
     return ll1+ll2 if np.isfinite(ll2) else -np.inf
 
-def log_posterior(theta, H, Sv, Y_pre, Y_post):
-    lp=log_prior(theta)
+def log_posterior(theta, H, Sv, Y_pre, Y_post, build_fn=None, prior_overrides=None):
+    """
+    Log-posterior for MCMC.
+
+    Parametere
+    ----------
+    theta           : parametervektor
+    H, Sv           : observasjons- og støymatriser
+    Y_pre, Y_post   : data (pre/post COVID)
+    build_fn        : valgfri funksjon(p, theta_H) → (G0,G1,Psi,Pi).
+                      None = standard v3/pi4chain logikk (bakoverkompatibel).
+                      Sett til build_matrices_altB for kj27+ (Alt B).
+    prior_overrides : valgfri dict {param_name: (spec_tuple)} som overstyrer
+                      PARAM_PRIORS lokalt. Brukes for å endre enkeltprior uten
+                      global endring (f.eks. psi_R: [0.50,0.99] i kj27).
+    """
+    if prior_overrides:
+        lp = log_prior(theta, overrides=prior_overrides)
+    else:
+        lp = log_prior(theta)
     if not np.isfinite(lp): return -np.inf
     try:
         class Pt(Parameters): pass
@@ -339,19 +394,19 @@ def log_posterior(theta, H, Sv, Y_pre, Y_post):
         setattr(Pt,'h_c',       H_C_FIXED)        # fast — PE-godkjent 2026-05-18 (C2 Alt A)
         setattr(Pt,'sigma_rp',  SIGMA_RP_FIXED)   # fast — PE-godkjent 2026-05-24 (kj10)
         setattr(Pt,'sigma_A',   SIGMA_A_FIXED)    # fast=0.006 — PE-godkjent 2026-05-28 (kj20: tak-problem)
-        # psi_R reaktivert 2026-05-28 (kj22): κ_P-fix løser KPI-problemet uten å fryse psi_R
         setattr(Pt,'kappa_M',   KM['kappa_M'])    # fast K&M=0.030 — kj14 viste estimering forverrer KPI
-        # rho_s: kj25 satte alltid 0.0 her (feil) → prior-dominert posterior. kj26 estimerer genuint.
-        # psi_R: kj25 satte PSI_R_KJ25_FIXED=0.90. kj26 estimerer fra data med K&M phi_I1=12.54.
-        setattr(Pt,'phi_I1',    PHI_I1_KJ26_FIXED)  # K&M=12.54 — kj25=0.50 var 25× for lav (K&M dok. s.59)
-        setattr(Pt,'phi_u',     PHI_U_FIXED)          # fast=0.2192 (K&M) — kj23: 1.72→BNP=2.33× (PE 2026-05-28)
-        setattr(Pt,'phi_PQ',    PHI_PQ_KJ26_FIXED)   # K&M=669 — kj25=300 var 2× for lav (K&M dok. s.59)
-        setattr(Pt,'lambda_pi4',LAMBDA_PI4_FIXED)     # pi4chain hybrid-vekt (ikke brukt i v3)
-        use_pi4 = H.shape[1] == NZ_PI4
-        if use_pi4:
-            G0,G1,Psi,Pi=build_matrices_pi4chain(Pt,theta_H=0.05)
+        setattr(Pt,'phi_I1',    PHI_I1_KJ26_FIXED)  # K&M=12.54 — kj25=0.50 var 25× for lav
+        setattr(Pt,'phi_u',     PHI_U_FIXED)
+        setattr(Pt,'phi_PQ',    PHI_PQ_KJ26_FIXED)  # K&M=669
+        setattr(Pt,'lambda_pi4',LAMBDA_PI4_FIXED)
+        if build_fn is not None:
+            G0,G1,Psi,Pi = build_fn(Pt, theta_H=0.05)
         else:
-            G0,G1,Psi,Pi=build_matrices_v3(Pt,theta_H=0.05)
+            use_pi4 = H.shape[1] == NZ_PI4
+            if use_pi4:
+                G0,G1,Psi,Pi=build_matrices_pi4chain(Pt,theta_H=0.05)
+            else:
+                G0,G1,Psi,Pi=build_matrices_v3(Pt,theta_H=0.05)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             T_n,R_n,d=bk_solve(G0,G1,Psi,Pi,verbose=False)
@@ -424,8 +479,17 @@ def adaptive_mcmc_with_monitoring(
         psrf_thr=1.10, ess_pct_thr=0.02,
         scale_init=0.676, seed=42, verbose=True,
         save_prefix="chain_v3_v2", use_reparam=False,
-        block_indices=None):
+        block_indices=None,
+        build_fn=None, prior_overrides=None):
+    """
+    Adaptiv MCMC med konvergensovervåkning.
 
+    build_fn        : valgfri modellbygger (None = standard v3/pi4chain).
+                      Sett build_matrices_altB for kj27+ (Alt B).
+    prior_overrides : valgfri dict {param: spec} for lokal prior-overstyring.
+                      Endrer IKKE global PARAM_PRIORS (exit-mulighet bevares).
+    """
+    import functools
     rng=np.random.default_rng(seed); N=N_PARAMS
     scale=scale_init; post_std=post_std_init.copy()
 
@@ -435,7 +499,8 @@ def adaptive_mcmc_with_monitoring(
         from nemo.estimation.reparam import (
             to_natural, to_unconstrained, wrap_log_posterior, REPARAM_PARAMS,
         )
-        log_post_fn = wrap_log_posterior(log_posterior)
+        _base = functools.partial(log_posterior, build_fn=build_fn, prior_overrides=prior_overrides)
+        log_post_fn = wrap_log_posterior(_base)
         theta_internal = to_unconstrained(theta_init)
         # post_std for reparametriserte parametre tolkes nå i unc-rom — sett til 1.0
         # som default skala (logit-rom; presis verdi tunes av sampleren).
@@ -445,7 +510,12 @@ def adaptive_mcmc_with_monitoring(
         if verbose:
             print(f"  Logit-reparametrisering AKTIV for: {REPARAM_PARAMS}")
     else:
-        log_post_fn = log_posterior
+        if build_fn is not None or prior_overrides is not None:
+            log_post_fn = functools.partial(log_posterior,
+                                            build_fn=build_fn,
+                                            prior_overrides=prior_overrides)
+        else:
+            log_post_fn = log_posterior
         theta_internal = theta_init.copy()
         to_natural = None  # ikke brukt
 

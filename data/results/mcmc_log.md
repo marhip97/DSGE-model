@@ -1,5 +1,46 @@
 # MCMC-kjøringslogg — NEMO Fase 0.5/2
 
+---
+
+## Prior-endringer + strukturell endring — kj27 (2026-05-29, PE fullmakt Alt B)
+
+### Kontekst
+kj26 (200k trekk, PSRF=1.008) viste: med K&M φ_I1=12.54 gir modellen BNP q4=0.33× NB (mål 0.8–1.5×).
+Diagnose: phi_H1=60.73 (K&M) kalibrert i parameters.py men ALDRI brukt i equations.py.
+Boliginvestering (IHY=0.10) manglet forward-looking Euler-ligning.
+PE godkjente Alt B: strukturell implementering av manglende boliginvesteringskanal.
+
+### Strukturell endring: build_matrices_altB (NZ 49→51)
+**Ny tilstandsvariabel:** INV_H (index 49) — boliginvestering med CEE Euler-ligning
+**Ny lagg-tilstand:** INV_H_L (index 50)
+**NZ_ALTB = 51**
+**Endringer i likninger:**
+- Ligning 7/8 (boligakkumulering): h_W = (1-δ_H)*h_W_{t-1} + δ_H*INV_H (ikke Q_H)
+- Ligning 9 (ressursbetingelse): Y = CY*C + IY*INV + IHY*INV_H + ...
+- Ny Euler: inv_H_t = [1/(φ_H1*(1+β))]*q_H_t + [1/(1+β)]*inv_H_{t-1} + [β/(1+β)]*E[inv_H_{t+1}]
+**Exit-mulighet:** build_matrices_v3 uendret. Bruk v3 i log_posterior for full rollback.
+
+### Endring 1: psi_R prior utvidet
+**Fra:** `Beta(2.0, 2.0, [0.50, 0.95])` (kj26)
+**Til:** `Beta(2.0, 2.0, [0.50, 0.99])` (kj27)
+**Begrunnelse:** kj26 traff psi_R=0.9486 (std=0.001) — klart prior-tak ved 0.95.
+psi_R-sweep viste at høyere psi_R gir større BNP q4 (0.334× ved 0.95, 0.399× ved 0.99).
+Med K&M φ_I1=12.54 trenger modellen vedvarende renter for tilstrekkelig BNP-transmisjon.
+
+### Endring 2: phi_H1 ny estimert parameter (N_PARAMS 18→19)
+**Prior:** `Normal(60.73, 40.0, [0.5, 200.0])`
+**K&M:** 60.73 (Tabell 8)
+**Begrunnelse:** phi_H1-sweep viser:
+  phi_H1=60.73 → BNP q4=0.33× | phi_H1=4.0 → 0.44× | phi_H1=1.0 → 0.78× (nær B5)
+NB sin fullmodell har kompenserende kanaler vi mangler. phi_H1 estimeres for å la data
+avgjøre nødvendig kompensasjonsgrad. Prior er bred og sentrert på K&M-verdi.
+
+### N_PARAMS: 18→19 (phi_H1 aktivert)
+### H-matrise: build_H_altB (14×51) — dinv_obs mappes til IY*INV + IHY*INV_H
+### Startverdi: kj26 posterior means + phi_H1=60.73 (K&M), lp=-3404.38 ✓
+
+---
+
 Loggføres per AGENTER.md-krav: alle MCMC-kjøringer skal dokumenteres her.
 
 ---
