@@ -29,12 +29,12 @@ from nemo.model.equations import build_matrices_v3, Y, PI, I_R, RER, E_i, SHOCK_
 from nemo.model.parameters import Parameters
 from nemo.solver.blanchard_kahn import solve, compute_irf
 
-# NB Memo 3/2024 Figur 1
+# NB Memo 3/2024 Figur 1 — korrigerte avlesninger (2026-05-30)
 NB_FIGUR1 = {
-    "Y":   {"q1": -0.20, "q4": -0.45, "q8": -0.35, "q12": -0.15},
-    "PI":  {"q1": -0.05, "q4": -0.15, "q8": -0.20, "q12": -0.10},
-    "I_R": {"q1": +1.00, "q4": +0.60, "q8": +0.20, "q12": +0.05},
-    "RER": {"q1": -0.50, "q4": -0.40, "q8": -0.20, "q12": -0.05},
+    "Y":   {"q1": -0.12, "q4": -0.47, "q8": -0.40, "q12": -0.25},
+    "PI":  {"q1": -0.03, "q4": -0.14, "q8": -0.22, "q12": -0.22},
+    "I_R": {"q1": +1.00, "q4": +0.55, "q8": +0.10, "q12": -0.15},
+    "RER": {"q1": -1.50, "q4": -1.00, "q8": -0.50, "q12": -0.20},
 }
 VAR_IDX  = {"Y": Y,  "PI": PI,  "I_R": I_R,  "RER": RER}
 HORIZONS = {"q1": 0, "q4": 3,   "q8": 7,     "q12": 11}

@@ -1780,3 +1780,67 @@ eller den underliggende UIP-strukturen endres (Spor D).
 De fire gjenstående avvikene er **strukturelle**, ikke estimeringsproblemer. Neste steg: Spor D
 (h_c fri for Y q1, persistent pengepolitikksjokk Z_t for å bryte I_R/psi_R-koblingen ved q8–q12).
 kj35 bevares; kj31 (0.353) og kj34 (0.200) forblir referanselinjer.
+
+---
+
+## Benchmark-korreksjon (2026-05-30, Sandkasse Fase 0.75)
+
+**Funn:** PE viste faktisk NB Memo 3/2024 Figur 1. Originale avlesninger var feil på to kritiske punkter:
+
+| Variable | q1 (gammel) | q1 (ny) | q4 (gammel) | q4 (ny) | q8 (gammel) | q8 (ny) | q12 (gammel) | q12 (ny) |
+|----------|-------------|---------|-------------|---------|-------------|---------|--------------|---------|
+| RER | −0.50 | **−1.50** | −0.40 | **−1.00** | −0.20 | **−0.50** | −0.05 | **−0.20** |
+| I_R | +1.00 | +1.00 | +0.60 | **+0.55** | +0.20 | **+0.10** | +0.05 | **−0.15** |
+| PI  | −0.05 | **−0.03** | −0.15 | **−0.14** | −0.20 | **−0.22** | −0.10 | **−0.22** |
+| Y   | −0.20 | **−0.12** | −0.45 | **−0.47** | −0.35 | **−0.40** | −0.15 | **−0.25** |
+
+**Kritiske endringer:**
+1. **RER ~3× for liten**: NB-figuren viser RER-respons ved q1=−1.50 (vi hadde −0.50). Faktisk 3× feil.
+2. **I_R q12 endret FORTEGN**: NB-modellens styringsrente underskyter (−0.15 ved q12), ikke +0.05.
+3. **PI mer persistent**: Inflasjonsgapet er nær toppunkt ved q12 (−0.22), ikke halvvei tilbake (−0.10).
+
+**Konsekvens for RMSE-historikk:**
+
+| Kjøring | RMSE (gammel benchmark) | RMSE (korrigert benchmark) |
+|---------|-------------------------|---------------------------|
+| kj31 | 0.353 | ~0.45 |
+| kj34 | 0.200 | ~0.32 |
+| kj35 | 0.154 | **0.317** |
+
+Alle kjøringer er vesentlig lenger fra NB enn vi trodde.
+
+**Strukturell diagnose — undershoot:**
+I_R-undershoot (negativ ved q12) er umulig med ren AR(1)-Taylor-regel, uavhengig av psi_R.
+Forsøk med `build_matrices_pi4chain` (E_t[π_{t+4}]-Taylor) ga numerisk ustabilitet med
+kj35-posterior (indeterminacy: psi_P1=0.29 < 1/(1-psi_R)=10 for lambda=0).
+Undershoot krever enten: (a) psi_P1>>1 (ikke støttet av data), (b) forward-looking spec
+med Taylor principle-kompatible parametre, (c) separat persistent sjokkkomponent.
+
+**2D-sweep funn (korrigert benchmark):**
+Beste oppnåelige RMSE med v3: **psi_R=0.92, rho_s=0.0 → RMSE=0.287, B5 ✅**.
+rho_s→0 gir RER q1 fra −0.72 til −1.046 (fremdeles 30% under NB's −1.50).
+
+**Oppdatering av NB_FIGUR1 i kodebasen:** `nb_multikvartal_score.py`, `sandkasse_diagnostikk.py`,
+`b5_nb_benchmark.py` er oppdatert med korrigerte avlesninger.
+
+---
+
+## kj36 — Design og forhåndsregistrering (2026-05-30)
+
+**Strategi:** rho_s mot 0, psi_R fri mot 0.92 — beste oppnåelig RMSE med v3.
+**Warm start:** kj35 posterior (rho_s justert til 0.05 ved start).
+**Startpunkt RMSE(korr):** 0.2929, RER.q1=−0.992, I_R.q12=+0.235.
+
+**Prior overrides:**
+```python
+'rho_s':   Normal(0.05, 0.05, [0.00, 0.25])  # mot 0 → RER-forbedring
+'psi_R':   Normal(0.90, 0.015, [0.85, 0.97]) # la data finne ~0.92
+'gamma_p': Normal(0.65, 0.05, [0.40, 0.85])  # behold fra kj35
+'phi_I1':  Normal(0.50, 0.001) + 'phi_H1': fast
+'rho_*':   Beta(5,3/2) fra kj35
+```
+
+**Forventet RMSE:** ≈ 0.28 (korrigert benchmark).
+**Analytisk begrensning:** I_R q12 forblir positiv (+0.23), ikke negativ (NB: −0.15).
+**B5 kriterium (korrigert):** by4 = |Y.q4|/0.47 ∈ [0.80, 1.50], bpi4 = |PI.q4|/0.14 ≥ 0.35.
+**Seed=36. Burn-in=30k, Prod=200k, max_recalib=10.**

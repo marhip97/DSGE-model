@@ -42,10 +42,10 @@ logger = logging.getLogger(__name__)
 # Disse er manuelle avlesninger fra figuren og brukes som indikative
 # benchmarks, ikke autoritative tall.
 NB_FIGUR1 = {
-    "Y":   {"q1": -0.20, "q4": -0.45, "q8": -0.35, "q12": -0.15},
-    "PI":  {"q1": -0.05, "q4": -0.15, "q8": -0.20, "q12": -0.10},
-    "I_R": {"q1": +1.00, "q4": +0.60, "q8": +0.20, "q12": +0.05},
-    "RER": {"q1": -0.50, "q4": -0.40, "q8": -0.20, "q12": -0.05},
+    "Y":   {"q1": -0.12, "q4": -0.47, "q8": -0.40, "q12": -0.25},
+    "PI":  {"q1": -0.03, "q4": -0.14, "q8": -0.22, "q12": -0.22},
+    "I_R": {"q1": +1.00, "q4": +0.55, "q8": +0.10, "q12": -0.15},
+    "RER": {"q1": -1.50, "q4": -1.00, "q8": -0.50, "q12": -0.20},
 }
 
 VARIABLER = [("BNP-gap (Y)", Y), ("KPI-inflasjon (PI)", PI),
