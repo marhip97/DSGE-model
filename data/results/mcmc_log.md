@@ -2091,3 +2091,30 @@ I_R.q12 forbedres fra +0.637 → +0.159 — undershoot fortsatt uoppnåelig med 
 Forventning: MCMC-posterior kan gi bedre RMSE (~0.25–0.27) når andre param justeres.
 
 **Seed=39. Burn-in=30k, Prod=200k.**
+
+---
+
+## kj39A — Endelige resultater (2026-05-30)
+
+**Konvergens:** PSRF=1.003, ESS=698 ✅
+
+**Posterior mean (nøkkel):**
+- psi_R = 0.902 (dogmatisk prior [0.85,0.91] — landet midt i, ikke ved tak!)
+- psi_P1 = 0.487, psi_Y = 0.443, rho_s = 0.003
+
+**NB-benchmark (IRF):**
+```
+Y:   [-0.460, -0.408, -0.148, +0.008]  (NB: [-0.12, -0.47, -0.40, -0.25])
+PI:  [-0.123, -0.151, -0.080, -0.006]  (NB: [-0.03, -0.14, -0.22, -0.22])
+I_R: [+1.000, +0.650, +0.369, +0.227]  (NB: [+1.00, +0.55, +0.10, -0.15])
+RER: [-1.117, -0.641, -0.040, +0.294]  (NB: [-1.50, -1.00, -0.50, -0.20])
+RMSE(16pt) = 0.283   B5: by4=0.868 ✅  bpi4=1.079 ✅
+```
+
+**Fremgang vs kj38:** RMSE 0.310→0.283. I_R.q4 forbedret (+0.882→+0.650≈NB).
+**Nytt problem:** RER-dynamikk verre (q4: −0.641 vs NB −1.00, q8: −0.040 vs −0.50).
+psi_R=0.90 → renten reverserer raskere → RER deprecierer tilbake for raskt.
+Klassisk psi_R/RER-trade-off i liten åpen økonomi.
+
+**Analytisk observasjon:** Data aksepterte psi_R=0.90 (ikke ved prior-tak).
+Viser at dogmatisk prior er gjennomførbart — men RER-kanalen krever ytterligere justering.
