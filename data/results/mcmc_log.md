@@ -1723,3 +1723,60 @@ Analytisk bevist: rho_s=0.50+gamma_p=0.65 → RMSE≈0.133 (vs kj34: 0.200, −3
 
 **Warm start:** kj34 posterior (når ferdig) eller kj33 tail
 **Mål:** RMSE(16pt) ≤ 0.133, B5 by4 ∈ [0.80, 1.50], PSRF < 1.10
+
+### kj35 — Resultater (2026-05-30)
+
+**Kjøring:** 200k produksjon, warm start fra kj33 tail, seed=350, 10 rekalibreringer.
+**Konvergens:** 20/20 OK, **max PSRF=1.003, min ESS=772** — beste konvergens i prosjektet.
+rho_*-mixingproblemet (rho_A/C/O/Ys/rp/H) som plaget burn-in løste seg fullstendig i produksjon.
+
+**RMSE(16pt NB) = 0.1544** (vs kj34: 0.200 −23%, vs kj31: 0.353 −56%). **B5 BESTÅTT:** by4=0.892, bpi4=0.374.
+
+| Parameter | Posterior mean ± std | Prior | Tolkning |
+|-----------|---------------------|-------|----------|
+| psi_R     | 0.903 ± 0.006 | N(0.88, 0.005) | Data drar mot 0.90, ikke prior-senter 0.88 |
+| rho_s     | 0.302 ± 0.003 | N(0.50, 0.05, [0.30,0.75]) | Data trekker til NEDRE grense 0.30 |
+| gamma_p   | 0.613 ± 0.051 | N(0.65, 0.05) | Data bekrefter høy inflasjonspersistens |
+| rho_rp    | 0.655 ± 0.144 | Beta(5,3) | Risikopremiepersistens, bredt identifisert |
+| rho_H     | 0.943 ± 0.024 | Beta(5,2) | Høy boligprispersistens |
+| phi_I2    | 65.5 ± 40.7 | bredt | Svakt identifisert (std > 60% av mean) |
+
+**IRF vs NB (normalisert peak I_R=1):**
+
+| Horisont | Y (NB/kj35) | PI (NB/kj35) | I_R (NB/kj35) | RER (NB/kj35) |
+|----------|-------------|--------------|---------------|---------------|
+| q1  | −0.20 / −0.359 | −0.05 / −0.037 | 1.00 / 1.000 | −0.50 / −0.722 |
+| q4  | −0.45 / −0.401 | −0.15 / −0.056 | 0.60 / 0.666 | −0.40 / −0.635 |
+| q8  | −0.35 / −0.168 | −0.20 / −0.030 | 0.20 / 0.385 | −0.20 / −0.098 |
+| q12 | −0.15 / −0.026 | −0.10 / −0.003 | 0.05 / 0.233 | −0.05 / +0.217 |
+
+**Nøkkelfunn — psi_R-debatten oppløst.** psi_R-sweep med kj35's øvrige parametre:
+
+| psi_R | RMSE |
+|-------|------|
+| 0.88 (NB-kalibrert) | 0.1533 |
+| 0.90 (data-drevet)  | 0.1536 |
+| 0.84 | 0.1656 |
+| 0.95 | 0.2061 |
+
+PE var bekymret for at psi_R=0.88 underdrev inflasjonsresponsen. kj35 viser at når rho_s og
+gamma_p er på plass, drar *data selv* psi_R til 0.90 — og RMSE er praktisk talt identisk med 0.88
+(forskjell 0.0003). **Konflikten mellom data (høy psi_R) og NB (0.88) hadde ingen reell
+konsekvens for modellprestasjon.** Problemet var manglende inflasjons- og valutapersistens,
+ikke renteglattingen.
+
+**Gjenstående gap mot ≤0.150 (vi ligger 0.154, knapt over):**
+1. **RER q12 feil fortegn** (+0.217 vs NB −0.05) — UIP-dynamikken bryter ned etter q8 selv med rho_s=0.30.
+2. **I_R q8–q12 for høy** (0.385/0.233 vs 0.20/0.05) — direkte konsekvens av psi_R=0.90.
+3. **PI q8 for svak** (−0.030 vs −0.20) — FEVD: E_P forklarer 96% av PI-varians (jf. Sandkasse C1).
+4. **Y q1 overreaksjon** (−0.359 vs −0.20) — habit h_c=0.938 fast.
+
+**Diskrepans mot analytisk prognose:** Sweep forutsa RMSE≈0.121 ved rho_s=0.70+gamma_p=0.65.
+Data trakk rho_s ned til 0.302 (nedre prior-grense), ikke 0.70 — derfor 0.154 i stedet for 0.121.
+**Likelihood foretrekker lav rho_s**; for å nå 0.12 må rho_s tvinges høyere med strammere prior,
+eller den underliggende UIP-strukturen endres (Spor D).
+
+**Konklusjon:** kj35 er beste estimerte modell hittil (RMSE=0.154, full konvergens, B5 ✅).
+De fire gjenstående avvikene er **strukturelle**, ikke estimeringsproblemer. Neste steg: Spor D
+(h_c fri for Y q1, persistent pengepolitikksjokk Z_t for å bryte I_R/psi_R-koblingen ved q8–q12).
+kj35 bevares; kj31 (0.353) og kj34 (0.200) forblir referanselinjer.
