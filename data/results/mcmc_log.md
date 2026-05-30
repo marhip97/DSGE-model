@@ -1844,3 +1844,122 @@ rho_s→0 gir RER q1 fra −0.72 til −1.046 (fremdeles 30% under NB's −1.50)
 **Analytisk begrensning:** I_R q12 forblir positiv (+0.23), ikke negativ (NB: −0.15).
 **B5 kriterium (korrigert):** by4 = |Y.q4|/0.47 ∈ [0.80, 1.50], bpi4 = |PI.q4|/0.14 ≥ 0.35.
 **Seed=36. Burn-in=30k, Prod=200k, max_recalib=10.**
+
+---
+
+## Punkt 4 — Strukturell analyse: I_R undershoot (2026-05-30)
+
+**Problemstilling:** NB Figur 1 viser styringsrenten underskyter med −0.15 ppt ved q12.
+Med AR(1) Taylor-regel (build_matrices_v3) forblir renten alltid positiv.
+
+### Sweep-resultater
+
+**phi_PQ sweep (kappa_P = 6·5/phi_PQ):**
+```
+phi_PQ=669  kappa_P=0.045  I_R.q12=+0.304  PI.q8=−0.033  RMSE=0.286
+phi_PQ=400  kappa_P=0.075  I_R.q12=+0.300  PI.q8=−0.051  RMSE=0.283
+phi_PQ=200  kappa_P=0.150  I_R.q12=+0.290  PI.q8=−0.095  RMSE=0.277  ← min RMSE
+phi_PQ=100  kappa_P=0.300  I_R.q12=+0.270  PI.q8=−0.185  RMSE=0.287
+phi_PQ=50   kappa_P=0.600  I_R.q12=+0.241  PI.q8=−0.353  RMSE=0.442  (forverrer)
+phi_PQ=25   UNSTABIL
+```
+Funn: kappa_P=0.15 (phi_PQ=200) minimerer RMSE. PI.q8 forbedres men forverres ved kappa_P>0.3.
+I_R undershoot oppnås IKKE ved noe phi_PQ-nivå.
+
+**psi_P1 sweep (Taylor-inflasjonsvekt):**
+```
+psi_P1=0.29  I_R.q12=+0.304  (baseline)
+psi_P1=1.00  I_R.q12=+0.293
+psi_P1=2.00  I_R.q12=+0.278
+psi_P1=5.00  I_R.q12=+0.239
+psi_P1=10.0  (ikke testet — RMSE ville forverres ytterligere)
+```
+Funn: psi_P1 har minimal effekt på I_R.q12 fordi endogen Taylor-komponent er liten
+relativt til psi_R^12 · (initial impulse). RER uendret ved alle psi_P1-verdier.
+
+**2D sweep: psi_R × psi_P1:**
+```
+psi_R=0.92 (alle psi_P1): I_R.q12 ∈ [+0.24, +0.30]  RMSE≈0.286–0.291
+psi_R=0.80 (alle psi_P1): I_R.q12 ∈ [+0.05, +0.06]  RMSE≈0.339–0.356
+psi_R=0.70 (alle psi_P1): I_R.q12 ∈ [+0.02, +0.04]  RMSE≈0.375–0.390
+```
+Funn: psi_R=0.70 gir I_R.q12≈+0.02 (nær null) men RMSE forverres med 30%.
+I_R.q12 er alltid > 0 — undershoot uoppnåelig med backward-looking Taylor.
+
+**pi4chain (fremoverskuende E_t[π_{t+4}]) med Taylor-prinsipp-tilfredsstillende params:**
+```
+psi_R=0.80, psi_P1=2.0, λ=1.0 (TP=0.40): I_R.q12=+0.12  RMSE=0.454
+psi_R=0.80, psi_P1=5.0, λ=1.0 (TP=1.00): I_R.q12=+0.24  RMSE=0.926
+psi_R=0.70, psi_P1=3.5, λ=1.0 (TP=1.05): neg peak (ustabil)
+psi_R=0.60, psi_P1=2.5, λ=1.0 (TP=1.00): RER.q1=+7.71 (eksplosivt)
+psi_R=0.50, psi_P1=2.5, λ=1.0 (TP=1.25): I_R.q4=+0.06 (feil form)
+```
+Funn: pi4chain med Taylor-prinsipp enten ustabil, eksplosiv, eller feil IRF-form.
+Ingen konfigurasjon gir undershoot.
+
+### Konklusjon
+
+I_R undershoot ved q12 (NB: −0.15) er **strukturelt uoppnåelig** med:
+1. Backward-looking AR(1) Taylor (build_matrices_v3) — psi_R^12·I_R_0 dominerer alltid
+2. Forward-looking pi4chain — krever enten ustabile eller unrealistiske parameterverdier
+
+**Matematisk argument:** For undershoot trenger vi
+`psi_R^12·I_R_0 + (1-psi_R)·Σ psi_R^(12-t)·[psi_P1·PI_t + psi_Y·Y_t] < 0`
+Med PI_t∈[−0.03,−0.22] og Y_t∈[−0.12,−0.47], og psi_P1≤5, er venstre side alltid >> 0
+(psi_R^12·1.0 ≈ 0.31 ved psi_R=0.92; endogen komponent ≈ 0.005).
+
+**Mulige strukturelle løsninger (ikke testet):**
+1. Separat persistent sjokkkomponent i Taylor-regel (D3 i sandkasseplan)
+2. Eksplisitt realrentemekanisme med nøytralrente-dynamikk
+3. Accept begrensning: beste v3 RMSE ≈ 0.287, dokumenter gap for PE
+
+**Beste v3 konfigurasjon (uendret fra sweep-analyse):**
+`psi_R=0.92, rho_s=0.0 → RMSE=0.287, B5 ✅`
+
+
+### D3 — Persistent sjokkkomponent (analytisk, 2026-05-30)
+
+Testet om separat AR(1)-sjokkkomponent `z_t = rho_Z * z_{t-1} + eps_i`
+(med rho_Z < 0 for fortegnskift) kan generere undershoot.
+
+```
+rho_Z=-0.10: I_R.q12=+0.36  (ingen undershoot)
+rho_Z=-0.30: I_R.q12=+0.30  (ingen undershoot)
+rho_Z=-0.50: I_R.q12=+0.26  (ingen undershoot)
+```
+
+Funn: Selv med negativt rho_Z dominerer AR(1)-inertien (psi_R^12·1.0 ≈ 0.37 ved psi_R=0.92).
+Oscillerende sjokkkomponent kan ikke overvinne akkumulert rente-inertia.
+
+**Endelig konklusjon Punkt 4:** I_R undershoot (−0.15 ved q12) krever ENTEN:
+1. Eksplisitt fremoverskuende pengepolitikk (E_t[π_{t+4}]) MED sterk Taylor-reaksjon (psi_P1 >> 1)
+2. Vedvarende negativ outputgap- og inflasjons-feedback via steepere NKPC + lavere psi_R ≈ 0.70
+   (men da forverres I_R.q4-formen, og RMSE ≈ 0.375)
+3. Akseptere begrensningen: v3 oppnår RMSE≈0.287, undershoot er ikke reproduserbar
+
+**Anbefaling til PE:** Begrensningen skyldes backward-looking AR(1) Taylor-regel.
+NBs faktiske NEMO bruker en fremoverskuende komponent (K&M §2.13) med trolig høyere
+effektiv Taylor-koeffisient. Krever NE-utvidelse og komplisert BK-kalibrering.
+Sandkassen anbefaler å godta RMSE≈0.28–0.29 som beste v3-resultat.
+
+
+---
+
+## phi_PQ=200 evaluering — kj37-kandidat (2026-05-30)
+
+**phi_PQ=200 (kappa_P=0.150)** med rho_s=0, psi_R=0.92 gir:
+- RMSE: 0.2768 (vs 0.2863 ved phi_PQ=669) — forbedring 0.009
+- PI.q4: −0.160 (NB: −0.14) ✅  — stor forbedring fra −0.058
+- PI.q8: −0.095 (NB: −0.22) — bedre, men fortsatt langt fra mål
+- Y.q1: −0.461 (NB: −0.12) — forverres (allerede for negativ)
+- RER.q1: −1.121 (NB: −1.50) — marginal forbedring
+
+**Anbefaling for kj37:**
+- phi_PQ=200 som fast kalibrering (erstatter 669)
+- Alternativt: fri estimering med `phi_PQ: Normal(200, 50, [50, 400])`
+  (krever utvidelse av PARAM_NAMES — dokumenter som strukturell endring)
+- Kombinere med kj36 posterior (rho_s→0, psi_R→0.92)
+
+**Merk:** phi_PQ=200 gir kappa_P=0.15, innenfor rimelige kalibreringsverdier
+(Gali 2015: 0.075–0.30, Smets&Wouters: 0.086). K&M's 669 er konservativt.
+
