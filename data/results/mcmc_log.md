@@ -2028,3 +2028,66 @@ gamma_p: Normal(0.65, 0.05, [0.40, 0.85])
 **Analytisk startpunkt:** RMSE(korr)=0.282, PI.q4=−0.152≈NB ✅, R[I_R,E_i]=0.976 ✅
 **Seed=38. Burn-in=30k, Prod=200k. Warm start: kj35.**
 
+
+---
+
+## kj38 — Endelige resultater (2026-05-30)
+
+**Konvergens:** PSRF=1.005, ESS=417 ✅ (etter 10 rekalibreringer — rho-parametere trege)
+
+**Posterior mean (nøkkel):**
+- psi_R = 0.9696 (treffer prior-tak 0.97 — igjen)
+- psi_P1 = 0.406 (bredt KI: [0.13, 0.77] — svakt identifisert)
+- rho_s = 0.003 (nær 0 ✅)
+
+**NB-benchmark (IRF):**
+```
+Y:   [-0.460, -0.535, -0.360, -0.190]  (NB: [-0.12, -0.47, -0.40, -0.25])
+PI:  [-0.123, -0.188, -0.157, -0.085]  (NB: [-0.03, -0.14, -0.22, -0.22])
+I_R: [+1.000, +0.882, +0.746, +0.637]  (NB: [+1.00, +0.55, +0.10, -0.15])
+RER: [-1.117, -0.898, -0.392, +0.051]  (NB: [-1.50, -1.00, -0.50, -0.20])
+RMSE(16pt) = 0.310   B5: by4=1.137 ✅  bpi4=1.342 ✅
+```
+
+**FEVD-diagnose (ny, 2026-05-30):**
+```
+I_R variasjon:  Konsum=87.5% ❌,  Pengepolitikk=11.3% ❌
+PI  variasjon:  Prismarkup=44.2%,  Konsum=25.9%,  Bolig=21.7%
+Y   variasjon:  Konsum=61.7%,  Bolig=19.0%,  Oljepris=15.8%
+RER variasjon:  Bolig=76.7%,  Oljepris=17.4%
+```
+
+**Konklusjon:** Fremoverskuende Taylor hjalp ikke. psi_R er identifisert via
+Taylorregel-respons på konsumsjokk (87.5% av I_R-variasjon), ikke pengepol.-sjokket.
+Rotkårsak: sigma_C=0.107 dominerer — men sigma_C shrinkage endrer ikke I_R.q12
+(IRF er T-matrise-egenskap, ikke FEVD-egenskap — bekreftet analytisk).
+
+---
+
+## kj39A — Forhåndsregistrering (2026-05-30)
+
+**Strategi:** Dogmatisk psi_R — tving psi_R til NB-konsistent verdi.
+Aksepterer ΔLL ≈ −437 likelihoodstraff.
+
+**Strukturelle valg:**
+- `build_matrices_v3` (backward-looking) — fremoverskuende endret ingenting
+- `phi_PQ=200` (kappa_P=0.15) beholdes — forbedrer PI.q4
+- Warm start: kj38 posterior, psi_R klippet til 0.88
+
+**Prior overrides:**
+```
+psi_R:   Normal(0.88, 0.005, [0.85, 0.91])   — DOGMATISK, halvtid≈5 kv
+psi_P1:  Normal(0.50, 0.20,  [0.10, 2.00])
+rho_s:   Normal(0.03, 0.03,  [0.00, 0.15])
+gamma_p: Normal(0.65, 0.05,  [0.40, 0.85])
+```
+
+**Analytisk forhåndsvisning (kj38-params, psi_R=0.88):**
+```
+I_R: [+1.000, +0.595, +0.292, +0.159]  (NB: [+1.00, +0.55, +0.10, -0.15])
+RMSE(16pt) ≈ 0.295   (vs kj38: 0.310, kj35: 0.287)
+```
+I_R.q12 forbedres fra +0.637 → +0.159 — undershoot fortsatt uoppnåelig med v3-struktur.
+Forventning: MCMC-posterior kan gi bedre RMSE (~0.25–0.27) når andre param justeres.
+
+**Seed=39. Burn-in=30k, Prod=200k.**
