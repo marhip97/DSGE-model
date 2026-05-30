@@ -1963,3 +1963,68 @@ Sandkassen anbefaler å godta RMSE≈0.28–0.29 som beste v3-resultat.
 **Merk:** phi_PQ=200 gir kappa_P=0.15, innenfor rimelige kalibreringsverdier
 (Gali 2015: 0.075–0.30, Smets&Wouters: 0.086). K&M's 669 er konservativt.
 
+
+---
+
+## kj36 — Terminert (2026-05-30)
+
+**Årsak:** Viser psi_R→0.97 (prior-tak) og RMSE=0.324 (verre enn kj35) etter 15k rekalibrerings-trekk.
+Data vil ha høyere psi_R enn benchmark-optimalt (0.92). Videre kjøring ikke meningsfull.
+**Siste status:** PSRF=1.068 (runde 3), rho_s=0.003 ✅ men psi_R=0.970 ❌ I_R.q4=0.888 ❌
+
+---
+
+## Strukturell analyse: build_matrices_v3_forward (2026-05-30)
+
+**Problem med build_matrices_pi4chain (eksisterende):**
+Sims-konsistenslikninger gjør π_t til ny jump-variabel → BK kansellerer 97% av E_i-sjokket.
+`R[I_R, E_i] = −0.032` vs v3's `0.979`. Monetærpolitikkssjokk er nærmest virkningsløst.
+
+**Korrekt implementasjon: build_matrices_v3_forward**
+Iterativ fixed-point: `E_t[π_{t+4}] = e_PI @ T^4 @ z_t` (modell-konsistente forventninger).
+- NZ=49 uendret (ingen nye tilstandsvariabler)
+- Pi-matrise uendret (ingen nye jump-variabler)
+- `R[I_R, E_i] = 0.976` ✅ — sjokket kanselleres ikke
+- Konvergerer typisk innen 5–15 iterasjoner
+
+**Lambda-sweep (kj35-posterior, rho_s=0):**
+```
+lambda=0.0 (ren fremoverskuende): I_R.q12=+0.239  RMSE=0.290 (vs v3: 0.290)
+lambda=0.5 (hybrid):              I_R.q12=+0.238  RMSE=0.290
+lambda=1.0 (= v3):                I_R.q12=+0.236  RMSE=0.290
+```
+Funn: minimal effekt med psi_P1=0.29. Årsak: (1-0.90)*0.29*(-0.055) ≈ −0.002 pr. kvartal
+— for lite til å overkomme psi_R^12*1.0≈0.31 (rate-inertia).
+
+**Kombinert forward + phi_PQ=200:**
+```
+forward lam=0, psi_P1=0.29, phi_PQ=200: RMSE=0.282, PI.q4=−0.152≈NB ✅
+forward lam=0, psi_P1=1.50, phi_PQ=200: RMSE=0.284, I_R.q12=+0.224
+```
+Beste konfigurasjon analytisk: phi_PQ=200 + forward (lambda=0, psi_P1 fri).
+
+**Endelig vurdering av I_R undershoot:**
+Uoppnåelig med v3-struktur selv med korrekt fremoverskuende Taylor.
+Krever enten: (1) mye høyere kappa_P (phi_PQ << 100) som gir ustabilitet,
+eller (2) vesentlig ny modellstruktur (wage-price spiral, inflation anchor).
+
+---
+
+## kj38 — Forhåndsregistrering (2026-05-30)
+
+**Strukturelle endringer fra kj35:**
+- `build_matrices_v3_forward` (ny funksjon) med lambda_pi4=0.0
+- `phi_PQ=200` (kappa_P=0.15) — fast kalibrering
+- NZ=49 uendret, Pi-matrise uendret
+
+**Prior overrides:**
+```
+rho_s:   Normal(0.03, 0.03, [0.00, 0.15])   — sterkere mot 0
+psi_R:   Normal(0.90, 0.015, [0.85, 0.97])
+psi_P1:  Normal(0.50, 0.20, [0.10, 2.00])   — fri, la data velge
+gamma_p: Normal(0.65, 0.05, [0.40, 0.85])
+```
+
+**Analytisk startpunkt:** RMSE(korr)=0.282, PI.q4=−0.152≈NB ✅, R[I_R,E_i]=0.976 ✅
+**Seed=38. Burn-in=30k, Prod=200k. Warm start: kj35.**
+
