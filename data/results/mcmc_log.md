@@ -10,7 +10,8 @@
 |---------|--------|------|----|--------------|---------------|
 | kj31    | ✅ Baseline | 1.006 | ✅ by4=1.20× | 0.060 | 0.353 |
 | kj32    | ⚠️ Fullført (PSRF❌) | 1.236 | ✅ by4=1.44× | — | 0.398 |
-| kj33    | 🔄 Kjører | — | — | — | mål ~0.200 |
+| kj33    | ⚠️ Delvis (74k/200k, rho_A drift) | 1.055 (tail) | ✅ by4=0.865× | — | 0.200 (tail) |
+| kj34    | 🔄 Planlagt | — | — | — | mål ~0.200 |
 
 ### Prioritert rekkefølge
 
@@ -1552,3 +1553,72 @@ Vår modell har bare sigma_i·ε_i (ren overraskelse). Kanskje Z_t gir bedre rat
 4. rho_Z<<1 er nesten ekvivalent med sigma_i direkte — gir ny grad av frihet for B5
 
 **PE-godkjenning påkrevd for kj26:** NZ 49→50, NE 13→14
+
+---
+
+## kj33 — Resultater og kj34 design (2026-05-30)
+
+### kj33 oppsummering
+
+**Kjøring:** 74k/200k trekk (avsluttet pga timeout). Seed=33, KPI-JAE.
+**Prior:** psi_R Normal(0.88, 0.005, [0.84, 0.92]), phi_I1=Normal(0.50, 0.001).
+**Warm start:** kj32 posterior (psi_R=0.9974).
+
+**Konvergens:**
+- psi_R: STABIL gjennom hele kjøringen ~0.903 ✅
+- rho_A: DRIFTET fra 0.149 (start) → 0.471 (tail [60k:74k]) ❌
+- Årsak: warm start fra kj32 (psi_R=0.997) ga rho_A fra feil geometrisk regime
+
+| Vindu     | PSRF  | rho_A mean |
+|-----------|-------|------------|
+| [20k:30k] | 1.064 | 0.178      |
+| [30k:40k] | 1.181 | 0.221      |
+| [40k:55k] | 1.224 | 0.257      |
+| [50k:70k] | 1.139 | 0.317      |
+| [55k:74k] | 1.055 | 0.455 ← best |
+
+**Posterior fra tail [55k:74k] (19k samples):**
+
+| Parameter | Mean   | Std    |
+|-----------|--------|--------|
+| psi_R     | 0.9032 | 0.0055 |
+| rho_A     | 0.4549 | 0.1433 |
+| rho_H     | 0.9401 | 0.0236 |
+| rho_rp    | 0.6240 | 0.1399 |
+| phi_I1    | 0.4997 | 0.0011 |
+| rho_s     | 0.0558 | 0.0038 |
+
+**NB multi-kvartal benchmark (tail posterior):**
+
+| Horisont | Y (NB) | Y (kj33) | PI (NB) | PI (kj33) | I_R (NB) | I_R (kj33) | RER (NB) | RER (kj33) |
+|----------|--------|----------|---------|-----------|----------|------------|---------|------------|
+| q1       | -0.20  | -0.431   | -0.05   | -0.067    | 1.00     | 1.000      | -0.50   | -1.005     |
+| q4       | -0.45  | -0.389   | -0.15   | -0.060    | 0.60     | 0.665      | -0.40   | -0.586     |
+| q8       | -0.35  | -0.153   | -0.20   | -0.020    | 0.20     | 0.387      | -0.20   | -0.041     |
+| q12      | -0.15  | -0.020   | -0.10   | +0.005    | 0.05     | 0.237      | -0.05   | +0.243     |
+
+**RMSE(16pt NB)=0.2000** (vs kj31: 0.353, vs kj32: 0.398) — −43% forbedring ✅
+**B5: by4=0.865× ✅  bpi4=0.402 ✅**
+
+**Primære avvik:**
+- Y q1: -0.431 (NB: -0.20) — 2× for stor respons
+- I_R q8-q12: for langsom avtagning (rentepersistens etter psi_R=0.88 nok)
+- RER q12: +0.243 (NB: -0.05) — feil fortegn
+
+### Diagnose: kj33 drifting rho_A
+
+rho_A drifter fordi:
+1. Warm start fra kj32 (psi_R=0.9974) ga rho_A≈0.15–0.25
+2. Med psi_R=0.88 endres geometrien: teknologisjokkets persistens-behov øker
+3. Prior Beta(5,3) → mean=0.625; data trekker mot ~0.47
+4. Overgangsperiode krever mer enn 74k iterasjoner
+
+### kj34 design
+
+**Strategi:** Varm fortsettelse fra kj33 tail [55k:74k] mean.
+- Starter rho_A=0.455 (nær potensiell posterior mode)
+- Identiske priors som kj33
+- Utvidet burn-in: 30k (vs 15k) + 10 rekalibreringer (vs 6)
+- Seed=34, 200k produksjon
+
+**Forventet:** PSRF<1.10 ved 40k–60k, RMSE(16pt)≈0.200, B5 ✅
