@@ -2118,3 +2118,35 @@ Klassisk psi_R/RER-trade-off i liten åpen økonomi.
 
 **Analytisk observasjon:** Data aksepterte psi_R=0.90 (ikke ved prior-tak).
 Viser at dogmatisk prior er gjennomførbart — men RER-kanalen krever ytterligere justering.
+
+---
+
+## kj40 — Strukturelle bugfikser (2026-05-31)
+
+**Bakgrunn:** Ekstern gjennomgang avdekket tre strukturelle feil i `src/nemo/model/equations.py`
+som har påvirket alle estimeringsrunder kj35–kj39B.
+
+### Funn A — EPS_RP frakoblet UIP (KRITISK)
+- **Problem:** `Psi[15, E_rp] = _w` sendte E_rp-sjokket direkte i UIP, forbigikk AR(1)-tilstanden EPS_RP.
+  Dermed hadde `rho_rp` null effekt på modellens dynamikk i alle kj35–kj39B.
+- **Fix:** Fjernet `Psi[15, E_rp]`; la til `G0[15, EPS_RP] = -_w` (persistent tilstand kobles inn).
+- **Konsekvens for tidligere kjøringer:** rho_rp-posteriorer er meningsløse. RER-FEVD undervurderte risikopremie.
+
+### Funn B — EPS_PREM dobbel kontemporær effekt (KRITISK)
+- **Problem:** UIP hadde både `G0[15, EPS_PREM] = -_w` (via tilstand) og `Psi[15, E_prem] = _w` (direkte sjokk).
+  Samme sjokk treffer UIP to ganger samme periode.
+- **Fix:** Fjernet `Psi[15, E_prem]`; beholdt tilstandsleddet `G0[15, EPS_PREM]`.
+- **Konsekvens:** EPS_PREM-effekten var 2× for stor i alle kj35–kj39B.
+
+### Funn C — I_STAR brukte rho_piS i stedet for rho_iS (LITEN EFFEKT)
+- **Problem:** `G1[44, I_STAR] = p.rho_piS` (linje 487) — copy-paste-feil. Skal være `p.rho_iS`.
+- **Fix:** Byttet til `p.rho_iS`. Ingen empirisk effekt nå (begge = 0.70), men semantisk korrekt.
+
+### Verifisering (2026-05-31)
+- BK stabil: v3 max_eig=0.9882, v3_forward max_eig=0.9882
+- `G0[15, EPS_RP] = -0.997` (korrekt, tilsvarer `-(1-rho_s)`)
+- `Psi[15, E_rp] = 0.0` ✅, `Psi[15, E_prem] = 0.0` ✅
+- Testpakke: 89 passed, 1 skipped, 3 xfailed (identisk med pre-fix)
+- Alle 15 IRF-tegntester grønne ✅
+
+**Neste steg:** kj40 — ny ren MCMC-kjøring med fikset equations.py. Warm start fra kj39B posterior.

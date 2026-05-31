@@ -345,12 +345,13 @@ def build_matrices(p=None):
     G0[15, I_STAR]    = -_w
     G0[15, PI_STAR]   =  _w
     G0[15, EPS_PREM]  = -_w
+    G0[15, EPS_RP]    = -_w            # Funn A: kobler persistent risikopremie-AR(1) inn i UIP
     G0[15, B_NW]      =  _w * phi_B
     G0[15, PO]        =  _w * phi_O
     G1[15, RER]       =  rho_s          # lagget RER-ledd
     Pi[15, RER]       =  _w
-    Psi[15, E_rp]     =  _w
-    Psi[15, E_prem]   =  _w
+    # Funn A: Psi[15, E_rp] fjernet — sjokket går via EPS_RP-tilstanden (rad 42)
+    # Funn B: Psi[15, E_prem] fjernet — sjokket går via EPS_PREM-tilstanden (rad 46)
  
     # D2. Eksportetterspørsel (Armington, korrigert µ)
     G0[16, X]   =  1.0
@@ -484,7 +485,7 @@ def build_matrices(p=None):
     G0[41,YS]=1.0;    G1[41,YS]=p.rho_Ys;   Psi[41,E_Ys]=1.0
     G0[42,EPS_RP]=1.0;G1[42,EPS_RP]=p.rho_rp;Psi[42,E_rp]=1.0
     G0[43,PI_STAR]=1.0;G1[43,PI_STAR]=p.rho_piS;Psi[43,E_piS]=1.0
-    G0[44,I_STAR]=1.0; G1[44,I_STAR]=p.rho_piS;  # utenlandsk rente
+    G0[44,I_STAR]=1.0; G1[44,I_STAR]=p.rho_iS;   # Funn C: utenlandsk rente bruker rho_iS, ikke rho_piS
     G0[45,EPS_PHI_H]=1.0;G1[45,EPS_PHI_H]=p.rho_phi_h;Psi[45,E_phi_h]=1.0
     G0[46,EPS_PREM]=1.0; G1[46,EPS_PREM]=p.rho_prem; Psi[46,E_prem]=1.0
     G0[47,EPS_I_ADJ]=1.0;G1[47,EPS_I_ADJ]=p.rho_I;  Psi[47,E_I]=1.0
