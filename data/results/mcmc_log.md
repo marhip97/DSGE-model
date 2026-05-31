@@ -2150,3 +2150,86 @@ som har påvirket alle estimeringsrunder kj35–kj39B.
 - Alle 15 IRF-tegntester grønne ✅
 
 **Neste steg:** kj40 — ny ren MCMC-kjøring med fikset equations.py. Warm start fra kj39B posterior.
+
+---
+
+## kj40 — Resultater (2026-05-31)
+
+**Konfigurasjon:** phi_PQ=150, psi_R~N(0.90,0.010,[0.85,0.95]), gamma_p~N(0.75,0.05,[0.55,0.90]),
+rho_rp~Beta(5,3,[0.10,0.99]), build_matrices_v3_forward, lambda_pi4=0.0, seed=40.
+Warm start: kj39A posterior.
+
+**Konvergens:** PSRF=1.086, ESS=450 ✅
+
+**Posterior mean (nøkkel):**
+- psi_R = 0.9491 (ved prior-tak 0.95 — identifikasjonsproblem uløst)
+- gamma_p = 0.7233, rho_rp = 0.3284, psi_P1 = 0.5298
+
+**NB-benchmark (IRF):**
+```
+Y:   [?, ?, ?, ?]  (NB: [-0.12, -0.47, -0.40, -0.25])
+PI:  [?, ?, ?, ?]  (NB: [-0.03, -0.14, -0.22, -0.22])
+I_R: [?, ?, ?, ?]  (NB: [+1.00, +0.55, +0.10, -0.15])
+RER: [?, ?, ?, ?]  (NB: [-1.50, -1.00, -0.50, -0.20])
+RMSE(16pt) = 0.278   B5: ✅
+```
+
+**Funn:**
+- rho_rp bekreftet identifisert etter Funn A-fix: posterior 0.329 vs prior-mean 0.625 (Beta(5,3)).
+  Risikopremie kortvarig (rho_rp=0.33), ikke langvarig som prior antok.
+- psi_R treffer taket igjen (0.9491): identifikasjonsproblem krever enten strammere dogmatisk prior
+  eller strukturell endring (PLT-mekanisme).
+- RMSE=0.278 marginalt bedre enn kj39A (0.283). Funn A/B/C-fix uten RMSE-gevinst — som forventet
+  (rho_rp påvirker E_rp-IRF, ikke E_i-IRF).
+
+**Analytisk sweep (2026-05-31, basert på kj40 posterior):**
+- psi_R=0.92 analytisk optimal (RMSE=0.286) — RER.q4-vekting drar opp
+- phi_PQ=125 → RMSE=0.2819, bedre RER.q1 (−1.17 vs −1.14)
+- rho_rp: null effekt på E_i-IRF (RMSE)
+- psi_P1: PI-respons for svak → hever prior-senter til 0.60
+
+---
+
+## kj41 — Resultater (2026-05-31)
+
+**Konfigurasjon:** phi_PQ=125 (kappa_P=0.24), psi_R~N(0.91,0.008,[0.87,0.95]),
+rho_rp~N(0.33,0.10,[0.05,0.65]) (informativ fra kj40), psi_P1~N(0.60,0.15,[0.10,2.00]),
+gamma_p~N(0.75,0.05,[0.55,0.90]), build_matrices_v3_forward, lambda_pi4=0.0, seed=41.
+Warm start: kj40 posterior.
+
+**Konvergens:** PSRF=1.00, ESS=620 ✅✅ (utmerket)
+
+**Posterior mean (nøkkel):**
+- psi_R = 0.9490 (ved prior-tak 0.95 — identifikasjonsproblem uløst, tredje kjøring på rad)
+- gamma_p = 0.7214, rho_rp = 0.1703, psi_P1 = 0.5598
+- acc=0.224, scale=0.8259
+
+**NB-benchmark (IRF):**
+```
+Y:   [-0.476, -0.517, -0.282, -0.075]  (NB: [-0.12, -0.47, -0.40, -0.25])
+PI:  [-0.180, -0.272, -0.206, -0.077]  (NB: [-0.03, -0.14, -0.22, -0.22])
+I_R: [+1.000, +0.793, +0.585, +0.447]  (NB: [+1.00, +0.55, +0.10, -0.15])
+RER: [-1.173, -0.885, -0.274, +0.217]  (NB: [-1.50, -1.00, -0.50, -0.20])
+RMSE(16pt) = 0.2771   B5: by4=1.101 ✅  bpi4=1.939 ✅
+```
+
+**Funn og diagnose:**
+- **psi_R=0.9490** — treffer taket for tredje kjøring på rad (kj39A: 0.902 med enda strammere prior,
+  kj40: 0.9491, kj41: 0.9490). Selv N(0.91, 0.008) er ikke tilstrekkelig dogmatisk.
+  Data vil ha psi_R→1 for å matche post-COVID rentepersistens.
+- **I_R for persistent:** q4=0.793 (NB: 0.55), q8=0.585 (NB: 0.10), q12=0.447 (NB: −0.15).
+  AR(1) Taylor-regel kan strukturelt ikke produsere underskudd (i_t < 0) uten eksogent sjokk.
+  Dette er en modelleringsbegrensning, ikke et estimeringsroblem.
+- **PI for sterk:** q1=−0.180 (NB: −0.03), q4=−0.272 (NB: −0.14). Umiddelbar PI-respons for stor.
+- **RER feil form:** q12=+0.217 (NB: −0.20) — RER snur feil vei på lang sikt.
+- **rho_rp falt:** 0.329 (kj40) → 0.170 (kj41). Informativ prior N(0.33,0.10) dro ikke opp.
+  phi_PQ=125 (mer prisfriksjon) endrer kanalen mellom rente og valuta.
+- **RMSE=0.2771** — identisk med kj40 (0.278). Ingen RMSE-gevinst fra phi_PQ-justeringen.
+
+**Konklusjon for kj42-strategi:**
+Identifikasjonsproblemet for psi_R er strukturelt. To mulige veier:
+1. **Fast kalibrering** psi_R=0.87 (K&M 2019 verdi) — overstyr data, bruk teorikonsistent verdi
+2. **PLT-mekanisme** (price level targeting) — tilstandsavhengig Taylor-regel som kan generere
+   underskudd og lave rho_rp-behov. Krever PE-godkjenning (strukturell modellendring).
+
+Anbefalt: kj42 med psi_R fast kalibrert (tight prior N(0.87,0.001)) og sammenlign IRF-kvalitet.
