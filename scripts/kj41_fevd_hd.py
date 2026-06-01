@@ -188,12 +188,13 @@ dates_post = obs_df[post_mask].index
 dates_pre  = obs_df[obs_df.index <= '2019-12-31'].index
 dates_post = obs_df[obs_df.index >= '2022-01-01'].index
 
-def shock_contributions(z_smooth: np.ndarray, h_rows: dict) -> dict:
-    """Beregn sjokk-bidrag per periode via glattede tilstander.
+def shock_contributions(z_smooth: np.ndarray, h_rows: dict,
+                        scales: dict) -> dict:
+    """Beregn sjokk-bidrag per periode via glattede tilstander (observerbare enheter).
 
     Følger analyse.py-formelen:
         eps_t  = z_smooth[t] - T @ z_smooth[t-1]
-        bidrag = H[obs, :] @ (R[:, sidx] * eps_t[sidx])
+        bidrag = scale * H[obs, :] @ (R[:, sidx] * eps_t[sidx])
     """
     T_obs = len(z_smooth)
     contrib: dict[str, dict[str, list]] = {vn: {SHOCK_NAMES[e]: [] for e in SHOCK_IDX}
@@ -202,19 +203,28 @@ def shock_contributions(z_smooth: np.ndarray, h_rows: dict) -> dict:
         eps_t = z_smooth[t] - T @ z_smooth[t-1]
         for vn in VAR_NAMES:
             h_row = h_rows[vn]
+            sc    = scales[vn]
             for eidx in SHOCK_IDX:
                 r_col = R[:, eidx]
                 contrib[vn][SHOCK_NAMES[eidx]].append(
-                    float(h_row @ (r_col * eps_t[eidx]))
+                    sc * float(h_row @ (r_col * eps_t[eidx]))
                 )
     return contrib
 
-# H-rader for hver variabel (observasjonsmatrise-rad for Y, PI, I_R, RER)
-# Bruk direkte tilstand-til-observabel mapping: H @ e_vidx
-h_rows = {vn: np.eye(NZ)[vidx] for vn, vidx in VAR_NAMES.items()}
+# H-rader fra observasjonsmatrisen (obs-rom → korrekte enheter)
+# OBS_NAMES-rekkefølge: dy_obs(0), dc_obs(1), ..., pi_obs(5), ..., i_R_obs(7), ..., ds_obs(9)
+_obs_map = {
+    'Y':   OBS_NAMES.index('dy_obs'),
+    'PI':  [k for k, n in enumerate(OBS_NAMES) if 'pi' in n][0],
+    'I_R': OBS_NAMES.index('i_R_obs'),
+    'RER': OBS_NAMES.index('ds_obs'),
+}
+h_rows   = {vn: Hmat[oidx] for vn, oidx in _obs_map.items()}
+# Skalering til annualiserte enheter for I_R (kvartal × 4)
+_scales  = {'Y': 1.0, 'PI': 1.0, 'I_R': 4.0, 'RER': 1.0}
 
-contrib_pre  = shock_contributions(z_pre, h_rows)
-contrib_post = shock_contributions(z_post, h_rows)
+contrib_pre  = shock_contributions(z_pre,  h_rows, _scales)
+contrib_post = shock_contributions(z_post, h_rows, _scales)
 
 hd = {
     "pre":  {vn: {s: v for s, v in contrib_pre[vn].items()}  for vn in VAR_NAMES},
@@ -225,7 +235,7 @@ hd = {
 
 json.dump(hd, open(RESULTS / "kj41_hd.json", "w"), indent=2)
 print(f"HD lagret: {RESULTS/'kj41_hd.json'}")
-print("NB: HD-bidrag er i tilstandsrommets enheter (log-avvik).")
-print("    Konvertering til observerbare enheter (%, pp) implementeres i kj41_analyse_v2.py.")
+print("HD-bidrag: periode-for-periode innovasjonsbidrag i observerbare enheter (%, pp)")
+print("For kumulativ nivå-HD: bruk sum(contrib[:t]) for hvert t (implementeres i v2).")
 
 print("\nkj41_fevd_hd fullført.")
