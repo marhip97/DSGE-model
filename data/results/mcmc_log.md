@@ -2233,3 +2233,89 @@ Identifikasjonsproblemet for psi_R er strukturelt. To mulige veier:
    underskudd og lave rho_rp-behov. Krever PE-godkjenning (strukturell modellendring).
 
 Anbefalt: kj42 med psi_R fast kalibrert (tight prior N(0.87,0.001)) og sammenlign IRF-kvalitet.
+
+---
+
+## kj42 — Resultater (2026-05-31/06-01)
+
+**Konfigurasjon:** phi_PQ=150, psi_R~N(0.87,0.001,[0.85,0.89]) (fast kalibrert K&M test),
+phi_I1~N(0.50,0.001,[0.40,0.60]), rho_rp~N(0.17,0.08,[0.05,0.40]),
+psi_P1~N(0.60,0.15,[0.10,2.00]), gamma_p~N(0.75,0.05,[0.55,0.90]),
+build_matrices_v3_forward, lambda_pi4=0.0, seed=42. Warm start: kj41 posterior (psi_R klippt [0.86,0.88]).
+
+**Konvergens:** PSRF=1.00, ESS=638 ✅✅ (utmerket). Maks 10 rekalibreringer nådd (AR-params blandet dårlig), produksjon kjørt uansett. Produksjons-PSRF falt raskt fra 1.12@10k → 1.00@30k.
+
+**Posterior mean (nøkkel):**
+- psi_R = 0.8707 (låst mot prior — identifikasjonsproblem uendret)
+- gamma_p = 0.7216, rho_rp = 0.1137, psi_P1 = 0.6220
+- acc=0.215, scale=0.8668
+
+**NB-benchmark (IRF):**
+```
+Y:   [-0.467, -0.366, -0.085, +0.052]  (NB: [-0.12, -0.47, -0.40, -0.25])
+PI:  [-0.150, -0.174, -0.078, +0.011]  (NB: [-0.03, -0.14, -0.22, -0.22])
+I_R: [+1.000, +0.550, +0.254, +0.145]  (NB: [+1.00, +0.55, +0.10, -0.15])
+RER: [-1.144, -0.565, +0.053, +0.334]  (NB: [-1.50, -1.00, -0.50, -0.20])
+RMSE(16pt) = 0.2987   B5: by4=0.778 ❌  bpi4=1.246 ✅
+```
+
+**Funn:**
+- RMSE=0.2987 er **dårligere enn kj41** (0.2771). Data foretrekker høy psi_R.
+- Y.q4=−0.366 (NB: −0.47): output-respons for svak ved lavere renteglatting.
+- I_R.q4=0.550 (NB: 0.55) ✅ — nærmest NB av alle kjøringer! Men q8 (0.254 vs 0.10) og q12 (+0.145 vs −0.15) fortsatt for persistente.
+- RER.q4=−0.565 (NB: −1.00): for rask tilbakegang.
+- **Konklusjon:** psi_R=0.87 forbedrer ikke RMSE. Problemet er strukturelt — AR(1) Taylor kan ikke generere renteunderskudd ved q12.
+
+---
+
+## kj43 — Resultater (2026-06-01)
+
+**Konfigurasjon:** phi_PQ=150, psi_R~N(0.6663,0.001,[0.64,0.69]) (K&M 2019 fullkalibrert),
+phi_I1~N(12.5432,0.001,[12.0,13.0]) (K&M 2019 fullkalibrert),
+psi_P1~N(0.2921,0.05,[0.10,0.60]), rho_rp~N(0.17,0.08,[0.05,0.40]),
+gamma_p~N(0.75,0.05,[0.55,0.90]), build_matrices_v3_forward, lambda_pi4=0.0, seed=43.
+Warm start: kj41 posterior (psi_R klippt [0.64,0.69], phi_I1 satt direkte til 12.5432).
+
+**Merk:** Første kjøringsforsøk feilet med lp=-inf fordi phi_I1=0.50 (fra kj41) var utenfor
+prior-støtten [12.0,13.0]. Fikset ved å sette theta_start[phi_I1]=12.5432 eksplisitt.
+
+**Konvergens:** PSRF=1.00, ESS=1180 ✅✅ (utmerket). Maks 10 rekalibreringer nådd (samme AR-mønster). Produksjons-PSRF konvergerte til 1.00 tidlig.
+
+**Posterior mean (nøkkel):**
+- psi_R = 0.6665 (låst mot prior K&M-verdi)
+- gamma_p = 0.7272, rho_rp = 0.1225, psi_P1 = 0.2973
+- acc=0.220, scale=0.8464
+
+**NB-benchmark (IRF):**
+```
+Y:   [-0.240, -0.016, +0.049, +0.045]  (NB: [-0.12, -0.47, -0.40, -0.25])
+PI:  [-0.086, -0.028, +0.016, +0.027]  (NB: [-0.03, -0.14, -0.22, -0.22])
+I_R: [+1.000, +0.243, +0.053, +0.033]  (NB: [+1.00, +0.55, +0.10, -0.15])
+RER: [-1.080, -0.147, +0.182, +0.209]  (NB: [-1.50, -1.00, -0.50, -0.20])
+RMSE(16pt) = 0.3797   B5: by4=0.035 ❌❌  bpi4=0.197 ❌
+```
+
+**Funn:**
+- RMSE=0.3797 — **dårligst av kj41–43**. K&M fullkalibrering passer ikke norske data.
+- Y.q4=−0.016 (NB: −0.47): output-respons nesten null! phi_I1=12.54 demper investeringer for mye.
+- I_R.q4=0.243 (NB: 0.55): renten faller for raskt med psi_R=0.67.
+- RER løper tilbake på feil måte (positivt ved q8/q12 vs NB negativ).
+
+**Samlet konklusjon kj41–kj43 (2026-06-01):**
+
+| Kjøring | psi_R | phi_I1 | RMSE | I_R.q4 | Y.q4 |
+|---------|-------|--------|------|---------|------|
+| kj41 | 0.9490 | 0.50 | **0.2771** | 0.793 | -0.517 |
+| kj42 | 0.8707 | 0.50 | 0.2987 | **0.550** | -0.366 |
+| kj43 | 0.6665 | 12.54 | 0.3797 | 0.243 | -0.016 |
+| **NB** | — | — | **0** | **0.55** | **-0.47** |
+
+1. **psi_R-identifikasjonsproblemet er strukturelt bekreftet** — norske post-COVID data vil ha
+   psi_R→0.95, uavhengig av phi_I1. Lavere psi_R gir alltid dårligere RMSE.
+2. **phi_I1-hypotesen falsifisert** — K&M phi_I1=12.54 gjør output-respons for svak, ikke bedre.
+3. **I_R.q12-underskuddet er uoppnåelig med AR(1) Taylor** — alle tre kjøringer har I_R.q12 > 0
+   (NB: -0.15). Dette krever en annen mekanisme (PLT/LQ/mean-reversion kanal).
+4. **Beste kalibrering:** kj41 (psi_R≈0.95, phi_I1=0.50) gir lavest RMSE (0.2771) og passerer
+   by4/bpi4-kriteriene.
+
+**Anbefalt neste steg:** kj44 med utvidet LQ-mekanisme eller asymmetrisk tapsfunksjon for å adressere I_R.q12-problemet. Alternativt: aksepter psi_R≈0.95 som best-fit og fokuser på FEVD-analyse.
