@@ -125,12 +125,11 @@ print(f"\nFEVD lagret: {RESULTS/'kj41_fevd.json'}")
 # ─────────────────────────────────────────────────────────────────────────────
 print("\n── Historisk dekomposisjon ──────────────────────────────────────────")
 
+from nemo.analysis.analyse import rts_smoother
+
 datafil  = ROOT / "data/processed/nemo_data_kpi_jae.csv"
 obs_df   = pd.read_csv(datafil, index_col=0, parse_dates=True)
 obs_kols = ['pi_core_obs' if k == 'pi_obs' else k for k in OBS_NAMES]
-
-pre  = obs_df[obs_df.index <= '2019-12-31'][obs_kols].values
-post_data = obs_df[obs_df.index >= '2022-01-01'][obs_kols].values
 
 Hmat = build_H()
 Sv   = build_Sv()
@@ -138,28 +137,18 @@ Sv   = build_Sv()
 Q = R @ np.diag(sigma_vec**2) @ R.T
 
 def kalman_filter_states(Y_obs: np.ndarray) -> np.ndarray:
-    """Kalman-filter (kun foroverpass) — returner filtrerte tilstander (T_obs × NZ).
-
-    Initialiseres med stasjonær kovarians fra Lyapunov-ligningen for numerisk stabilitet.
-    """
+    """Kalman-filter (kun foroverpass) — returner filtrerte tilstander (T_obs × NZ)."""
     from scipy.linalg import solve_discrete_lyapunov
     T_obs = len(Y_obs)
     z_filt = np.zeros((T_obs, NZ))
-
     try:
         P = solve_discrete_lyapunov(T, Q)
     except Exception:
         P = np.eye(NZ) * 1.0
-
     z = np.zeros(NZ)
-
     for t in range(T_obs):
-        z_pr = T @ z
-        P_pr = T @ P @ T.T + Q
-        P_pr = (P_pr + P_pr.T) / 2
-
-        obs = Y_obs[t]
-        valid = np.where(np.isfinite(obs))[0]
+        z_pr = T @ z; P_pr = (T @ P @ T.T + Q); P_pr = (P_pr + P_pr.T)/2
+        obs = Y_obs[t]; valid = np.where(np.isfinite(obs))[0]
         if len(valid) > 0:
             H_v   = Hmat[valid, :]
             Sv_v  = Sv[np.ix_(valid, valid)]
@@ -177,39 +166,55 @@ def kalman_filter_states(Y_obs: np.ndarray) -> np.ndarray:
 
     return z_filt
 
-# Pre-COVID
-z_pre  = kalman_filter_states(pre)
-# Post-COVID
-z_post = kalman_filter_states(post_data)
+# Kombiner pre+post (med NaN-hull for COVID-perioden) for full RTS-smoother
+dates_all = obs_df.index
+obs_all   = obs_df[obs_kols].values
+# Merk: COVID-perioden (2020Q1–2021Q4) er NaN i data — smoother håndterer dette
+Q_mat = np.diag(sigma_vec**2)
+
+print("  Kjører RTS-smoother (full periode inkl. COVID-hull)...")
+z_all = rts_smoother(T, R, Q_mat, obs_all, Hmat, Sv)
+print(f"  RTS-smoother ferdig: {len(z_all)} perioder.")
+
+# Split tilbake til pre/post
+pre_mask  = obs_df.index <= '2019-12-31'
+post_mask = obs_df.index >= '2022-01-01'
+z_pre  = z_all[pre_mask]
+z_post = z_all[post_mask]
+
+dates_pre  = obs_df[pre_mask].index
+dates_post = obs_df[post_mask].index
 
 dates_pre  = obs_df[obs_df.index <= '2019-12-31'].index
 dates_post = obs_df[obs_df.index >= '2022-01-01'].index
 
-def shock_contributions(z_smooth: np.ndarray) -> dict:
-    """Beregn sjokk-bidrag til observerbare via glattede tilstander.
+def shock_contributions(z_smooth: np.ndarray, h_rows: dict) -> dict:
+    """Beregn sjokk-bidrag per periode via glattede tilstander.
 
-    Strukturelle sjokk gjenopprettes ved minste-norm inversjon:
-        innov_t = R @ eps_t  →  eps_hat_t = R^+ @ innov_t
-    Bidrag av sjokk k til variabel j: R[j,k] * eps_hat_t[k]
+    Følger analyse.py-formelen:
+        eps_t  = z_smooth[t] - T @ z_smooth[t-1]
+        bidrag = H[obs, :] @ (R[:, sidx] * eps_t[sidx])
     """
-    T_obs  = len(z_smooth)
-    R_sub  = R[:, SHOCK_IDX]            # NZ × n_shock
-    R_pinv = np.linalg.pinv(R_sub)      # n_shock × NZ  (pseudo-invers)
-
+    T_obs = len(z_smooth)
     contrib: dict[str, dict[str, list]] = {vn: {SHOCK_NAMES[e]: [] for e in SHOCK_IDX}
                                             for vn in VAR_NAMES}
     for t in range(1, T_obs):
-        innov    = z_smooth[t] - T @ z_smooth[t-1]   # NZ
-        eps_hat  = R_pinv @ innov                      # n_shock (strukturelle sjokk)
-        for vn, vidx in VAR_NAMES.items():
-            for k, eidx in enumerate(SHOCK_IDX):
+        eps_t = z_smooth[t] - T @ z_smooth[t-1]
+        for vn in VAR_NAMES:
+            h_row = h_rows[vn]
+            for eidx in SHOCK_IDX:
+                r_col = R[:, eidx]
                 contrib[vn][SHOCK_NAMES[eidx]].append(
-                    float(R_sub[vidx, k] * eps_hat[k])
+                    float(h_row @ (r_col * eps_t[eidx]))
                 )
     return contrib
 
-contrib_pre  = shock_contributions(z_pre)
-contrib_post = shock_contributions(z_post)
+# H-rader for hver variabel (observasjonsmatrise-rad for Y, PI, I_R, RER)
+# Bruk direkte tilstand-til-observabel mapping: H @ e_vidx
+h_rows = {vn: np.eye(NZ)[vidx] for vn, vidx in VAR_NAMES.items()}
+
+contrib_pre  = shock_contributions(z_pre, h_rows)
+contrib_post = shock_contributions(z_post, h_rows)
 
 hd = {
     "pre":  {vn: {s: v for s, v in contrib_pre[vn].items()}  for vn in VAR_NAMES},
@@ -219,8 +224,8 @@ hd = {
 }
 
 json.dump(hd, open(RESULTS / "kj41_hd.json", "w"), indent=2)
-print(f"HD lagret (foreløpig — krever full RTS-smoother for endelig versjon): {RESULTS/'kj41_hd.json'}")
-print("\nNB: Kalman-filter HD er foreløpig. Historisk dekomposisjon med full RTS-smoother")
-print("    implementeres i kj41_analyse_v2.py.")
+print(f"HD lagret: {RESULTS/'kj41_hd.json'}")
+print("NB: HD-bidrag er i tilstandsrommets enheter (log-avvik).")
+print("    Konvertering til observerbare enheter (%, pp) implementeres i kj41_analyse_v2.py.")
 
 print("\nkj41_fevd_hd fullført.")

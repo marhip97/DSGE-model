@@ -2319,3 +2319,36 @@ RMSE(16pt) = 0.3797   B5: by4=0.035 ❌❌  bpi4=0.197 ❌
    by4/bpi4-kriteriene.
 
 **Anbefalt neste steg:** kj44 med utvidet LQ-mekanisme eller asymmetrisk tapsfunksjon for å adressere I_R.q12-problemet. Alternativt: aksepter psi_R≈0.95 som best-fit og fokuser på FEVD-analyse.
+
+---
+
+## kj41 FEVD — Resultater (2026-06-01)
+
+**Script:** `scripts/kj41_fevd_hd.py`
+**Posterior:** kj41 (psi_R=0.9490, phi_PQ=150, build_matrices_v3_forward)
+
+### FEVD ved q4/q8/q20
+
+**I_R (Styringsrente):**
+- Konsum: 84% / 87% / 86% — renten identifiseres primært via konsumkanalen
+- Pengepolitikk: 16% / 13% / 9% — lav bidragsandel
+- Konklusjon: psi_R estimeres via konsumsjokk, ikke pengepolitikksjokket
+
+**BNP-gap (Y):**
+- Konsum: 75% / 73% / 66%
+- Oljepris: 20% / 19% / 16%
+
+**KPI-inflasjon (PI):**
+- Prismarkup: 47% / 45% / 36%
+- Konsum: 40% / 39% / 36%
+
+**Valutakurs (RER):**
+- Oljepris: 69% (q4) → 20% (q20) — dominerer kortsiktig
+- Bolig: 4% (q4) → 71% (q20) — vokser langsiktig (krever videre analyse)
+- Risikopremie: 5% / 4% / 1% — lav etter sigma_rp=0.006 kalibrering
+
+### Historisk dekomposisjon
+RTS-smoother (analyse.py) kjørt over full periode (100 kvartaler inkl. COVID-hull).
+HD-bidrag er foreløpig i tilstandsrommets log-avviksenheter — konvertering til
+observerbare enheter (%, pp) implementeres i kj41_analyse_v2.py.
+
