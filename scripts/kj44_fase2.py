@@ -96,11 +96,28 @@ post_std    = np.array([max(s[n]["std"], 0.001) for n in PARAM_NAMES])
 
 idx_psiR = PARAM_NAMES.index('psi_R')
 
-# Ingen prior_overrides — bruk standardprior for psi_R (Beta(2,2,[0.50,0.99]))
-# psi_R=0.9490 fra kj41 er innenfor [0.50,0.99], ingen klipping nødvendig
+# Prior overrides — identisk med kj41 MINUS psi_R, for å isolere reparam-effekten.
+# psi_R frigjøres til default-prior Beta(2,2,[0.50,0.99]); reparam._bounds leser
+# default PARAM_PRIORS, så logit-transformen bruker [0.50,0.99]. psi_R=0.9490 fra
+# kj41 ligger innenfor — ingen klipping. Alt annet holdes likt kj41 (ingen
+# konfundering fra samtidige prior-endringer).
+prior_overrides = {
+    'psi_P1':  ('normal', 0.60, 0.15,  0.10, 2.00),
+    'gamma_p': ('normal', 0.75, 0.05,  0.55, 0.90),
+    'rho_s':   ('normal', 0.03, 0.03,  0.00, 0.15),
+    'rho_rp':  ('normal', 0.33, 0.10,  0.05, 0.65),
+    'phi_I1':  ('normal', 0.50, 0.001, 0.40, 0.60),
+    'phi_H1':  ('normal', 60.73, 0.001, 60.70, 60.76),
+    'rho_A':   ('beta', 5.0, 3.0, 0.01, 0.99),
+    'rho_C':   ('beta', 5.0, 3.0, 0.10, 0.99),
+    'rho_O':   ('beta', 5.0, 3.0, 0.10, 0.99),
+    'rho_Ys':  ('beta', 5.0, 3.0, 0.10, 0.99),
+    'rho_H':   ('beta', 5.0, 2.0, 0.30, 0.99),
+}
 print(f"Warm start kj44: psi_R={theta_start[idx_psiR]:.4f} (kj41 posterior mean)")
 
-lp0 = log_posterior(theta_start, H, Sv, pre, post, build_fn=_build_fn)
+lp0 = log_posterior(theta_start, H, Sv, pre, post, build_fn=_build_fn,
+                    prior_overrides=prior_overrides)
 irf0 = lag_irf_normalisert(theta_start)
 print(f"  lp0={lp0:.2f}")
 if irf0 is not None:
@@ -135,6 +152,7 @@ chain, lp_chain, meta = adaptive_mcmc_with_monitoring(
     scale_init=0.70, seed=44, verbose=True,
     save_prefix=str(RESULTS / "chain_kj44_prod"),
     build_fn=_build_fn,
+    prior_overrides=prior_overrides,
     use_reparam=True,      # Fase 2: logit-reparametrisering for psi_R
 )
 
