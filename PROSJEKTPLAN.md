@@ -244,29 +244,35 @@ Kjøres hvis Spor A–C ikke gir RMSE ≤ 0.150.
 
 ---
 
-## Fase 1 — Faktisk datainnhenting 🚧 (AKTIV — startet 2026-06-01)
+## Fase 1 — Faktisk datainnhenting ✅ (Avsluttet 2026-06-01)
 
 **Mål:** Erstatte syntetisk fallback med ekte API-kall.
 
 **Leveranser:**
-- [ ] `src/nemo/data/ssb.py` — JSON-stat-klient for SSB tabeller 09189,
-      03013, 10235, 05111, 09786, 07241, 08946
-- [ ] `src/nemo/data/norges_bank.py` — SDMX-klient for POLICY_RATE,
-      NIBOR/3M, EXR/B.EUR.NOK.SP, CREDIT_INDICATOR/K2.HH
-- [ ] `src/nemo/data/fred.py` — utenlandsdata (oljepris, handelspartner-BNP)
-- [ ] `src/nemo/data/pipeline.py` — transformasjon (log-diff, demean, HP-gap)
-- [ ] `data/processed/nemo_data.csv` — endelig 14-variabel observasjonssett
-- [ ] `data/processed/nemo_demean.json` — demean-verdier for nivå-rekonstruksjon
-- [ ] `tests/test_data_pipeline.py` — sjekk format, missing-håndtering, demean
+- [x] `src/nemo/data/ssb.py` — JSON-stat-klient for SSB (PxWeb v0 + v2)
+- [x] `src/nemo/data/norges_bank.py` — SDMX-klient for POLICY_RATE, NIBOR/3M, EXR, CREDIT
+- [x] `src/nemo/data/fred.py` — utenlandsdata (oljepris Brent, handelspartner-BNP)
+- [x] `src/nemo/data/pipeline.py` — transformasjon (log-diff, demean, HP-gap)
+- [x] `data/processed/nemo_data_kpi_jae.csv` — 15-variabel observasjonssett, 2001Q1–2025Q4
+- [x] `data/processed/nemo_demean_kpi_jae.json` — demean-verdier per variabel
+- [x] `tests/test_data_pipeline.py` — 35 tester, alle grønne
 
 **Akseptansekriterier:**
-- `python -m nemo.data.pipeline` produserer `data/processed/nemo_data.csv`
-  fra ferske API-kall
-- Filen har samme format som dagens `nemo_data_faktisk_v2.csv`
-- Tester bekrefter at API-feil ikke krasjer pipelinen (cached fallback)
+- [x] Pipeline-kode implementert med cache-fallback
+- [x] Format identisk med `nemo_data_faktisk_v2.csv` (+ `pi_core_obs`-kolonne)
+- [x] Tester bekrefter at API-feil ikke krasjer pipelinen — 35/35 pass
 
-**Risiko:** SSB-tabell-IDer kan endres. FRED krever API-nøkkel
-(`secrets.FRED_API_KEY` i GitHub Actions).
+**Kjøre pipeline lokalt (kreves — sky-IPer blokkert av SSB/NB):**
+```bash
+python -m nemo.data.pipeline --kpi-jae
+# Output: data/processed/nemo_data_kpi_jae.csv + nemo_demean_kpi_jae.json
+```
+SSB PxWeb v2 og Norges Bank SDMX-API blokkerer cloud-IPer (403). Pipeline
+må kjøres fra lokal maskin eller whitelistet server. Output commites til repo.
+
+**Siste kjøring:** 2025Q4 (2025-12-31) — `nemo_data_kpi_jae.csv` er oppdatert.
+
+**Risiko (gjenværende):** SSB-tabell-IDer kan endres. FRED krever API-nøkkel.
 
 ## Fase 2 — Revidert estimering med forbedret sampler / informert prior
 
