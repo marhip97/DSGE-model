@@ -190,12 +190,7 @@ dates_post = obs_df[obs_df.index >= '2022-01-01'].index
 
 def shock_contributions(z_smooth: np.ndarray, h_rows: dict,
                         scales: dict) -> dict:
-    """Beregn sjokk-bidrag per periode via glattede tilstander (observerbare enheter).
-
-    Følger analyse.py-formelen:
-        eps_t  = z_smooth[t] - T @ z_smooth[t-1]
-        bidrag = scale * H[obs, :] @ (R[:, sidx] * eps_t[sidx])
-    """
+    """Beregn periode-for-periode sjokk-innovasjonsbidrag (for sum/cumulering)."""
     T_obs = len(z_smooth)
     contrib: dict[str, dict[str, list]] = {vn: {SHOCK_NAMES[e]: [] for e in SHOCK_IDX}
                                             for vn in VAR_NAMES}
@@ -210,6 +205,43 @@ def shock_contributions(z_smooth: np.ndarray, h_rows: dict,
                     sc * float(h_row @ (r_col * eps_t[eidx]))
                 )
     return contrib
+
+
+def level_hd(z_smooth: np.ndarray, h_rows: dict, scales: dict,
+             R_pinv: np.ndarray) -> dict:
+    """Full nivå-HD via rekursiv propagasjon gjennom T-matrisen.
+
+    Sjokk-amplitude hentes via pseudo-invers: ε_t = R⁺ @ (z_t - T @ z_{t-1}),
+    slik at sum_j R[:,j]*ε_j(t) = proj_{col(R)}(residual) ≈ residual.
+    Dette gir nøyaktig additivitet: Σ_j bidrag_j + initial ≈ H @ z_t.
+    """
+    T_obs  = len(z_smooth)
+    result: dict[str, dict[str, list]] = {
+        vn: {**{SHOCK_NAMES[e]: [] for e in SHOCK_IDX}, "initial": []}
+        for vn in VAR_NAMES
+    }
+
+    c_state  = {eidx: np.zeros(NZ) for eidx in SHOCK_IDX}
+    z0_state = z_smooth[0].copy()
+
+    for t in range(1, T_obs):
+        residual   = z_smooth[t] - T @ z_smooth[t-1]
+        eps_shocks = R_pinv @ residual          # (NE,) sjokk-amplituder
+        z0_state   = T @ z0_state
+
+        # Oppdater tilstandsbidrag for alle sjokk (EN gang per tidssteg)
+        for eidx in SHOCK_IDX:
+            c_state[eidx] = T @ c_state[eidx] + R[:, eidx] * eps_shocks[eidx]
+
+        for vn in VAR_NAMES:
+            h_row = h_rows[vn]
+            sc    = scales[vn]
+            result[vn]["initial"].append(sc * float(h_row @ z0_state))
+            for eidx in SHOCK_IDX:
+                result[vn][SHOCK_NAMES[eidx]].append(
+                    sc * float(h_row @ c_state[eidx])
+                )
+    return result
 
 # H-rader fra observasjonsmatrisen (obs-rom → korrekte enheter)
 # OBS_NAMES-rekkefølge: dy_obs(0), dc_obs(1), ..., pi_obs(5), ..., i_R_obs(7), ..., ds_obs(9)
@@ -226,16 +258,41 @@ _scales  = {'Y': 1.0, 'PI': 1.0, 'I_R': 4.0, 'RER': 1.0}
 contrib_pre  = shock_contributions(z_pre,  h_rows, _scales)
 contrib_post = shock_contributions(z_post, h_rows, _scales)
 
+# Pseudo-invers av R for nøyaktig sjokk-attributering
+R_pinv = np.linalg.pinv(R)  # (NE × NZ)
+
+# Nivå-HD via rekursiv propagasjon
+print("  Beregner nivå-HD (rekursiv propagasjon gjennom T)...")
+lvl_pre  = level_hd(z_pre,  h_rows, _scales, R_pinv)
+lvl_post = level_hd(z_post, h_rows, _scales, R_pinv)
+
 hd = {
-    "pre":  {vn: {s: v for s, v in contrib_pre[vn].items()}  for vn in VAR_NAMES},
-    "post": {vn: {s: v for s, v in contrib_post[vn].items()} for vn in VAR_NAMES},
+    # Periode-for-periode innovasjonsbidrag (brukes til å sjekke additivitet)
+    "innov_pre":  {vn: {s: v for s, v in contrib_pre[vn].items()}  for vn in VAR_NAMES},
+    "innov_post": {vn: {s: v for s, v in contrib_post[vn].items()} for vn in VAR_NAMES},
+    # Nivå-bidrag akkumulert via T-propagasjon (dette er HD-plottet)
+    "level_pre":  {vn: dict(lvl_pre[vn])  for vn in VAR_NAMES},
+    "level_post": {vn: dict(lvl_post[vn]) for vn in VAR_NAMES},
     "dates_pre":  [str(d.date()) for d in dates_pre[1:]],
     "dates_post": [str(d.date()) for d in dates_post[1:]],
 }
 
 json.dump(hd, open(RESULTS / "kj41_hd.json", "w"), indent=2)
 print(f"HD lagret: {RESULTS/'kj41_hd.json'}")
-print("HD-bidrag: periode-for-periode innovasjonsbidrag i observerbare enheter (%, pp)")
-print("For kumulativ nivå-HD: bruk sum(contrib[:t]) for hvert t (implementeres i v2).")
+
+# Sanity-sjekk: sjokk-sum + initial ≈ H @ z_smooth (observert nivå)
+print("\n  Sanity-sjekk nivå-HD (post-COVID I_R, siste kvartal):")
+last_t = -1
+total_contrib = sum(
+    lvl_post["I_R"].get(SHOCK_NAMES[e], [0])[last_t] for e in SHOCK_IDX
+) + lvl_post["I_R"]["initial"][last_t]
+actual = _scales["I_R"] * float(h_rows["I_R"] @ z_post[last_t])
+print(f"    Sum sjokk+initial: {total_contrib:.4f}  Faktisk H@z: {actual:.4f}  "
+      f"Diff: {abs(total_contrib-actual):.2e}")
+
+print("\n  Post-COVID I_R nivåbidrag siste kvartal (annualisert %):")
+for s, vals in sorted(lvl_post["I_R"].items(),
+                      key=lambda x: abs(x[1][last_t]), reverse=True):
+    print(f"    {s:22s}  {vals[last_t]:+.4f}%")
 
 print("\nkj41_fevd_hd fullført.")
