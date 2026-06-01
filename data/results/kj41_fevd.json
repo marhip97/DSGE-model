@@ -1,0 +1,130 @@
+{
+  "Y": {
+    "q4": {
+      "TFP": 0.0,
+      "Konsum": 74.9,
+      "Prismarkup": 0.8,
+      "Oljepris": 20.1,
+      "Utenl.ettersp.": 2.6,
+      "Risikopremie": 0.4,
+      "Pengepolitikk": 0.2,
+      "Bolig": 1.0
+    },
+    "q8": {
+      "TFP": 0.0,
+      "Konsum": 72.6,
+      "Prismarkup": 0.9,
+      "Oljepris": 19.2,
+      "Utenl.ettersp.": 2.5,
+      "Risikopremie": 0.4,
+      "Pengepolitikk": 0.2,
+      "Bolig": 4.2
+    },
+    "q20": {
+      "TFP": 0.1,
+      "Konsum": 66.3,
+      "Prismarkup": 1.1,
+      "Oljepris": 16.0,
+      "Utenl.ettersp.": 2.1,
+      "Risikopremie": 0.3,
+      "Pengepolitikk": 0.2,
+      "Bolig": 14.0
+    }
+  },
+  "PI": {
+    "q4": {
+      "TFP": 2.3,
+      "Konsum": 39.7,
+      "Prismarkup": 46.9,
+      "Oljepris": 8.8,
+      "Utenl.ettersp.": 1.2,
+      "Risikopremie": 0.3,
+      "Pengepolitikk": 0.1,
+      "Bolig": 0.7
+    },
+    "q8": {
+      "TFP": 2.2,
+      "Konsum": 38.5,
+      "Prismarkup": 45.1,
+      "Oljepris": 8.7,
+      "Utenl.ettersp.": 1.2,
+      "Risikopremie": 0.2,
+      "Pengepolitikk": 0.2,
+      "Bolig": 4.0
+    },
+    "q20": {
+      "TFP": 1.7,
+      "Konsum": 35.5,
+      "Prismarkup": 35.6,
+      "Oljepris": 6.8,
+      "Utenl.ettersp.": 0.9,
+      "Risikopremie": 0.2,
+      "Pengepolitikk": 0.2,
+      "Bolig": 19.0
+    }
+  },
+  "I_R": {
+    "q4": {
+      "TFP": 0.0,
+      "Konsum": 83.6,
+      "Prismarkup": 0.4,
+      "Oljepris": 0.2,
+      "Utenl.ettersp.": 0.2,
+      "Risikopremie": 0.0,
+      "Pengepolitikk": 15.5,
+      "Bolig": 0.0
+    },
+    "q8": {
+      "TFP": 0.0,
+      "Konsum": 86.5,
+      "Prismarkup": 0.4,
+      "Oljepris": 0.2,
+      "Utenl.ettersp.": 0.2,
+      "Risikopremie": 0.0,
+      "Pengepolitikk": 12.6,
+      "Bolig": 0.1
+    },
+    "q20": {
+      "TFP": 0.0,
+      "Konsum": 85.7,
+      "Prismarkup": 0.2,
+      "Oljepris": 0.2,
+      "Utenl.ettersp.": 0.1,
+      "Risikopremie": 0.0,
+      "Pengepolitikk": 9.2,
+      "Bolig": 4.5
+    }
+  },
+  "RER": {
+    "q4": {
+      "TFP": 0.4,
+      "Konsum": 12.8,
+      "Prismarkup": 7.5,
+      "Oljepris": 69.4,
+      "Utenl.ettersp.": 0.2,
+      "Risikopremie": 4.8,
+      "Pengepolitikk": 0.5,
+      "Bolig": 4.3
+    },
+    "q8": {
+      "TFP": 0.3,
+      "Konsum": 10.1,
+      "Prismarkup": 6.3,
+      "Oljepris": 53.5,
+      "Utenl.ettersp.": 0.1,
+      "Risikopremie": 3.7,
+      "Pengepolitikk": 0.4,
+      "Bolig": 25.5
+    },
+    "q20": {
+      "TFP": 0.1,
+      "Konsum": 5.2,
+      "Prismarkup": 2.6,
+      "Oljepris": 19.7,
+      "Utenl.ettersp.": 0.1,
+      "Risikopremie": 1.4,
+      "Pengepolitikk": 0.2,
+      "Bolig": 70.6
+    }
+  }
+}
