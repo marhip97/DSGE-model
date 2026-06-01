@@ -188,6 +188,62 @@ tilpasning" med separat begrunnelse.
 
 Hvis Spor A eller C avdekker større problemer, kan dette utvides.
 
+## Fase 0.75 — Sandkasse: Full modellprestasjon mot NB 🚧
+
+**Startet 2026-05-30.** PE gir full sandkasse-fullmakt: alle endringer inkludert
+modellstruktur, nye sjokk/tilstandsvariabler og observasjonsvariabler — uten
+eskalering — så lenge endringene er konsistente med normal DSGE-praksis og
+NBs NEMO-dokumentasjon.
+
+**Motivasjon:** kj34 (psi_R=0.88) gir RMSE(16pt NB)=0.200, men alle variabler
+returnerer for raskt til null etter q4. Systematisk persistensunderskudd i Y, PI,
+I_R og RER q8–q12 vs NB Memo 3/2024 Figur 1.
+
+| Horisont | Y avvik | PI avvik | I_R avvik | RER avvik |
+|----------|---------|----------|-----------|-----------|
+| q4       | −13%    | −60%     | +11%      | +47%      |
+| q8       | −56%    | −90%     | +94%      | −79%      |
+| q12      | −87%    | Feil fortegn | +374% | Feil fortegn |
+
+**Exit-strategi:** kj31 (RMSE=0.353) og kj34 (RMSE=0.200) bevares som referanselinjer.
+
+**Suksesskriterium:** RMSE(16pt NB) ≤ 0.150, PI q4 ≥ 0.70× NB, PSRF < 1.10.
+
+### Spor A — Datagrunnlag (kj35, betinget)
+
+- A1: KPI total vs KPI-JAE — sammenlign PI-identifikasjon
+- A2: Importprisvekst som observasjonsvariabel (dpM_obs) — NB-konsistent
+- A3: Dataperiode post-COVID — sjekk lengde og identifikasjonsevne
+
+### Spor B — Modellstruktur (kj35–kj37)
+
+- B1: Parametersweep — gamma_p, kappa_M, h_c, rho_s, phi_PQ vs RMSE(16pt)
+- B2: Dogmatisk prior for vinnende parameter(e) — kj35
+- B3: Finansiell friksjon phi_B fri (kj36, betinget)
+- B4: xi_w / xi_p lønns-/prisrigiditet fri (kj37, betinget)
+- B5: NEMO complete documentation gjennomgang for manglende mekanismer
+
+### Spor C — Estimering (kj38, betinget)
+
+- C1: FEVD — varians-dekomposisjon Y/PI/I_R/RER per sjokk
+- C2: sigma_rp diagnose (nå 0.016, K&M: 0.006)
+- C3: Tettere prior-struktur basert på Spor A–B-funn
+- C4: Taylor-regel koeffisienter (psi_P1, psi_Y) sweep
+
+### Spor D — Modellutvidelser (kj39+, betinget)
+
+Kjøres hvis Spor A–C ikke gir RMSE ≤ 0.150.
+
+- D1: h_c fri med Beta(5,2)-prior (i stedet for fast 0.938)
+- D2: Importprisinflasjonskanal — korrekt NEMO-spec verifisering
+- D3: Persistent pengepolitikk-komponent Z_t (NE: 13→14)
+
+**Verktøy:** `scripts/sandkasse_diagnostikk.py` — parametersweep, FEVD, datavergining.
+**Logging:** `data/results/mcmc_log.md` under seksjoner "Sandkasse A/B/C/D".
+**Kjøringer:** kj35–kj49 reservert.
+
+---
+
 ## Fase 1 — Faktisk datainnhenting 🚧
 
 **Mål:** Erstatte syntetisk fallback med ekte API-kall.

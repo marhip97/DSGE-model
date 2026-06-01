@@ -30,6 +30,7 @@ from scipy.special import betaln, gammaln
 
 from nemo.model.equations import (
     build_matrices_v3, build_matrices_pi4chain, build_matrices_altB,
+    build_matrices_v3_forward,
     NZ, NZ_PI4, NZ_ALTB, NE,
     Y, C, INV, INV_H, X, M, PI, W, I_R, RER, S, PO, YS,
     Q_H, B_NW, C_NW, I_D, I_L_NW, L, MC,
@@ -80,6 +81,7 @@ PSI_R_KJ25_FIXED = 0.90
 # fra data (posterior var prior-dominert). kj26 fjerner dette og estimerer rho_s genuint.
 PHI_I1_KJ26_FIXED = 12.54   # K&M Tabell 8 (complete doc. s.59): kj25 brukte 0.50 (25× for lav)
 PHI_PQ_KJ26_FIXED = 669.0   # K&M Tabell 8 (complete doc. s.59): kj25 brukte 300 (2× for lav)
+PHI_PQ_KJ38_FIXED = 200.0   # Sandkasse kj38+: kappa_P=0.15, forbedrer PI.q4≈NB
 # lambda_pi4: vekt på samtid π i hybrid Taylor-regel (0=ren E_t[π_{t+4}], 1=samtid)
 LAMBDA_PI4_FIXED = 0.0
 # psi_R: fryses til K&M=0.667 for kj21-diagnose — test om psi_R→0.956 er rotårsak

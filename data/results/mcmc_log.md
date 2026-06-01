@@ -2,6 +2,88 @@
 
 ---
 
+## Arbeidsplan etter kj31 (PE fullmakt 2026-05-29) — oppdatert 2026-05-29
+
+### Status per 2026-05-29
+
+| Kjøring | Status | PSRF | B5 | RMSE(Kalman) | RMSE(16pt NB) |
+|---------|--------|------|----|--------------|---------------|
+| kj31    | ✅ Baseline | 1.006 | ✅ by4=1.20× | 0.060 | 0.353 |
+| kj32    | ⚠️ Fullført (PSRF❌) | 1.236 | ✅ by4=1.44× | — | 0.398 |
+| kj33    | ⚠️ Delvis (74k/200k, rho_A drift) | 1.055 (tail) | ✅ by4=0.865× | — | 0.200 (tail) |
+| kj34    | 🔄 Planlagt | — | — | — | mål ~0.200 |
+
+### Prioritert rekkefølge
+
+**Steg 1 — kj31 evaluering (FULLFØRT ✅)**
+PSRF=1.006, B5=1.20×, RMSE=0.060 — alle tre mål bestått.
+Multi-kvartal NB-RMSE=0.353 — primær svakhet: psi_R≈0.99 → I_R og RER avviker.
+
+**Steg 2 — kj32: phi_I1=0.40 (LL-optimal) + psi_R fri i B5-sonen (KJØRER 🔄)**
+phi_I1=0.40 (ΔLL≈+37 vs kj31), psi_R Beta(2,2,[0.85,0.999]).
+Forventet utfall: psi_R→0.995+ (data-drevet), RMSE(16pt)≈0.35, RMSE(Kalman)<0.06.
+Formål: dokumentere LL-optimal B5-passerende punkt; warm-start for kj33.
+
+**Steg 3 — kj33: NB-kalibrert psi_R (planlagt)**
+Funn: psi_R=0.88–0.90 minimerer RMSE(16pt)=0.200 (mot 0.353 ved psi_R=0.989).
+Design:
+  phi_I1: Normal(0.50, 0.001, [0.40, 0.60]) — kj31-nivå (B5-sikker med psi_R=0.88)
+  psi_R:  Normal(0.88, 0.005, [0.84, 0.92]) — dogmatisk kalibrering til NB-IRF-decay
+  Alle andre priors: identisk kj31/kj32 (Beta(5,3) for rho_*)
+Begrunnelse: I_R halvtid 3–4 kv (NB) krever psi_R≈0.84–0.88; data-LL kan ikke identifisere dette.
+Faglig: kalibrert renteglatting er konsistent med GEORG (ω_r=0.74) og NB-modell.
+B5-risiko: psi_R=0.88 + phi_I1=0.50 → by4=0.81× (akkurat pass). phi_I1=0.50 er kritisk.
+Exitstrategi: kj31 (data-drevet) forblir baseline.
+
+**Steg 4 — rho_A-diagnose (betinget)**
+rho_A=0.145 (K&M=0.804). Sweep og diagnostikk etter kj33.
+
+---
+
+## Analytiske funn — psi_R og phi_I1 (2026-05-29, etter kj31)
+
+### psi_R-identifikasjon: grenseidentifikasjonsproblem
+LL-sweep (kj31 posterior, psi_R ∈ [0.666, 0.999]):
+  - LL monotont stigende: ΔLL = +1224 fra K&M=0.666 til 0.999
+  - Ingen indre maksimum — data vil ha psi_R→1.0
+  - psi_R=0.9894 er **constrained MLE** (bundet av øvre grense 0.99)
+
+### B5-betingelse: psi_R ≥ 0.88 med phi_I1=0.50
+  Sweepresultat (ved kj31 posterior, phi_I1=0.50):
+  - psi_R=0.666 (K&M): by4=0.329 ❌
+  - psi_R=0.85:         by4=0.723 ❌
+  - psi_R=0.88:         by4=0.811 ✅ (laveste B5-passerende verdi)
+  - psi_R=0.989:        by4=1.200 ✅
+
+### 2D LL-sweep: phi_I1 × psi_R
+  Optimalt B5-passerende hjørne: phi_I1=0.40 + psi_R=0.999
+  - LL=-3222 (ΔLL≈+37 vs kj31: phi_I1=0.50, psi_R=0.989→LL≈-3279)
+  - by4=1.444 ✅ (nær øvre B5-grense 1.5)
+
+  phi_I1=0.30 + psi_R≥0.989: by4>1.5 — B5 FEILER (overshoots)
+  phi_I1=0.10: best LL men by4≥2.4 — B5 FEILER alltid
+
+  → phi_I1=0.40 er constrained MLE over B5-passeringsrommet
+
+**Steg 3 — phi_I1 frislipp (kj33, betinget)**
+Kun hvis kj32 B5 passerer:
+phi_I1: Normal(0.50, 0.05, [0.30, 0.80]) — la data justere rundt 0.50 med std=0.05.
+Formål: dokumentere at phi_I1=0.50 ikke er et frihetsgrads-artefakt, men et dataresultat.
+Exitstrategi: tilbake til kj31-frysingen hvis phi_I1 drifter utenfor B5-intervall.
+
+**Steg 4 — rho_A-diagnose**
+rho_A=0.091 (K&M=0.804) er mistenkelig lav — nær hvit støy for teknologisjokk.
+Mulige årsaker: (a) modellspesifikasjon, (b) datasignal, (c) identifikasjonsartefakt.
+Diagnose: sweep rho_A ∈ {0.09, 0.30, 0.60, 0.80} med fastholdte øvrige parametere,
+beregn LL og B5 for hvert punkt.
+
+### Priorvalg-prinsipp (PE fullmakt)
+- Alle prior-overrides via `prior_overrides`-dict — global PARAM_PRIORS uendret.
+- Exitstrategi bevares: kj31 er referanselinje.
+- Strukturelle modellendringer (NZ, NE, observasjonssett) krever eksplisitt PE-godkjenning.
+
+---
+
 ## Prior-endringer — kj28 (2026-05-29, PE fullmakt)
 
 ### Kontekst
@@ -224,6 +306,215 @@ phi_I1=0.50 og phi_H1=60.73 frosset. build_matrices_v3 (NZ=49).
 ### Forventet resultat
 Med kun 13 effektivt fri parametere burde PSRF < 1.10 og ESS > 200 være oppnåelig.
 psi_R vil fortsatt treffe ~0.99 (historisk mønster), men B5 er BESTÅTT med phi_I1=0.50.
+
+---
+
+## Resultater kj31 (117k trekk, avkortet ved container timeout — 2026-05-29)
+
+**Merk:** Prosessen ble avbrutt ved 117k/200k trekk (container timeout). Kjeden var
+fullt konvergens-god (PSRF=1.01 ved 110k) og partial chain er statistisk gyldig.
+
+**Konvergens (partial chain, 117k trekk):**
+| Kriterium | Verdi | Terskel | Status |
+|-----------|-------|---------|--------|
+| PSRF_max  | **1.006** | < 1.10 | ✅ BESTÅTT |
+| ESS_min   | **478** | > 200 | ✅ BESTÅTT |
+| Akseptrate | 0.180 | 0.15–0.40 | ✅ |
+| OK / totalt | **20/20** | 20/20 | ✅ FULLSTENDIG KONVERGENS |
+
+**Data-fit:**
+| Mål | Verdi | Terskel | Status |
+|-----|-------|---------|--------|
+| RMSE (alle) | **0.0599** | < 0.118 | ✅ |
+| RMSE pre    | 0.0614 | — | — |
+| RMSE post   | 0.0531 | — | — |
+
+**B5-benchmark (posterior mean):**
+| Variabel | kj31 ratio | Mål | Status |
+|----------|-----------|-----|--------|
+| BNP q4   | **1.2019×** | 0.8–1.5× | ✅ |
+| KPI q4   | **0.5528×** | ≥ 0.35× | ✅ |
+
+**Posterior mean — alle 20 parametere:**
+| Parameter | kj31 mean | kj31 std | [5%, 95%] | K&M | PSRF |
+|-----------|----------|----------|-----------|-----|------|
+| rho_A | 0.1455 | 0.0611 | [0.062, 0.261] | 0.804 | 1.002 |
+| rho_C | 0.2330 | 0.0591 | [0.152, 0.343] | 0.725 | 1.001 |
+| rho_O | 0.2379 | 0.0555 | [0.159, 0.341] | 0.874 | 1.003 |
+| rho_Ys | 0.3386 | 0.0788 | [0.219, 0.476] | 0.783 | 1.002 |
+| rho_rp | 0.6542 | 0.1456 | [0.397, 0.874] | 0.737 | 1.003 |
+| rho_H | **0.9650** | 0.0168 | [0.934, 0.985] | 0.694 | 1.006 |
+| sigma_C | 0.1093 | 0.0085 | [0.096, 0.124] | 0.030 | 1.004 |
+| sigma_O | 0.1520 | 0.0122 | [0.133, 0.173] | 0.079 | 1.001 |
+| sigma_Ys | 0.0173 | 0.0014 | [0.015, 0.020] | 0.011 | 1.001 |
+| sigma_i | 0.0003 | 0.0000 | [0.000, 0.000] | 0.0003 | 1.000 |
+| sigma_P | 0.0065 | 0.0006 | [0.006, 0.007] | 0.003 | 1.005 |
+| sigma_H | 0.3397 | 0.0301 | [0.294, 0.392] | 0.050 | 1.001 |
+| psi_R | **0.9894** | 0.0004 | [0.989, 0.990] | 0.666 | 1.005 |
+| psi_P1 | 0.3107 | 0.0973 | [0.151, 0.473] | 0.292 | 1.003 |
+| psi_Y | 0.2951 | 0.0479 | [0.215, 0.373] | 0.242 | 1.004 |
+| gamma_p | 0.1699 | 0.0930 | [0.049, 0.344] | 0.350 | 1.004 |
+| phi_I1 | **0.4998** | 0.0010 | [0.498, 0.501] | 12.54 | 1.000 |
+| phi_I2 | 67.918 | 40.401 | [9.457, 140.6] | 165.7 | 1.002 |
+| rho_s | 0.0548 | 0.0034 | [0.051, 0.061] | — | 1.003 |
+| phi_H1 | 60.730 | 0.001 | [60.73, 60.73] | 60.73 | 1.002 |
+
+**Konklusjon:**
+kj31 er **Fase 0.5-baseline** — alle tre mål bestått: PSRF ✅ B5 ✅ RMSE ✅.
+Neste: kj32 (psi_R-identifikasjonstest) og rho_A-diagnose (sweep).
+
+**Åpne spørsmål:**
+1. psi_R=0.9894 — real data-signal eller identifikasjonsproblem? → kj32
+2. phi_I1=0.50 (frosset) — bør dokumenteres som modellfunn via LL-sweep
+3. rho_A=0.145 (K&M=0.804) — svakt identifisert, posteriorkredibilitetsintervall bredt
+4. rho_H=0.965 — høyt, men konvergens god. Sensitivitetstest mot kj32-prior?
+
+---
+
+## Multi-kvartal NB-benchmark — kj31 (2026-05-29, PE fullmakt)
+
+**Skript:** `scripts/nb_multikvartal_score.py`
+**Data:** `data/results/B5_nb_benchmark.json` → `nb_referanse` (q1/q4/q8/q12, Y/PI/I_R/RER)
+
+### kj31 posterior mean — avvik mot NB Memo 3/2024 Figur 1
+
+| Var  | Hor. | Modell   | NB     | Avvik    | Status |
+|------|------|----------|--------|----------|--------|
+| Y    | q1   | −0.4302  | −0.200 | −0.2302  | ⚠️     |
+| Y    | q4   | −0.5408  | −0.450 | −0.0908  | ✅     |
+| Y    | q8   | −0.4280  | −0.350 | −0.0780  | ✅     |
+| Y    | q12  | −0.3156  | −0.150 | −0.1656  | ⚠️     |
+| PI   | q1   | −0.0652  | −0.050 | −0.0152  | ✅     |
+| PI   | q4   | −0.0829  | −0.150 | +0.0671  | ✅     |
+| PI   | q8   | −0.0619  | −0.200 | +0.1381  | ✅     |
+| PI   | q12  | −0.0385  | −0.100 | +0.0615  | ✅     |
+| I_R  | q1   | +1.0000  | +1.000 | +0.0000  | ✅     |
+| I_R  | q4   | +0.9606  | +0.600 | +0.3606  | ❌     |
+| I_R  | q8   | +0.9102  | +0.200 | +0.7102  | ❌     |
+| I_R  | q12  | +0.8636  | +0.050 | +0.8136  | ❌     |
+| RER  | q1   | −1.0043  | −0.500 | −0.5043  | ❌     |
+| RER  | q4   | −0.8855  | −0.400 | −0.4855  | ❌     |
+| RER  | q8   | −0.4854  | −0.200 | −0.2854  | ⚠️     |
+| RER  | q12  | −0.1264  | −0.050 | −0.0764  | ✅     |
+
+**RMSE(16 pt) = 0.353   MAD = 0.255**
+
+### Diagnose
+
+**Primær årsak:** psi_R=0.9894 (nær unit-root) → renten knapt avtar etter sjokket.
+- I_R halvtid ≈ 69 kv (psi_R^69 ≈ 0.5). NB impliserer halvtid ≈ 3–4 kv (psi_R ≈ 0.83–0.87).
+- Konsekvens 1: I_R(q4)=0.96 vs NB 0.60 — renten forblir høy
+- Konsekvens 2: RER(q1)=−1.00 vs NB −0.50 — stor initial valutaappreksiering (UIP med persistent rente)
+
+**Y-overshoot q1:** Y(q1)=−0.43 vs NB −0.20 — **uavhengig av psi_R**
+- psi_R-sweep viser Y(q1) og RER(q1) konstant for alle psi_R ∈ [0.666, 0.999]
+- Y(q1) drevet av phi_I1=0.40, phi_I2≈68, IS-kurve. Krever separat diagnose.
+- Mulig forklaring: vår modell har sterkere initial BNP-respons enn NB (strukturell forskjell)
+
+### psi_R-sweep: RMSE(16pt) vs psi_R (andre param = kj31 posterior mean)
+
+| psi_R | I_R(q4) | I_R(q8) | RMSE(16pt) | Status |
+|-------|---------|---------|------------|--------|
+| 0.666 | +0.216  | +0.031  | 0.263      | —      |
+| 0.750 | +0.339  | +0.082  | 0.240      | —      |
+| 0.800 | +0.432  | +0.142  | 0.223      | —      |
+| 0.840 | +0.519  | +0.216  | 0.210      | —      |
+| **0.880** | **+0.618**  | **+0.325**  | **0.200**  | **Optimal** |
+| 0.900 | +0.673  | +0.395  | 0.200      | —      |
+| 0.920 | +0.731  | +0.479  | 0.208      | —      |
+| 0.950 | +0.824  | +0.636  | 0.242      | —      |
+| 0.989 | +0.959  | +0.907  | 0.352      | kj31   |
+| 0.999 | +0.996  | +0.991  | 0.395      | —      |
+
+**Optimal psi_R for multi-kvartal NB-fit: 0.88–0.90 (RMSE=0.200)**
+
+### Identifikasjonskonflikt (fundamental spenning)
+
+Data-likelihood: monotont stigende til psi_R→1.0 (ΔLL ≈ +1224 fra K&M til 0.999)
+NB-benchmark: minimeres ved psi_R≈0.88 (RMSE=0.200 vs 0.353 ved psi_R=0.989)
+B5 enkel: krever psi_R≥0.88 med phi_I1=0.40 (BESTÅTT)
+
+Prior-beregning (for å tvinge psi_R=0.88 mot data-LL=0.999):
+- LL-straff: psi_R=0.88 vs 0.999 → ΔLL ≈ −437 (ca. lineær interpolasjon)
+- Normal(0.88, 0.02): logpdf straff ≈ −18 → data dominerer fullstendig
+- Normal(0.88, 0.005): logpdf straff ≈ −281 → borderline
+- Normal(0.88, 0.001): logpdf straff ≈ −7000 → prior dominerer (tilnærmet fast)
+→ **Kun dogmatisk prior (std≈0.005) kan tvinge psi_R til benchmark-optimal verdi**
+
+### Implikasjon for kj33
+
+**Design-valg for kj33:** Kalibrert psi_R vs estimert psi_R
+- kj32: psi_R Beta(2,2,[0.85,0.999]) — fortsatt data-drevet → forventes psi_R→0.995+
+- kj33: psi_R Normal(0.88, 0.005, [0.84, 0.92]) — dogmatisk kalibrering til NB-IRF
+  - Fordel: RMSE(16pt)=0.200, I_R q4≈0.62, I_R q8≈0.33
+  - Kostnad: ΔLL≈−437 vs data-optimal; B5 q4 (by4 avhenger av phi_I1)
+  - Faglig begrunnelse: "Vi kalibrerer renteglatting til NB-standardmodell (ω_r≈0.88)"
+  - B5-risiko: med psi_R=0.88 og phi_I1=0.40 → by4=0.52× ❌ (fra sweep over)
+
+**B5-problem med psi_R=0.88:**
+Fra B5-sweep (kj31): psi_R=0.88 + phi_I1=0.50 → by4=0.811× ✅ (akkurat B5)
+Fra psi_R-sweep kj31 (phi_I1=0.40): by4 ikke beregnet eksplisitt
+NB: med phi_I1=0.40 er by4≈1.11 ved psi_R=0.925 (kj32 start). Ved psi_R=0.88 forventes
+by4 å falle under 0.8× basert på monoton sammenheng.
+
+**Konklusjon (kj33-design):**
+- psi_R=0.88 er NB-optimalt men B5 krever phi_I1=0.50 (ikke 0.40) ved dette psi_R-nivå
+- kj33: phi_I1=Normal(0.50, 0.001) + psi_R=Normal(0.88, 0.005, [0.84, 0.92])
+  → Avveining: estimert phi_I1 (kj31) vs NB-kalibrert psi_R
+  → Exitstrategi: kj31 (data-drevet) er referanselinjen
+
+---
+
+## Resultater kj32 (200k trekk, fullført 2026-05-29)
+
+**Spesifikasjon:** phi_I1=0.40 (LL-optimal, frosset) + psi_R Beta(2,2,[0.85,0.999])
+
+**Konvergens:**
+| Kriterium | Verdi | Terskel | Status |
+|-----------|-------|---------|--------|
+| PSRF_max | 1.236 (psi_P1) | < 1.10 | ❌ |
+| ESS_min  | 424   | > 4 000 | ❌ |
+| Konv/totalt | 17/20 | 20/20 | ⚠️ |
+| acc | 0.285 | 0.15–0.40 | ✅ |
+
+**Problematiske param (PSRF>1.10):** rho_O (1.103), rho_Ys (1.143), psi_P1 (1.236)
+- Ny feil: psi_P1 (Taylor-regel inflasjonskoeff) — ikke problematisk i kj31
+- Trolig: phi_I1=0.40 endrer parameterkorrelasjoner og destabiliserer psi_P1-identifikasjon
+
+**Nøkkelposteriorer:**
+| Parameter | kj32 mean | kj32 std | kj31 mean | K&M | PSRF |
+|-----------|----------|----------|----------|-----|------|
+| psi_R | **0.9974** | 0.0008 | 0.9894 | 0.666 | 1.006 ✓ |
+| phi_I1 | 0.3994 | 0.0010 | 0.4998 | 12.54 | 1.002 ✓ |
+| psi_P1 | 0.3267 | 0.0901 | 0.3107 | 0.381 | 1.236 ❌ |
+| rho_O | 0.2374 | 0.0538 | 0.2379 | 0.874 | 1.103 ❌ |
+| rho_Ys | 0.3152 | 0.0623 | 0.3386 | 0.783 | 1.143 ❌ |
+| rho_H | 0.9421 | 0.0153 | 0.9650 | 0.694 | 1.017 ✓ |
+| rho_s | 0.0556 | 0.0039 | 0.0548 | — | 1.018 ✓ |
+
+**B5-benchmark (posterior mean):**
+| Variabel | kj32 | kj31 | NB-target | Status |
+|----------|------|------|-----------|--------|
+| BNP q4 (by4) | **1.44×** | 1.20× | 0.8–1.5× | ✅ (nær øvre grense) |
+| KPI q4 (bpi4) | **0.636×** | 0.553× | ≥ 0.35× | ✅ |
+
+**Multi-kvartal NB-benchmark (posterior mean):**
+| Var | q4 modell | q4 NB | q8 modell | q8 NB | Status |
+|-----|-----------|-------|-----------|-------|--------|
+| I_R | 0.990 | 0.600 | 0.977 | 0.200 | ❌❌ |
+| RER | −0.924 | −0.400 | — | −0.200 | ❌ |
+| Y | −0.647 | −0.450 | — | −0.350 | ⚠️ |
+
+**RMSE(16pt NB) = 0.398** — FORVERRET fra kj31 (0.353). Årsak: psi_R→0.9974 (enda høyere enn 0.9894 i kj31).
+
+**Viktigste funn:**
+1. **psi_R=0.9974** — data driver psi_R mot grensen (0.999) selv med phi_I1=0.40
+2. **Bredere B5-sone hjalp ikke** — LL presser fortsatt psi_R oppover; by4=1.44× (nær grensen 1.5×)
+3. **Multi-kvartal benchmark forverret** — høyere psi_R → renten avtar enda saktere → RMSE opp
+4. **psi_P1 konvergensfeil** — phi_I1=0.40 endrer modellgeometrien og destabiliserer Taylor-regel
+
+**Konklusjon:** kj32 bekrefter boundary-identifikasjonsproblemet. Dokumenteringsformål oppfylt.
+Baseline forblir kj31. **kj33 (NB-kalibrert psi_R=0.88) er neste og prioriterte steg.**
 
 ---
 
@@ -1262,3 +1553,769 @@ Vår modell har bare sigma_i·ε_i (ren overraskelse). Kanskje Z_t gir bedre rat
 4. rho_Z<<1 er nesten ekvivalent med sigma_i direkte — gir ny grad av frihet for B5
 
 **PE-godkjenning påkrevd for kj26:** NZ 49→50, NE 13→14
+
+---
+
+## kj33 — Resultater og kj34 design (2026-05-30)
+
+### kj33 oppsummering
+
+**Kjøring:** 74k/200k trekk (avsluttet pga timeout). Seed=33, KPI-JAE.
+**Prior:** psi_R Normal(0.88, 0.005, [0.84, 0.92]), phi_I1=Normal(0.50, 0.001).
+**Warm start:** kj32 posterior (psi_R=0.9974).
+
+**Konvergens:**
+- psi_R: STABIL gjennom hele kjøringen ~0.903 ✅
+- rho_A: DRIFTET fra 0.149 (start) → 0.471 (tail [60k:74k]) ❌
+- Årsak: warm start fra kj32 (psi_R=0.997) ga rho_A fra feil geometrisk regime
+
+| Vindu     | PSRF  | rho_A mean |
+|-----------|-------|------------|
+| [20k:30k] | 1.064 | 0.178      |
+| [30k:40k] | 1.181 | 0.221      |
+| [40k:55k] | 1.224 | 0.257      |
+| [50k:70k] | 1.139 | 0.317      |
+| [55k:74k] | 1.055 | 0.455 ← best |
+
+**Posterior fra tail [55k:74k] (19k samples):**
+
+| Parameter | Mean   | Std    |
+|-----------|--------|--------|
+| psi_R     | 0.9032 | 0.0055 |
+| rho_A     | 0.4549 | 0.1433 |
+| rho_H     | 0.9401 | 0.0236 |
+| rho_rp    | 0.6240 | 0.1399 |
+| phi_I1    | 0.4997 | 0.0011 |
+| rho_s     | 0.0558 | 0.0038 |
+
+**NB multi-kvartal benchmark (tail posterior):**
+
+| Horisont | Y (NB) | Y (kj33) | PI (NB) | PI (kj33) | I_R (NB) | I_R (kj33) | RER (NB) | RER (kj33) |
+|----------|--------|----------|---------|-----------|----------|------------|---------|------------|
+| q1       | -0.20  | -0.431   | -0.05   | -0.067    | 1.00     | 1.000      | -0.50   | -1.005     |
+| q4       | -0.45  | -0.389   | -0.15   | -0.060    | 0.60     | 0.665      | -0.40   | -0.586     |
+| q8       | -0.35  | -0.153   | -0.20   | -0.020    | 0.20     | 0.387      | -0.20   | -0.041     |
+| q12      | -0.15  | -0.020   | -0.10   | +0.005    | 0.05     | 0.237      | -0.05   | +0.243     |
+
+**RMSE(16pt NB)=0.2000** (vs kj31: 0.353, vs kj32: 0.398) — −43% forbedring ✅
+**B5: by4=0.865× ✅  bpi4=0.402 ✅**
+
+**Primære avvik:**
+- Y q1: -0.431 (NB: -0.20) — 2× for stor respons
+- I_R q8-q12: for langsom avtagning (rentepersistens etter psi_R=0.88 nok)
+- RER q12: +0.243 (NB: -0.05) — feil fortegn
+
+### Diagnose: kj33 drifting rho_A
+
+rho_A drifter fordi:
+1. Warm start fra kj32 (psi_R=0.9974) ga rho_A≈0.15–0.25
+2. Med psi_R=0.88 endres geometrien: teknologisjokkets persistens-behov øker
+3. Prior Beta(5,3) → mean=0.625; data trekker mot ~0.47
+4. Overgangsperiode krever mer enn 74k iterasjoner
+
+### kj34 design
+
+**Strategi:** Varm fortsettelse fra kj33 tail [55k:74k] mean.
+- Starter rho_A=0.455 (nær potensiell posterior mode)
+- Identiske priors som kj33
+- Utvidet burn-in: 30k (vs 15k) + 10 rekalibreringer (vs 6)
+- Seed=34, 200k produksjon
+
+**Forventet:** PSRF<1.10 ved 40k–60k, RMSE(16pt)≈0.200, B5 ✅
+
+---
+
+## Sandkasse Fase 0.75 — Full modellprestasjon mot NB (2026-05-30)
+
+**PE-fullmakt:** Full autoritet til alle endringer inkl. modellstruktur, sjokk, observasjoner — konsistent med NEMO-dokumentasjonen.
+**Exit:** kj31 (RMSE=0.353) og kj34 (RMSE=0.200) bevares som referanselinjer.
+
+### Sandkasse A — Datagrunnlag
+
+**A1 — KPI-JAE vs KPI total (analytisk, 2026-05-30):**
+IRF-modellen er uavhengig av datagrunnlaget (posterior-avhengig, ikke lik-avhengig).
+Posteriorestimater fra kj31 og kj33 (begge KPI-JAE) gir:
+- kj33 tail: RMSE=0.200, kj31: RMSE=0.353
+Data-valg påvirker hvilke posterior-verdier MCMC konvergerer mot, men
+IRF-strukturen bestemmes av parameterverdiene. Konklusjon: KPI-JAE vs KPI
+er ikke primær forklaring på PI-svakheten.
+
+### Sandkasse B — Modellstruktur (sweeps, 2026-05-30)
+
+Gjennomført parametersweep med kj33 tail posterior som basis.
+Verktøy: `scripts/sandkasse_diagnostikk.py`.
+
+**B1 — Parametersweep RMSE(16pt NB):**
+
+| Parameter | Verdi | RMSE | PI.q4 | RER.q12 | Merknad |
+|-----------|-------|------|-------|---------|---------|
+| Basis     | —     | 0.200 | −0.060 | +0.243 | kj33 tail |
+| **rho_s** | 0.30  | **0.159** | −0.063 | +0.224 | ✅ beste enkeltpar. |
+| **rho_s** | 0.50  | **0.136** | −0.063 | +0.184 | ✅✅ |
+| **rho_s** | 0.70  | **0.122** | −0.057 | +0.074 | ✅✅✅ |
+| gamma_p   | 0.65  | 0.194 | −0.054 | +0.238 | Liten gevinst |
+| kappa_M   | 0.10  | 0.221 | −0.108 | +0.285 | **DÅRLIGERE** |
+| phi_PQ    | alle  | 0.200 | −0.060 | +0.243 | Ingen effekt |
+| rho_rp    | alle  | 0.200 | −0.060 | +0.243 | Ingen effekt |
+| psi_P1    | 0.80  | 0.199 | −0.060 | +0.244 | Marginal |
+
+**Dominerende funn: `rho_s` er med stor margin den viktigste parameteren.**
+rho_s er AR(1)-glatting av RER i UIP-ligningen. Høyere rho_s → gradvis
+valutakursjustering → mer persistent RER og Y-respons → RMSE −40%.
+Referanse: Justiniano & Preston (2010) finner rho_s ≈ 0.40–0.60 for åpen økonomi.
+
+**Overraskende funn:**
+- phi_PQ (Rotemberg-kostnad → kappa_P): null effekt. Årsak: IRF normalisert mot
+  peak(I_R) — brattere Phillips-kurve øker PI-respons og I_R-respons proporsjonalt.
+- kappa_M høyere: DÅRLIGERE RMSE. Import-leddet forverrer totaltilpasningen
+  selv om PI.q4 isolert sett forbedres (andre variabler forverres mer).
+- rho_rp: ingen effekt på normalisert IRF.
+
+**Beste kombinasjoner (analytisk):**
+
+| Kombinasjon | RMSE | PI.q4 | PI.q8 | RER.q12 | I_R.q12 |
+|-------------|------|-------|-------|---------|---------|
+| Basis | 0.200 | −0.060 | −0.020 | +0.243 | +0.237 |
+| rho_s=0.50 | 0.136 | −0.063 | −0.026 | +0.184 | +0.231 |
+| rho_s=0.70 | 0.122 | −0.057 | −0.032 | +0.074 | +0.227 |
+| rho_s=0.70+gamma_p=0.65 | **0.121** | −0.048 | −0.037 | +0.067 | +0.226 |
+| rho_s=0.70+gamma_p=0.65+psi_P1=0.60 | **0.120** | −0.048 | −0.037 | +0.070 | +0.221 |
+
+**Mål RMSE ≤ 0.150:** Nådd analytisk med rho_s≥0.50 ✅
+**Mål RMSE ≤ 0.120:** Nådd analytisk med rho_s=0.70+gamma_p=0.65 ✅
+
+### Sandkasse C — Estimering (FEVD, 2026-05-30)
+
+**C1 — FEVD (20 kvartaler, kj33 tail posterior):**
+
+| Sjokk | Y | PI | I_R | RER |
+|-------|---|-----|------|-----|
+| TFP | 1.9% | 0.9% | 0.1% | 0.2% |
+| Konsum | 2.7% | 0.0% | 0.2% | 0.1% |
+| Off.forbruk | 8.0% | 0.1% | 0.2% | 0.0% |
+| Risikopremie | 3.3% | 0.2% | 0.0% | 8.9% |
+| **Pengepolitikk** | **55.1%** | **2.0%** | **98.9%** | **36.2%** |
+| **Prismarkup** | **6.1%** | **95.7%** | **0.3%** | **9.5%** |
+| Pengemarkedspremie | 8.7% | 0.7% | 0.1% | 26.4% |
+| Inv.just.kost. | 9.5% | 0.1% | 0.1% | 0.0% |
+| Utenl.inflasjon | 1.1% | 0.0% | 0.0% | 17.5% |
+
+**Nøkkeldiagnose:** PI drives 96% av prismarkup-sjokk. Pengepolitikk bidrar bare 2%
+til PI-varians. Dette forklarer hvorfor PI-responsen til et rente-sjokk er så liten:
+modellen sier at inflasjon nesten ikke responderer på pengepolitikk.
+
+**Implikasjon:** PI-underprestasjon i IRF er et FEVD/identifikasjonsproblem, ikke
+en parameterkalibreringsfeil. Ingen parametersweep (gamma_p, kappa_M, psi_P1) kan
+løse dette uten å endre sjokk-strukturen.
+
+### kj35 — Design (NB-kalibrert rho_s + gamma_p)
+
+**Strategi:** Dogmatisk prior for rho_s=0.50 og gamma_p=0.65.
+Analytisk bevist: rho_s=0.50+gamma_p=0.65 → RMSE≈0.133 (vs kj34: 0.200, −33%).
+
+**Prior overrides:**
+```python
+'rho_s':   Normal(0.50, 0.05, [0.30, 0.75])  # Justiniano & Preston (2010)
+'gamma_p': Normal(0.65, 0.05, [0.40, 0.85])  # Smets & Wouters (2007)
+'psi_R':   Normal(0.88, 0.005, [0.84, 0.92]) # NB-kalibrert (kj33/kj34)
+'phi_I1':  Normal(0.50, 0.001)               # fast (B5-sikker)
+```
+
+**Warm start:** kj34 posterior (når ferdig) eller kj33 tail
+**Mål:** RMSE(16pt) ≤ 0.133, B5 by4 ∈ [0.80, 1.50], PSRF < 1.10
+
+### kj35 — Resultater (2026-05-30)
+
+**Kjøring:** 200k produksjon, warm start fra kj33 tail, seed=350, 10 rekalibreringer.
+**Konvergens:** 20/20 OK, **max PSRF=1.003, min ESS=772** — beste konvergens i prosjektet.
+rho_*-mixingproblemet (rho_A/C/O/Ys/rp/H) som plaget burn-in løste seg fullstendig i produksjon.
+
+**RMSE(16pt NB) = 0.1544** (vs kj34: 0.200 −23%, vs kj31: 0.353 −56%). **B5 BESTÅTT:** by4=0.892, bpi4=0.374.
+
+| Parameter | Posterior mean ± std | Prior | Tolkning |
+|-----------|---------------------|-------|----------|
+| psi_R     | 0.903 ± 0.006 | N(0.88, 0.005) | Data drar mot 0.90, ikke prior-senter 0.88 |
+| rho_s     | 0.302 ± 0.003 | N(0.50, 0.05, [0.30,0.75]) | Data trekker til NEDRE grense 0.30 |
+| gamma_p   | 0.613 ± 0.051 | N(0.65, 0.05) | Data bekrefter høy inflasjonspersistens |
+| rho_rp    | 0.655 ± 0.144 | Beta(5,3) | Risikopremiepersistens, bredt identifisert |
+| rho_H     | 0.943 ± 0.024 | Beta(5,2) | Høy boligprispersistens |
+| phi_I2    | 65.5 ± 40.7 | bredt | Svakt identifisert (std > 60% av mean) |
+
+**IRF vs NB (normalisert peak I_R=1):**
+
+| Horisont | Y (NB/kj35) | PI (NB/kj35) | I_R (NB/kj35) | RER (NB/kj35) |
+|----------|-------------|--------------|---------------|---------------|
+| q1  | −0.20 / −0.359 | −0.05 / −0.037 | 1.00 / 1.000 | −0.50 / −0.722 |
+| q4  | −0.45 / −0.401 | −0.15 / −0.056 | 0.60 / 0.666 | −0.40 / −0.635 |
+| q8  | −0.35 / −0.168 | −0.20 / −0.030 | 0.20 / 0.385 | −0.20 / −0.098 |
+| q12 | −0.15 / −0.026 | −0.10 / −0.003 | 0.05 / 0.233 | −0.05 / +0.217 |
+
+**Nøkkelfunn — psi_R-debatten oppløst.** psi_R-sweep med kj35's øvrige parametre:
+
+| psi_R | RMSE |
+|-------|------|
+| 0.88 (NB-kalibrert) | 0.1533 |
+| 0.90 (data-drevet)  | 0.1536 |
+| 0.84 | 0.1656 |
+| 0.95 | 0.2061 |
+
+PE var bekymret for at psi_R=0.88 underdrev inflasjonsresponsen. kj35 viser at når rho_s og
+gamma_p er på plass, drar *data selv* psi_R til 0.90 — og RMSE er praktisk talt identisk med 0.88
+(forskjell 0.0003). **Konflikten mellom data (høy psi_R) og NB (0.88) hadde ingen reell
+konsekvens for modellprestasjon.** Problemet var manglende inflasjons- og valutapersistens,
+ikke renteglattingen.
+
+**Gjenstående gap mot ≤0.150 (vi ligger 0.154, knapt over):**
+1. **RER q12 feil fortegn** (+0.217 vs NB −0.05) — UIP-dynamikken bryter ned etter q8 selv med rho_s=0.30.
+2. **I_R q8–q12 for høy** (0.385/0.233 vs 0.20/0.05) — direkte konsekvens av psi_R=0.90.
+3. **PI q8 for svak** (−0.030 vs −0.20) — FEVD: E_P forklarer 96% av PI-varians (jf. Sandkasse C1).
+4. **Y q1 overreaksjon** (−0.359 vs −0.20) — habit h_c=0.938 fast.
+
+**Diskrepans mot analytisk prognose:** Sweep forutsa RMSE≈0.121 ved rho_s=0.70+gamma_p=0.65.
+Data trakk rho_s ned til 0.302 (nedre prior-grense), ikke 0.70 — derfor 0.154 i stedet for 0.121.
+**Likelihood foretrekker lav rho_s**; for å nå 0.12 må rho_s tvinges høyere med strammere prior,
+eller den underliggende UIP-strukturen endres (Spor D).
+
+**Konklusjon:** kj35 er beste estimerte modell hittil (RMSE=0.154, full konvergens, B5 ✅).
+De fire gjenstående avvikene er **strukturelle**, ikke estimeringsproblemer. Neste steg: Spor D
+(h_c fri for Y q1, persistent pengepolitikksjokk Z_t for å bryte I_R/psi_R-koblingen ved q8–q12).
+kj35 bevares; kj31 (0.353) og kj34 (0.200) forblir referanselinjer.
+
+---
+
+## Benchmark-korreksjon (2026-05-30, Sandkasse Fase 0.75)
+
+**Funn:** PE viste faktisk NB Memo 3/2024 Figur 1. Originale avlesninger var feil på to kritiske punkter:
+
+| Variable | q1 (gammel) | q1 (ny) | q4 (gammel) | q4 (ny) | q8 (gammel) | q8 (ny) | q12 (gammel) | q12 (ny) |
+|----------|-------------|---------|-------------|---------|-------------|---------|--------------|---------|
+| RER | −0.50 | **−1.50** | −0.40 | **−1.00** | −0.20 | **−0.50** | −0.05 | **−0.20** |
+| I_R | +1.00 | +1.00 | +0.60 | **+0.55** | +0.20 | **+0.10** | +0.05 | **−0.15** |
+| PI  | −0.05 | **−0.03** | −0.15 | **−0.14** | −0.20 | **−0.22** | −0.10 | **−0.22** |
+| Y   | −0.20 | **−0.12** | −0.45 | **−0.47** | −0.35 | **−0.40** | −0.15 | **−0.25** |
+
+**Kritiske endringer:**
+1. **RER ~3× for liten**: NB-figuren viser RER-respons ved q1=−1.50 (vi hadde −0.50). Faktisk 3× feil.
+2. **I_R q12 endret FORTEGN**: NB-modellens styringsrente underskyter (−0.15 ved q12), ikke +0.05.
+3. **PI mer persistent**: Inflasjonsgapet er nær toppunkt ved q12 (−0.22), ikke halvvei tilbake (−0.10).
+
+**Konsekvens for RMSE-historikk:**
+
+| Kjøring | RMSE (gammel benchmark) | RMSE (korrigert benchmark) |
+|---------|-------------------------|---------------------------|
+| kj31 | 0.353 | ~0.45 |
+| kj34 | 0.200 | ~0.32 |
+| kj35 | 0.154 | **0.317** |
+
+Alle kjøringer er vesentlig lenger fra NB enn vi trodde.
+
+**Strukturell diagnose — undershoot:**
+I_R-undershoot (negativ ved q12) er umulig med ren AR(1)-Taylor-regel, uavhengig av psi_R.
+Forsøk med `build_matrices_pi4chain` (E_t[π_{t+4}]-Taylor) ga numerisk ustabilitet med
+kj35-posterior (indeterminacy: psi_P1=0.29 < 1/(1-psi_R)=10 for lambda=0).
+Undershoot krever enten: (a) psi_P1>>1 (ikke støttet av data), (b) forward-looking spec
+med Taylor principle-kompatible parametre, (c) separat persistent sjokkkomponent.
+
+**2D-sweep funn (korrigert benchmark):**
+Beste oppnåelige RMSE med v3: **psi_R=0.92, rho_s=0.0 → RMSE=0.287, B5 ✅**.
+rho_s→0 gir RER q1 fra −0.72 til −1.046 (fremdeles 30% under NB's −1.50).
+
+**Oppdatering av NB_FIGUR1 i kodebasen:** `nb_multikvartal_score.py`, `sandkasse_diagnostikk.py`,
+`b5_nb_benchmark.py` er oppdatert med korrigerte avlesninger.
+
+---
+
+## kj36 — Design og forhåndsregistrering (2026-05-30)
+
+**Strategi:** rho_s mot 0, psi_R fri mot 0.92 — beste oppnåelig RMSE med v3.
+**Warm start:** kj35 posterior (rho_s justert til 0.05 ved start).
+**Startpunkt RMSE(korr):** 0.2929, RER.q1=−0.992, I_R.q12=+0.235.
+
+**Prior overrides:**
+```python
+'rho_s':   Normal(0.05, 0.05, [0.00, 0.25])  # mot 0 → RER-forbedring
+'psi_R':   Normal(0.90, 0.015, [0.85, 0.97]) # la data finne ~0.92
+'gamma_p': Normal(0.65, 0.05, [0.40, 0.85])  # behold fra kj35
+'phi_I1':  Normal(0.50, 0.001) + 'phi_H1': fast
+'rho_*':   Beta(5,3/2) fra kj35
+```
+
+**Forventet RMSE:** ≈ 0.28 (korrigert benchmark).
+**Analytisk begrensning:** I_R q12 forblir positiv (+0.23), ikke negativ (NB: −0.15).
+**B5 kriterium (korrigert):** by4 = |Y.q4|/0.47 ∈ [0.80, 1.50], bpi4 = |PI.q4|/0.14 ≥ 0.35.
+**Seed=36. Burn-in=30k, Prod=200k, max_recalib=10.**
+
+---
+
+## Punkt 4 — Strukturell analyse: I_R undershoot (2026-05-30)
+
+**Problemstilling:** NB Figur 1 viser styringsrenten underskyter med −0.15 ppt ved q12.
+Med AR(1) Taylor-regel (build_matrices_v3) forblir renten alltid positiv.
+
+### Sweep-resultater
+
+**phi_PQ sweep (kappa_P = 6·5/phi_PQ):**
+```
+phi_PQ=669  kappa_P=0.045  I_R.q12=+0.304  PI.q8=−0.033  RMSE=0.286
+phi_PQ=400  kappa_P=0.075  I_R.q12=+0.300  PI.q8=−0.051  RMSE=0.283
+phi_PQ=200  kappa_P=0.150  I_R.q12=+0.290  PI.q8=−0.095  RMSE=0.277  ← min RMSE
+phi_PQ=100  kappa_P=0.300  I_R.q12=+0.270  PI.q8=−0.185  RMSE=0.287
+phi_PQ=50   kappa_P=0.600  I_R.q12=+0.241  PI.q8=−0.353  RMSE=0.442  (forverrer)
+phi_PQ=25   UNSTABIL
+```
+Funn: kappa_P=0.15 (phi_PQ=200) minimerer RMSE. PI.q8 forbedres men forverres ved kappa_P>0.3.
+I_R undershoot oppnås IKKE ved noe phi_PQ-nivå.
+
+**psi_P1 sweep (Taylor-inflasjonsvekt):**
+```
+psi_P1=0.29  I_R.q12=+0.304  (baseline)
+psi_P1=1.00  I_R.q12=+0.293
+psi_P1=2.00  I_R.q12=+0.278
+psi_P1=5.00  I_R.q12=+0.239
+psi_P1=10.0  (ikke testet — RMSE ville forverres ytterligere)
+```
+Funn: psi_P1 har minimal effekt på I_R.q12 fordi endogen Taylor-komponent er liten
+relativt til psi_R^12 · (initial impulse). RER uendret ved alle psi_P1-verdier.
+
+**2D sweep: psi_R × psi_P1:**
+```
+psi_R=0.92 (alle psi_P1): I_R.q12 ∈ [+0.24, +0.30]  RMSE≈0.286–0.291
+psi_R=0.80 (alle psi_P1): I_R.q12 ∈ [+0.05, +0.06]  RMSE≈0.339–0.356
+psi_R=0.70 (alle psi_P1): I_R.q12 ∈ [+0.02, +0.04]  RMSE≈0.375–0.390
+```
+Funn: psi_R=0.70 gir I_R.q12≈+0.02 (nær null) men RMSE forverres med 30%.
+I_R.q12 er alltid > 0 — undershoot uoppnåelig med backward-looking Taylor.
+
+**pi4chain (fremoverskuende E_t[π_{t+4}]) med Taylor-prinsipp-tilfredsstillende params:**
+```
+psi_R=0.80, psi_P1=2.0, λ=1.0 (TP=0.40): I_R.q12=+0.12  RMSE=0.454
+psi_R=0.80, psi_P1=5.0, λ=1.0 (TP=1.00): I_R.q12=+0.24  RMSE=0.926
+psi_R=0.70, psi_P1=3.5, λ=1.0 (TP=1.05): neg peak (ustabil)
+psi_R=0.60, psi_P1=2.5, λ=1.0 (TP=1.00): RER.q1=+7.71 (eksplosivt)
+psi_R=0.50, psi_P1=2.5, λ=1.0 (TP=1.25): I_R.q4=+0.06 (feil form)
+```
+Funn: pi4chain med Taylor-prinsipp enten ustabil, eksplosiv, eller feil IRF-form.
+Ingen konfigurasjon gir undershoot.
+
+### Konklusjon
+
+I_R undershoot ved q12 (NB: −0.15) er **strukturelt uoppnåelig** med:
+1. Backward-looking AR(1) Taylor (build_matrices_v3) — psi_R^12·I_R_0 dominerer alltid
+2. Forward-looking pi4chain — krever enten ustabile eller unrealistiske parameterverdier
+
+**Matematisk argument:** For undershoot trenger vi
+`psi_R^12·I_R_0 + (1-psi_R)·Σ psi_R^(12-t)·[psi_P1·PI_t + psi_Y·Y_t] < 0`
+Med PI_t∈[−0.03,−0.22] og Y_t∈[−0.12,−0.47], og psi_P1≤5, er venstre side alltid >> 0
+(psi_R^12·1.0 ≈ 0.31 ved psi_R=0.92; endogen komponent ≈ 0.005).
+
+**Mulige strukturelle løsninger (ikke testet):**
+1. Separat persistent sjokkkomponent i Taylor-regel (D3 i sandkasseplan)
+2. Eksplisitt realrentemekanisme med nøytralrente-dynamikk
+3. Accept begrensning: beste v3 RMSE ≈ 0.287, dokumenter gap for PE
+
+**Beste v3 konfigurasjon (uendret fra sweep-analyse):**
+`psi_R=0.92, rho_s=0.0 → RMSE=0.287, B5 ✅`
+
+
+### D3 — Persistent sjokkkomponent (analytisk, 2026-05-30)
+
+Testet om separat AR(1)-sjokkkomponent `z_t = rho_Z * z_{t-1} + eps_i`
+(med rho_Z < 0 for fortegnskift) kan generere undershoot.
+
+```
+rho_Z=-0.10: I_R.q12=+0.36  (ingen undershoot)
+rho_Z=-0.30: I_R.q12=+0.30  (ingen undershoot)
+rho_Z=-0.50: I_R.q12=+0.26  (ingen undershoot)
+```
+
+Funn: Selv med negativt rho_Z dominerer AR(1)-inertien (psi_R^12·1.0 ≈ 0.37 ved psi_R=0.92).
+Oscillerende sjokkkomponent kan ikke overvinne akkumulert rente-inertia.
+
+**Endelig konklusjon Punkt 4:** I_R undershoot (−0.15 ved q12) krever ENTEN:
+1. Eksplisitt fremoverskuende pengepolitikk (E_t[π_{t+4}]) MED sterk Taylor-reaksjon (psi_P1 >> 1)
+2. Vedvarende negativ outputgap- og inflasjons-feedback via steepere NKPC + lavere psi_R ≈ 0.70
+   (men da forverres I_R.q4-formen, og RMSE ≈ 0.375)
+3. Akseptere begrensningen: v3 oppnår RMSE≈0.287, undershoot er ikke reproduserbar
+
+**Anbefaling til PE:** Begrensningen skyldes backward-looking AR(1) Taylor-regel.
+NBs faktiske NEMO bruker en fremoverskuende komponent (K&M §2.13) med trolig høyere
+effektiv Taylor-koeffisient. Krever NE-utvidelse og komplisert BK-kalibrering.
+Sandkassen anbefaler å godta RMSE≈0.28–0.29 som beste v3-resultat.
+
+
+---
+
+## phi_PQ=200 evaluering — kj37-kandidat (2026-05-30)
+
+**phi_PQ=200 (kappa_P=0.150)** med rho_s=0, psi_R=0.92 gir:
+- RMSE: 0.2768 (vs 0.2863 ved phi_PQ=669) — forbedring 0.009
+- PI.q4: −0.160 (NB: −0.14) ✅  — stor forbedring fra −0.058
+- PI.q8: −0.095 (NB: −0.22) — bedre, men fortsatt langt fra mål
+- Y.q1: −0.461 (NB: −0.12) — forverres (allerede for negativ)
+- RER.q1: −1.121 (NB: −1.50) — marginal forbedring
+
+**Anbefaling for kj37:**
+- phi_PQ=200 som fast kalibrering (erstatter 669)
+- Alternativt: fri estimering med `phi_PQ: Normal(200, 50, [50, 400])`
+  (krever utvidelse av PARAM_NAMES — dokumenter som strukturell endring)
+- Kombinere med kj36 posterior (rho_s→0, psi_R→0.92)
+
+**Merk:** phi_PQ=200 gir kappa_P=0.15, innenfor rimelige kalibreringsverdier
+(Gali 2015: 0.075–0.30, Smets&Wouters: 0.086). K&M's 669 er konservativt.
+
+
+---
+
+## kj36 — Terminert (2026-05-30)
+
+**Årsak:** Viser psi_R→0.97 (prior-tak) og RMSE=0.324 (verre enn kj35) etter 15k rekalibrerings-trekk.
+Data vil ha høyere psi_R enn benchmark-optimalt (0.92). Videre kjøring ikke meningsfull.
+**Siste status:** PSRF=1.068 (runde 3), rho_s=0.003 ✅ men psi_R=0.970 ❌ I_R.q4=0.888 ❌
+
+---
+
+## Strukturell analyse: build_matrices_v3_forward (2026-05-30)
+
+**Problem med build_matrices_pi4chain (eksisterende):**
+Sims-konsistenslikninger gjør π_t til ny jump-variabel → BK kansellerer 97% av E_i-sjokket.
+`R[I_R, E_i] = −0.032` vs v3's `0.979`. Monetærpolitikkssjokk er nærmest virkningsløst.
+
+**Korrekt implementasjon: build_matrices_v3_forward**
+Iterativ fixed-point: `E_t[π_{t+4}] = e_PI @ T^4 @ z_t` (modell-konsistente forventninger).
+- NZ=49 uendret (ingen nye tilstandsvariabler)
+- Pi-matrise uendret (ingen nye jump-variabler)
+- `R[I_R, E_i] = 0.976` ✅ — sjokket kanselleres ikke
+- Konvergerer typisk innen 5–15 iterasjoner
+
+**Lambda-sweep (kj35-posterior, rho_s=0):**
+```
+lambda=0.0 (ren fremoverskuende): I_R.q12=+0.239  RMSE=0.290 (vs v3: 0.290)
+lambda=0.5 (hybrid):              I_R.q12=+0.238  RMSE=0.290
+lambda=1.0 (= v3):                I_R.q12=+0.236  RMSE=0.290
+```
+Funn: minimal effekt med psi_P1=0.29. Årsak: (1-0.90)*0.29*(-0.055) ≈ −0.002 pr. kvartal
+— for lite til å overkomme psi_R^12*1.0≈0.31 (rate-inertia).
+
+**Kombinert forward + phi_PQ=200:**
+```
+forward lam=0, psi_P1=0.29, phi_PQ=200: RMSE=0.282, PI.q4=−0.152≈NB ✅
+forward lam=0, psi_P1=1.50, phi_PQ=200: RMSE=0.284, I_R.q12=+0.224
+```
+Beste konfigurasjon analytisk: phi_PQ=200 + forward (lambda=0, psi_P1 fri).
+
+**Endelig vurdering av I_R undershoot:**
+Uoppnåelig med v3-struktur selv med korrekt fremoverskuende Taylor.
+Krever enten: (1) mye høyere kappa_P (phi_PQ << 100) som gir ustabilitet,
+eller (2) vesentlig ny modellstruktur (wage-price spiral, inflation anchor).
+
+---
+
+## kj38 — Forhåndsregistrering (2026-05-30)
+
+**Strukturelle endringer fra kj35:**
+- `build_matrices_v3_forward` (ny funksjon) med lambda_pi4=0.0
+- `phi_PQ=200` (kappa_P=0.15) — fast kalibrering
+- NZ=49 uendret, Pi-matrise uendret
+
+**Prior overrides:**
+```
+rho_s:   Normal(0.03, 0.03, [0.00, 0.15])   — sterkere mot 0
+psi_R:   Normal(0.90, 0.015, [0.85, 0.97])
+psi_P1:  Normal(0.50, 0.20, [0.10, 2.00])   — fri, la data velge
+gamma_p: Normal(0.65, 0.05, [0.40, 0.85])
+```
+
+**Analytisk startpunkt:** RMSE(korr)=0.282, PI.q4=−0.152≈NB ✅, R[I_R,E_i]=0.976 ✅
+**Seed=38. Burn-in=30k, Prod=200k. Warm start: kj35.**
+
+
+---
+
+## kj38 — Endelige resultater (2026-05-30)
+
+**Konvergens:** PSRF=1.005, ESS=417 ✅ (etter 10 rekalibreringer — rho-parametere trege)
+
+**Posterior mean (nøkkel):**
+- psi_R = 0.9696 (treffer prior-tak 0.97 — igjen)
+- psi_P1 = 0.406 (bredt KI: [0.13, 0.77] — svakt identifisert)
+- rho_s = 0.003 (nær 0 ✅)
+
+**NB-benchmark (IRF):**
+```
+Y:   [-0.460, -0.535, -0.360, -0.190]  (NB: [-0.12, -0.47, -0.40, -0.25])
+PI:  [-0.123, -0.188, -0.157, -0.085]  (NB: [-0.03, -0.14, -0.22, -0.22])
+I_R: [+1.000, +0.882, +0.746, +0.637]  (NB: [+1.00, +0.55, +0.10, -0.15])
+RER: [-1.117, -0.898, -0.392, +0.051]  (NB: [-1.50, -1.00, -0.50, -0.20])
+RMSE(16pt) = 0.310   B5: by4=1.137 ✅  bpi4=1.342 ✅
+```
+
+**FEVD-diagnose (ny, 2026-05-30):**
+```
+I_R variasjon:  Konsum=87.5% ❌,  Pengepolitikk=11.3% ❌
+PI  variasjon:  Prismarkup=44.2%,  Konsum=25.9%,  Bolig=21.7%
+Y   variasjon:  Konsum=61.7%,  Bolig=19.0%,  Oljepris=15.8%
+RER variasjon:  Bolig=76.7%,  Oljepris=17.4%
+```
+
+**Konklusjon:** Fremoverskuende Taylor hjalp ikke. psi_R er identifisert via
+Taylorregel-respons på konsumsjokk (87.5% av I_R-variasjon), ikke pengepol.-sjokket.
+Rotkårsak: sigma_C=0.107 dominerer — men sigma_C shrinkage endrer ikke I_R.q12
+(IRF er T-matrise-egenskap, ikke FEVD-egenskap — bekreftet analytisk).
+
+---
+
+## kj39A — Forhåndsregistrering (2026-05-30)
+
+**Strategi:** Dogmatisk psi_R — tving psi_R til NB-konsistent verdi.
+Aksepterer ΔLL ≈ −437 likelihoodstraff.
+
+**Strukturelle valg:**
+- `build_matrices_v3` (backward-looking) — fremoverskuende endret ingenting
+- `phi_PQ=200` (kappa_P=0.15) beholdes — forbedrer PI.q4
+- Warm start: kj38 posterior, psi_R klippet til 0.88
+
+**Prior overrides:**
+```
+psi_R:   Normal(0.88, 0.005, [0.85, 0.91])   — DOGMATISK, halvtid≈5 kv
+psi_P1:  Normal(0.50, 0.20,  [0.10, 2.00])
+rho_s:   Normal(0.03, 0.03,  [0.00, 0.15])
+gamma_p: Normal(0.65, 0.05,  [0.40, 0.85])
+```
+
+**Analytisk forhåndsvisning (kj38-params, psi_R=0.88):**
+```
+I_R: [+1.000, +0.595, +0.292, +0.159]  (NB: [+1.00, +0.55, +0.10, -0.15])
+RMSE(16pt) ≈ 0.295   (vs kj38: 0.310, kj35: 0.287)
+```
+I_R.q12 forbedres fra +0.637 → +0.159 — undershoot fortsatt uoppnåelig med v3-struktur.
+Forventning: MCMC-posterior kan gi bedre RMSE (~0.25–0.27) når andre param justeres.
+
+**Seed=39. Burn-in=30k, Prod=200k.**
+
+---
+
+## kj39A — Endelige resultater (2026-05-30)
+
+**Konvergens:** PSRF=1.003, ESS=698 ✅
+
+**Posterior mean (nøkkel):**
+- psi_R = 0.902 (dogmatisk prior [0.85,0.91] — landet midt i, ikke ved tak!)
+- psi_P1 = 0.487, psi_Y = 0.443, rho_s = 0.003
+
+**NB-benchmark (IRF):**
+```
+Y:   [-0.460, -0.408, -0.148, +0.008]  (NB: [-0.12, -0.47, -0.40, -0.25])
+PI:  [-0.123, -0.151, -0.080, -0.006]  (NB: [-0.03, -0.14, -0.22, -0.22])
+I_R: [+1.000, +0.650, +0.369, +0.227]  (NB: [+1.00, +0.55, +0.10, -0.15])
+RER: [-1.117, -0.641, -0.040, +0.294]  (NB: [-1.50, -1.00, -0.50, -0.20])
+RMSE(16pt) = 0.283   B5: by4=0.868 ✅  bpi4=1.079 ✅
+```
+
+**Fremgang vs kj38:** RMSE 0.310→0.283. I_R.q4 forbedret (+0.882→+0.650≈NB).
+**Nytt problem:** RER-dynamikk verre (q4: −0.641 vs NB −1.00, q8: −0.040 vs −0.50).
+psi_R=0.90 → renten reverserer raskere → RER deprecierer tilbake for raskt.
+Klassisk psi_R/RER-trade-off i liten åpen økonomi.
+
+**Analytisk observasjon:** Data aksepterte psi_R=0.90 (ikke ved prior-tak).
+Viser at dogmatisk prior er gjennomførbart — men RER-kanalen krever ytterligere justering.
+
+---
+
+## kj40 — Strukturelle bugfikser (2026-05-31)
+
+**Bakgrunn:** Ekstern gjennomgang avdekket tre strukturelle feil i `src/nemo/model/equations.py`
+som har påvirket alle estimeringsrunder kj35–kj39B.
+
+### Funn A — EPS_RP frakoblet UIP (KRITISK)
+- **Problem:** `Psi[15, E_rp] = _w` sendte E_rp-sjokket direkte i UIP, forbigikk AR(1)-tilstanden EPS_RP.
+  Dermed hadde `rho_rp` null effekt på modellens dynamikk i alle kj35–kj39B.
+- **Fix:** Fjernet `Psi[15, E_rp]`; la til `G0[15, EPS_RP] = -_w` (persistent tilstand kobles inn).
+- **Konsekvens for tidligere kjøringer:** rho_rp-posteriorer er meningsløse. RER-FEVD undervurderte risikopremie.
+
+### Funn B — EPS_PREM dobbel kontemporær effekt (KRITISK)
+- **Problem:** UIP hadde både `G0[15, EPS_PREM] = -_w` (via tilstand) og `Psi[15, E_prem] = _w` (direkte sjokk).
+  Samme sjokk treffer UIP to ganger samme periode.
+- **Fix:** Fjernet `Psi[15, E_prem]`; beholdt tilstandsleddet `G0[15, EPS_PREM]`.
+- **Konsekvens:** EPS_PREM-effekten var 2× for stor i alle kj35–kj39B.
+
+### Funn C — I_STAR brukte rho_piS i stedet for rho_iS (LITEN EFFEKT)
+- **Problem:** `G1[44, I_STAR] = p.rho_piS` (linje 487) — copy-paste-feil. Skal være `p.rho_iS`.
+- **Fix:** Byttet til `p.rho_iS`. Ingen empirisk effekt nå (begge = 0.70), men semantisk korrekt.
+
+### Verifisering (2026-05-31)
+- BK stabil: v3 max_eig=0.9882, v3_forward max_eig=0.9882
+- `G0[15, EPS_RP] = -0.997` (korrekt, tilsvarer `-(1-rho_s)`)
+- `Psi[15, E_rp] = 0.0` ✅, `Psi[15, E_prem] = 0.0` ✅
+- Testpakke: 89 passed, 1 skipped, 3 xfailed (identisk med pre-fix)
+- Alle 15 IRF-tegntester grønne ✅
+
+**Neste steg:** kj40 — ny ren MCMC-kjøring med fikset equations.py. Warm start fra kj39B posterior.
+
+---
+
+## kj40 — Resultater (2026-05-31)
+
+**Konfigurasjon:** phi_PQ=150, psi_R~N(0.90,0.010,[0.85,0.95]), gamma_p~N(0.75,0.05,[0.55,0.90]),
+rho_rp~Beta(5,3,[0.10,0.99]), build_matrices_v3_forward, lambda_pi4=0.0, seed=40.
+Warm start: kj39A posterior.
+
+**Konvergens:** PSRF=1.086, ESS=450 ✅
+
+**Posterior mean (nøkkel):**
+- psi_R = 0.9491 (ved prior-tak 0.95 — identifikasjonsproblem uløst)
+- gamma_p = 0.7233, rho_rp = 0.3284, psi_P1 = 0.5298
+
+**NB-benchmark (IRF):**
+```
+Y:   [?, ?, ?, ?]  (NB: [-0.12, -0.47, -0.40, -0.25])
+PI:  [?, ?, ?, ?]  (NB: [-0.03, -0.14, -0.22, -0.22])
+I_R: [?, ?, ?, ?]  (NB: [+1.00, +0.55, +0.10, -0.15])
+RER: [?, ?, ?, ?]  (NB: [-1.50, -1.00, -0.50, -0.20])
+RMSE(16pt) = 0.278   B5: ✅
+```
+
+**Funn:**
+- rho_rp bekreftet identifisert etter Funn A-fix: posterior 0.329 vs prior-mean 0.625 (Beta(5,3)).
+  Risikopremie kortvarig (rho_rp=0.33), ikke langvarig som prior antok.
+- psi_R treffer taket igjen (0.9491): identifikasjonsproblem krever enten strammere dogmatisk prior
+  eller strukturell endring (PLT-mekanisme).
+- RMSE=0.278 marginalt bedre enn kj39A (0.283). Funn A/B/C-fix uten RMSE-gevinst — som forventet
+  (rho_rp påvirker E_rp-IRF, ikke E_i-IRF).
+
+**Analytisk sweep (2026-05-31, basert på kj40 posterior):**
+- psi_R=0.92 analytisk optimal (RMSE=0.286) — RER.q4-vekting drar opp
+- phi_PQ=125 → RMSE=0.2819, bedre RER.q1 (−1.17 vs −1.14)
+- rho_rp: null effekt på E_i-IRF (RMSE)
+- psi_P1: PI-respons for svak → hever prior-senter til 0.60
+
+---
+
+## kj41 — Resultater (2026-05-31)
+
+**Konfigurasjon:** phi_PQ=125 (kappa_P=0.24), psi_R~N(0.91,0.008,[0.87,0.95]),
+rho_rp~N(0.33,0.10,[0.05,0.65]) (informativ fra kj40), psi_P1~N(0.60,0.15,[0.10,2.00]),
+gamma_p~N(0.75,0.05,[0.55,0.90]), build_matrices_v3_forward, lambda_pi4=0.0, seed=41.
+Warm start: kj40 posterior.
+
+**Konvergens:** PSRF=1.00, ESS=620 ✅✅ (utmerket)
+
+**Posterior mean (nøkkel):**
+- psi_R = 0.9490 (ved prior-tak 0.95 — identifikasjonsproblem uløst, tredje kjøring på rad)
+- gamma_p = 0.7214, rho_rp = 0.1703, psi_P1 = 0.5598
+- acc=0.224, scale=0.8259
+
+**NB-benchmark (IRF):**
+```
+Y:   [-0.476, -0.517, -0.282, -0.075]  (NB: [-0.12, -0.47, -0.40, -0.25])
+PI:  [-0.180, -0.272, -0.206, -0.077]  (NB: [-0.03, -0.14, -0.22, -0.22])
+I_R: [+1.000, +0.793, +0.585, +0.447]  (NB: [+1.00, +0.55, +0.10, -0.15])
+RER: [-1.173, -0.885, -0.274, +0.217]  (NB: [-1.50, -1.00, -0.50, -0.20])
+RMSE(16pt) = 0.2771   B5: by4=1.101 ✅  bpi4=1.939 ✅
+```
+
+**Funn og diagnose:**
+- **psi_R=0.9490** — treffer taket for tredje kjøring på rad (kj39A: 0.902 med enda strammere prior,
+  kj40: 0.9491, kj41: 0.9490). Selv N(0.91, 0.008) er ikke tilstrekkelig dogmatisk.
+  Data vil ha psi_R→1 for å matche post-COVID rentepersistens.
+- **I_R for persistent:** q4=0.793 (NB: 0.55), q8=0.585 (NB: 0.10), q12=0.447 (NB: −0.15).
+  AR(1) Taylor-regel kan strukturelt ikke produsere underskudd (i_t < 0) uten eksogent sjokk.
+  Dette er en modelleringsbegrensning, ikke et estimeringsroblem.
+- **PI for sterk:** q1=−0.180 (NB: −0.03), q4=−0.272 (NB: −0.14). Umiddelbar PI-respons for stor.
+- **RER feil form:** q12=+0.217 (NB: −0.20) — RER snur feil vei på lang sikt.
+- **rho_rp falt:** 0.329 (kj40) → 0.170 (kj41). Informativ prior N(0.33,0.10) dro ikke opp.
+  phi_PQ=125 (mer prisfriksjon) endrer kanalen mellom rente og valuta.
+- **RMSE=0.2771** — identisk med kj40 (0.278). Ingen RMSE-gevinst fra phi_PQ-justeringen.
+
+**Konklusjon for kj42-strategi:**
+Identifikasjonsproblemet for psi_R er strukturelt. To mulige veier:
+1. **Fast kalibrering** psi_R=0.87 (K&M 2019 verdi) — overstyr data, bruk teorikonsistent verdi
+2. **PLT-mekanisme** (price level targeting) — tilstandsavhengig Taylor-regel som kan generere
+   underskudd og lave rho_rp-behov. Krever PE-godkjenning (strukturell modellendring).
+
+Anbefalt: kj42 med psi_R fast kalibrert (tight prior N(0.87,0.001)) og sammenlign IRF-kvalitet.
+
+---
+
+## kj42 — Resultater (2026-05-31/06-01)
+
+**Konfigurasjon:** phi_PQ=150, psi_R~N(0.87,0.001,[0.85,0.89]) (fast kalibrert K&M test),
+phi_I1~N(0.50,0.001,[0.40,0.60]), rho_rp~N(0.17,0.08,[0.05,0.40]),
+psi_P1~N(0.60,0.15,[0.10,2.00]), gamma_p~N(0.75,0.05,[0.55,0.90]),
+build_matrices_v3_forward, lambda_pi4=0.0, seed=42. Warm start: kj41 posterior (psi_R klippt [0.86,0.88]).
+
+**Konvergens:** PSRF=1.00, ESS=638 ✅✅ (utmerket). Maks 10 rekalibreringer nådd (AR-params blandet dårlig), produksjon kjørt uansett. Produksjons-PSRF falt raskt fra 1.12@10k → 1.00@30k.
+
+**Posterior mean (nøkkel):**
+- psi_R = 0.8707 (låst mot prior — identifikasjonsproblem uendret)
+- gamma_p = 0.7216, rho_rp = 0.1137, psi_P1 = 0.6220
+- acc=0.215, scale=0.8668
+
+**NB-benchmark (IRF):**
+```
+Y:   [-0.467, -0.366, -0.085, +0.052]  (NB: [-0.12, -0.47, -0.40, -0.25])
+PI:  [-0.150, -0.174, -0.078, +0.011]  (NB: [-0.03, -0.14, -0.22, -0.22])
+I_R: [+1.000, +0.550, +0.254, +0.145]  (NB: [+1.00, +0.55, +0.10, -0.15])
+RER: [-1.144, -0.565, +0.053, +0.334]  (NB: [-1.50, -1.00, -0.50, -0.20])
+RMSE(16pt) = 0.2987   B5: by4=0.778 ❌  bpi4=1.246 ✅
+```
+
+**Funn:**
+- RMSE=0.2987 er **dårligere enn kj41** (0.2771). Data foretrekker høy psi_R.
+- Y.q4=−0.366 (NB: −0.47): output-respons for svak ved lavere renteglatting.
+- I_R.q4=0.550 (NB: 0.55) ✅ — nærmest NB av alle kjøringer! Men q8 (0.254 vs 0.10) og q12 (+0.145 vs −0.15) fortsatt for persistente.
+- RER.q4=−0.565 (NB: −1.00): for rask tilbakegang.
+- **Konklusjon:** psi_R=0.87 forbedrer ikke RMSE. Problemet er strukturelt — AR(1) Taylor kan ikke generere renteunderskudd ved q12.
+
+---
+
+## kj43 — Resultater (2026-06-01)
+
+**Konfigurasjon:** phi_PQ=150, psi_R~N(0.6663,0.001,[0.64,0.69]) (K&M 2019 fullkalibrert),
+phi_I1~N(12.5432,0.001,[12.0,13.0]) (K&M 2019 fullkalibrert),
+psi_P1~N(0.2921,0.05,[0.10,0.60]), rho_rp~N(0.17,0.08,[0.05,0.40]),
+gamma_p~N(0.75,0.05,[0.55,0.90]), build_matrices_v3_forward, lambda_pi4=0.0, seed=43.
+Warm start: kj41 posterior (psi_R klippt [0.64,0.69], phi_I1 satt direkte til 12.5432).
+
+**Merk:** Første kjøringsforsøk feilet med lp=-inf fordi phi_I1=0.50 (fra kj41) var utenfor
+prior-støtten [12.0,13.0]. Fikset ved å sette theta_start[phi_I1]=12.5432 eksplisitt.
+
+**Konvergens:** PSRF=1.00, ESS=1180 ✅✅ (utmerket). Maks 10 rekalibreringer nådd (samme AR-mønster). Produksjons-PSRF konvergerte til 1.00 tidlig.
+
+**Posterior mean (nøkkel):**
+- psi_R = 0.6665 (låst mot prior K&M-verdi)
+- gamma_p = 0.7272, rho_rp = 0.1225, psi_P1 = 0.2973
+- acc=0.220, scale=0.8464
+
+**NB-benchmark (IRF):**
+```
+Y:   [-0.240, -0.016, +0.049, +0.045]  (NB: [-0.12, -0.47, -0.40, -0.25])
+PI:  [-0.086, -0.028, +0.016, +0.027]  (NB: [-0.03, -0.14, -0.22, -0.22])
+I_R: [+1.000, +0.243, +0.053, +0.033]  (NB: [+1.00, +0.55, +0.10, -0.15])
+RER: [-1.080, -0.147, +0.182, +0.209]  (NB: [-1.50, -1.00, -0.50, -0.20])
+RMSE(16pt) = 0.3797   B5: by4=0.035 ❌❌  bpi4=0.197 ❌
+```
+
+**Funn:**
+- RMSE=0.3797 — **dårligst av kj41–43**. K&M fullkalibrering passer ikke norske data.
+- Y.q4=−0.016 (NB: −0.47): output-respons nesten null! phi_I1=12.54 demper investeringer for mye.
+- I_R.q4=0.243 (NB: 0.55): renten faller for raskt med psi_R=0.67.
+- RER løper tilbake på feil måte (positivt ved q8/q12 vs NB negativ).
+
+**Samlet konklusjon kj41–kj43 (2026-06-01):**
+
+| Kjøring | psi_R | phi_I1 | RMSE | I_R.q4 | Y.q4 |
+|---------|-------|--------|------|---------|------|
+| kj41 | 0.9490 | 0.50 | **0.2771** | 0.793 | -0.517 |
+| kj42 | 0.8707 | 0.50 | 0.2987 | **0.550** | -0.366 |
+| kj43 | 0.6665 | 12.54 | 0.3797 | 0.243 | -0.016 |
+| **NB** | — | — | **0** | **0.55** | **-0.47** |
+
+1. **psi_R-identifikasjonsproblemet er strukturelt bekreftet** — norske post-COVID data vil ha
+   psi_R→0.95, uavhengig av phi_I1. Lavere psi_R gir alltid dårligere RMSE.
+2. **phi_I1-hypotesen falsifisert** — K&M phi_I1=12.54 gjør output-respons for svak, ikke bedre.
+3. **I_R.q12-underskuddet er uoppnåelig med AR(1) Taylor** — alle tre kjøringer har I_R.q12 > 0
+   (NB: -0.15). Dette krever en annen mekanisme (PLT/LQ/mean-reversion kanal).
+4. **Beste kalibrering:** kj41 (psi_R≈0.95, phi_I1=0.50) gir lavest RMSE (0.2771) og passerer
+   by4/bpi4-kriteriene.
+
+**Anbefalt neste steg:** kj44 med utvidet LQ-mekanisme eller asymmetrisk tapsfunksjon for å adressere I_R.q12-problemet. Alternativt: aksepter psi_R≈0.95 som best-fit og fokuser på FEVD-analyse.

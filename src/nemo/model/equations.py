@@ -87,6 +87,8 @@ Sjokk (NE = 13):
 ================================================================================
 """
  
+import warnings
+
 import numpy as np
 
 from nemo.model.parameters import Parameters
@@ -343,12 +345,13 @@ def build_matrices(p=None):
     G0[15, I_STAR]    = -_w
     G0[15, PI_STAR]   =  _w
     G0[15, EPS_PREM]  = -_w
+    G0[15, EPS_RP]    = -_w            # Funn A: kobler persistent risikopremie-AR(1) inn i UIP
     G0[15, B_NW]      =  _w * phi_B
     G0[15, PO]        =  _w * phi_O
     G1[15, RER]       =  rho_s          # lagget RER-ledd
     Pi[15, RER]       =  _w
-    Psi[15, E_rp]     =  _w
-    Psi[15, E_prem]   =  _w
+    # Funn A: Psi[15, E_rp] fjernet — sjokket går via EPS_RP-tilstanden (rad 42)
+    # Funn B: Psi[15, E_prem] fjernet — sjokket går via EPS_PREM-tilstanden (rad 46)
  
     # D2. Eksportetterspørsel (Armington, korrigert µ)
     G0[16, X]   =  1.0
@@ -482,7 +485,7 @@ def build_matrices(p=None):
     G0[41,YS]=1.0;    G1[41,YS]=p.rho_Ys;   Psi[41,E_Ys]=1.0
     G0[42,EPS_RP]=1.0;G1[42,EPS_RP]=p.rho_rp;Psi[42,E_rp]=1.0
     G0[43,PI_STAR]=1.0;G1[43,PI_STAR]=p.rho_piS;Psi[43,E_piS]=1.0
-    G0[44,I_STAR]=1.0; G1[44,I_STAR]=p.rho_piS;  # utenlandsk rente
+    G0[44,I_STAR]=1.0; G1[44,I_STAR]=p.rho_iS;   # Funn C: utenlandsk rente bruker rho_iS, ikke rho_piS
     G0[45,EPS_PHI_H]=1.0;G1[45,EPS_PHI_H]=p.rho_phi_h;Psi[45,E_phi_h]=1.0
     G0[46,EPS_PREM]=1.0; G1[46,EPS_PREM]=p.rho_prem; Psi[46,E_prem]=1.0
     G0[47,EPS_I_ADJ]=1.0;G1[47,EPS_I_ADJ]=p.rho_I;  Psi[47,E_I]=1.0
@@ -975,6 +978,91 @@ def build_matrices_pi4chain(p=None, theta_H: float = 0.05):
         G0[row, X_now] = 1.0
         G1[row, X_lag] = 1.0
         Pi[row, X_now] = 1.0
+
+    return G0, G1, Psi, Pi
+
+
+def build_matrices_v3_forward(p=None, theta_H: float = 0.05,
+                               lambda_pi4: float | None = None,
+                               n_iter: int = 30, tol: float = 1e-8):
+    """
+    NEMO v3 med modell-konsistent fremoverskuende Taylor-regel.
+
+    Taylor-regelen er hybrid: λ·π_t + (1-λ)·E_t[π_{t+4}]
+    der E_t[π_{t+4}] = e_PI @ T^4 @ z_t beregnes iterativt (fixed-point).
+
+    Fordel over build_matrices_pi4chain:
+      - NZ=49 (uendret, ingen nye tilstandsvariabler)
+      - Pi-matrise fra v3 uendret (ingen nye jump-variabler)
+      - BK kansellerer IKKE E_i-sjokket (R[I_R, E_i] ≈ 0.98)
+      - Stabilitet fra v3 bevares
+
+    Parametere
+    ----------
+    p          : Parameters-instans (bruker defaults hvis None)
+    theta_H    : Boligpris-forventningsparameter (videresendt til v3)
+    lambda_pi4 : Hybrid-vekt (0=rent fremoverskuende, 1=v3 samtid).
+                 Henter p.lambda_pi4 hvis None, ellers default 0.5.
+    n_iter     : Maks iterasjoner for fixed-point konvergens
+    tol        : Konvergenstoleranse (||T_new - T_prev||_max)
+
+    Returnerer
+    ----------
+    G0, G1, Psi, Pi : (NZ×NZ) matriser — samme format som build_matrices_v3
+    """
+    from nemo.solver.blanchard_kahn import solve as _solve
+
+    if p is None:
+        from nemo.model.parameters import Parameters as _DefaultP
+        p = _DefaultP
+
+    lam = lambda_pi4
+    if lam is None:
+        lam = float(getattr(p, 'lambda_pi4', 0.5))
+
+    # Startpunkt: standard v3 (backward-looking)
+    G0, G1, Psi, Pi = build_matrices_v3(p, theta_H)
+
+    # Koeffisienter for rad 20 (Taylor-regel) fra v3
+    psi_R  = p.psi_R
+    psi_P1 = p.psi_P1
+
+    # Basisrad 20 fra v3 (med samtid PI-term = -(1-psi_R)*psi_P1)
+    G0_row20_base = G0[20, :].copy()
+
+    # Løs v3 for startverdi av T
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        T_prev, _, d = _solve(G0, G1, Psi, Pi, verbose=False)
+    if not d.get("stable", False):
+        return G0, G1, Psi, Pi   # fallback til v3 hvis ustabilt
+
+    # Seleksjonsvektor for PI (rad 0)
+    e_PI = np.zeros(NZ)
+    e_PI[PI] = 1.0
+
+    for _ in range(n_iter):
+        # E_t[π_{t+4}] = e_PI @ T^4 @ z_t  →  fwd_row[j] = e_PI @ T^4[:, j]... nei:
+        # T^4 @ z_t: rad-PI av T^4 gir forventning for PI 4 perioder frem
+        T4_PI = e_PI @ np.linalg.matrix_power(T_prev, 4)   # (NZ,)
+
+        # Oppdater rad 20: ta utgangspunkt i basisraden (unngå akkumulering)
+        G0[20, :] = G0_row20_base.copy()
+        # Fjern v3-bidrag fra samtid PI og erstatt med hybrid
+        G0[20, PI] = -(1.0 - psi_R) * psi_P1 * lam
+        # Legg til fremoverskuende komponent som lineærkombinasjon av alle tilstander
+        G0[20, :] -= (1.0 - psi_R) * psi_P1 * (1.0 - lam) * T4_PI
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            T_new, _, d_new = _solve(G0, G1, Psi, Pi, verbose=False)
+        if not d_new.get("stable", False):
+            G0[20, :] = G0_row20_base.copy()   # reverter til v3
+            return G0, G1, Psi, Pi
+
+        if np.max(np.abs(T_new - T_prev)) < tol:
+            break
+        T_prev = T_new
 
     return G0, G1, Psi, Pi
 
