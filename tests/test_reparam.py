@@ -66,16 +66,39 @@ def test_grensetilfeller_klippes(name: str):
 
 
 def test_jacobian_har_riktig_fortegn_og_størrelse():
-    """log|dx/dy| skal være 0.0 når REPARAM_PARAMS er tom (psi_R og h_c er nå faste)."""
+    """log|dx/dy| skal være endelig og negativ for psi_R i (lb, ub).
+
+    For u ∈ (0,1): log(ub-lb) + log(u) + log(1-u) < 0 (u·(1-u) < 1/(ub-lb)).
+    """
     theta = _theta_km()
     log_jac = log_jacobian(theta)
-    assert log_jac == 0.0
+    if len(REPARAM_PARAMS) == 0:
+        assert log_jac == 0.0
+    else:
+        assert np.isfinite(log_jac), f"log_jacobian er ikke endelig: {log_jac}"
+        assert log_jac < 0.0, f"log_jacobian forventet negativ, fikk {log_jac}"
 
 
 def test_jacobian_returnerer_minusinf_utenfor_støtte():
-    """Med tom REPARAM_PARAMS returneres alltid 0.0 (ingen grenser å sjekke)."""
-    theta = _theta_km()
-    assert log_jacobian(theta) == 0.0
+    """log_jacobian skal returnere -inf når et REPARAM_PARAMS-parameter er utenfor (lb, ub)."""
+    if len(REPARAM_PARAMS) == 0:
+        theta = _theta_km()
+        assert log_jacobian(theta) == 0.0
+        return
+
+    name = REPARAM_PARAMS[0]
+    i = PARAM_NAMES.index(name)
+    lb, ub = PARAM_PRIORS[name][-2], PARAM_PRIORS[name][-1]
+
+    # Utenfor øvre grense
+    theta_over = _theta_km()
+    theta_over[i] = ub + 0.01
+    assert log_jacobian(theta_over) == -np.inf, "Skal gi -inf over øvre grense"
+
+    # Utenfor nedre grense
+    theta_under = _theta_km()
+    theta_under[i] = lb - 0.01
+    assert log_jacobian(theta_under) == -np.inf, "Skal gi -inf under nedre grense"
 
 
 def test_jacobian_numerisk_vs_analytisk():

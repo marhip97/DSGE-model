@@ -32,8 +32,10 @@ from nemo.estimation.mcmc import PARAM_NAMES, PARAM_PRIORS
 
 # Parametre som transformeres til ubegrenset rom
 # h_c fjernet 2026-05-18 — fast til H_C_FIXED=0.938 (PE-godkjent, C2 Alt A)
-# psi_R fjernet 2026-05-24 — fast til PSI_R_FIXED=0.667 (PE-godkjent, kj11)
-REPARAM_PARAMS: tuple[str, ...] = ()
+# psi_R: reaktivert 2026-06-01 (Fase 2, C5 §2). psi_R er estimert (ikke fast lenger)
+# og treffer konsistent 0.99-grensen i kj41 (posterior mean=0.9490).
+# Logit-transformasjonen avslører om posterior er genuint ved grensen eller artefakt.
+REPARAM_PARAMS: tuple[str, ...] = ("psi_R",)
 
 
 def _bounds(name: str) -> tuple[float, float]:
