@@ -2344,11 +2344,10 @@ RMSE(16pt) = 0.3797   B5: by4=0.035 ❌❌  bpi4=0.197 ❌
 
 **Valutakurs (RER):**
 - Oljepris: 69% (q4) → 20% (q20) — dominerer kortsiktig
-- Bolig: 4% (q4) → 71% (q20) — vokser langsiktig (krever videre analyse)
+- Bolig: 4% (q4) → 71% (q20) — vokser langsiktig (se begrensningsdokument pkt. 5)
 - Risikopremie: 5% / 4% / 1% — lav etter sigma_rp=0.006 kalibrering
 
 ### Historisk dekomposisjon
 RTS-smoother (analyse.py) kjørt over full periode (100 kvartaler inkl. COVID-hull).
-HD-bidrag er foreløpig i tilstandsrommets log-avviksenheter — konvertering til
-observerbare enheter (%, pp) implementeres i kj41_analyse_v2.py.
-
+Nivå-HD beregnet via rekursiv T-propagasjon med pseudo-invers sjokk-recovery.
+Resultater: `data/results/kj41_hd.json` (level_pre/post + innov_pre/post).

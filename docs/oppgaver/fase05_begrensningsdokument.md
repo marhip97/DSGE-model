@@ -93,6 +93,36 @@ IRF til fundamentale sjokk er uendret ift. en hypotetisk deterministisk løsning
 
 ---
 
+### 5. RER/bolig FEVD-dominans ved lang horisont (ny, 2026-06-01)
+
+FEVD viser at boligsjokket forklarer 71 % av RER-variansen ved q20, mot kun 4 % ved q4.
+
+**Årsak:** sigma_H = 0.333 (posterior mean kj41) er det største estimerte sjokket.
+Boligpriskanalen til valutakursen er aktiv i modellen via UIP og risikopremieleddet.
+Over lengre horisonter dominerer det langsomme boligsjokket (rho_H ≈ 0.85).
+
+**Implikasjon for bruk:** Langsiktige RER-projeksjoner vil være boligdrevet.
+Kortsiktig RER (q4) er oljepris-dominert (69 %) — mer i tråd med empiri.
+
+**Planlagt løsning:** Ingen umiddelbar tiltak. Dokumenteres som kjent begrensning.
+Vurderes på nytt etter Fase 1 med oppdaterte data.
+
+---
+
+### 6. I_R.q12 feil fortegn vs. NB-benchmark (ny, 2026-06-01)
+
+Alle MCMC-kjøringer (kj41–43) gir I_R.q12 > 0, mens NB Memo 3/2024 Figur 1 viser -0.15 pp.
+
+**Årsak:** AR(1) Taylor-regel med høy psi_R≈0.95 gir geometrisk forfall uten reversering.
+Mean-reversion i styringsrenten krever en PLT/LQ-mekanisme eller ekstern reverserende kraft.
+
+**Implikasjon for bruk:** Pengepolitiske sjokkanalyser viser ikke korrekt rentenormalisering.
+
+**Planlagt løsning:** kj44+ med LQ/PLT-mekanisme — krever PE-godkjenning.
+Utsatt til etter Fase 1.
+
+---
+
 ## Anbefalte begrensninger på bruk (frem til Fase 2)
 
 1. **Bruk ikke** modellen til kvantitative pengepolitikk-IRF uten å skalere ned ~6×

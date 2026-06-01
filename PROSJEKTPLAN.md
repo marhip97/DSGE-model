@@ -188,9 +188,9 @@ tilpasning" med separat begrunnelse.
 
 Hvis Spor A eller C avdekker større problemer, kan dette utvides.
 
-## Fase 0.75 — Sandkasse: Full modellprestasjon mot NB 🚧
+## Fase 0.75 — Sandkasse: Full modellprestasjon mot NB ✅
 
-**Startet 2026-05-30.** PE gir full sandkasse-fullmakt: alle endringer inkludert
+**Startet 2026-05-30. Avsluttet 2026-06-01.** PE gir full sandkasse-fullmakt: alle endringer inkludert
 modellstruktur, nye sjokk/tilstandsvariabler og observasjonsvariabler — uten
 eskalering — så lenge endringene er konsistente med normal DSGE-praksis og
 NBs NEMO-dokumentasjon.
@@ -244,7 +244,7 @@ Kjøres hvis Spor A–C ikke gir RMSE ≤ 0.150.
 
 ---
 
-## Fase 1 — Faktisk datainnhenting 🚧
+## Fase 1 — Faktisk datainnhenting 🚧 (AKTIV — startet 2026-06-01)
 
 **Mål:** Erstatte syntetisk fallback med ekte API-kall.
 

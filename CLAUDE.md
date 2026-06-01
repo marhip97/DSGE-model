@@ -33,8 +33,9 @@ prosjekteier.
 
 ## Aktiv fase
 
-Per 2026-05-14: **Fase 0.5 — Modellkvalitetssikring**. Se `PROSJEKTPLAN.md`
-for full beskrivelse, og `docs/oppgaver/` for konkrete oppgaver.
+Per 2026-06-01: **Fase 1 — Faktisk datainnhenting** (SSB/NB/FRED til 2025).
+Fase 0.5 og 0.75 avsluttet. Beste estimering: kj41 (psi_R=0.9490, RMSE=0.2771).
+Se `PROSJEKTPLAN.md` for full beskrivelse, og `docs/oppgaver/` for konkrete oppgaver.
 
 Anbefalt startsekvens for Claude Code:
 - `docs/oppgaver/B5_nb_benchmark.md` (rask diagnose mot NB-figur)
