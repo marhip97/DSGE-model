@@ -15,9 +15,9 @@ on:
         default: "false"
         type: boolean
       kpi_jae:
-        description: "Hent KPI-JAE (SSB 10235) og lag nemo_data_kpi_jae.csv (Test B / kj16)"
+        description: "Hent KPI-JAE (SSB 10235) — standard: alltid på scheduled runs"
         required: false
-        default: "false"
+        default: "true"
         type: boolean
 
 permissions:
@@ -26,6 +26,9 @@ permissions:
 jobs:
   oppdater-data:
     runs-on: ubuntu-latest
+
+    env:
+      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
 
     steps:
       - uses: actions/checkout@v4
@@ -45,49 +48,36 @@ jobs:
 
       - name: Kjør datapipeline
         run: |
-          FLAGS=""
-          if [ "${{ inputs.no_cache }}" = "true" ]; then FLAGS="$FLAGS --no-cache"; fi
-          if [ "${{ inputs.kpi_jae }}" = "true" ]; then FLAGS="$FLAGS --kpi-jae"; fi
+          FLAGS="--kpi-jae"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "${{ inputs.no_cache }}" = "true" ]; then FLAGS="$FLAGS --no-cache"; fi
+            if [ "${{ inputs.kpi_jae }}" = "false" ]; then FLAGS="${FLAGS/--kpi-jae/}"; fi
+          fi
           python -m nemo.data.pipeline --log-level INFO $FLAGS
 
       - name: Sjekk om data er endret
         id: diff
         run: |
-          # Stage filene — git diff --quiet ser ikke nye utrakkede filer,
-          # men git diff --cached gjør det etter staging.
-          git add data/processed/nemo_data.csv data/processed/nemo_demean.json 2>/dev/null || true
-          if git diff --cached --quiet data/processed/nemo_data.csv data/processed/nemo_demean.json 2>/dev/null; then
+          git add data/processed/ 2>/dev/null || true
+          if git diff --cached --quiet data/processed/; then
             echo "endret=false" >> $GITHUB_OUTPUT
           else
             echo "endret=true" >> $GITHUB_OUTPUT
           fi
-          # KPI-JAE-fil (hvis generert)
-          if [ -f data/processed/nemo_data_kpi_jae.csv ]; then
-            echo "kpi_jae_endret=true" >> $GITHUB_OUTPUT
-          else
-            echo "kpi_jae_endret=false" >> $GITHUB_OUTPUT
-          fi
-          echo "--- Siste observasjon i ny fil ---"
-          tail -2 data/processed/nemo_data.csv || true
+          echo "--- Siste observasjon ---"
+          tail -2 data/processed/nemo_data_kpi_jae.csv 2>/dev/null || \
+          tail -2 data/processed/nemo_data.csv 2>/dev/null || true
 
       - name: Commit og push oppdatert data
-        if: steps.diff.outputs.endret == 'true' || steps.diff.outputs.kpi_jae_endret == 'true'
+        if: steps.diff.outputs.endret == 'true'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # nemo_data.csv og nemo_demean.json er allerede staged fra diff-steget
-          # Legg til KPI-JAE-filer hvis de finnes
-          if [ -f data/processed/nemo_data_kpi_jae.csv ]; then
-            git add data/processed/nemo_data_kpi_jae.csv data/processed/nemo_demean_kpi_jae.json || true
-          fi
-          SISTE=$(tail -1 data/processed/nemo_data.csv | cut -d',' -f1)
-          MSG="[DATA] Kvartalsvis oppdatering — siste obs: ${SISTE}"
-          if [ "${{ inputs.kpi_jae }}" = "true" ]; then
-            MSG="$MSG (inkl. KPI-JAE)"
-          fi
-          git commit -m "$MSG"
+          SISTE=$(tail -1 data/processed/nemo_data_kpi_jae.csv 2>/dev/null | cut -d',' -f1 || \
+                  tail -1 data/processed/nemo_data.csv | cut -d',' -f1)
+          git commit -m "[DATA] Kvartalsvis oppdatering — siste obs: ${SISTE}"
           git push
 
       - name: Ingen endring — data allerede oppdatert
-        if: steps.diff.outputs.endret == 'false' && steps.diff.outputs.kpi_jae_endret == 'false'
-        run: echo "nemo_data.csv er allerede oppdatert. Ingen commit nødvendig."
+        if: steps.diff.outputs.endret == 'false'
+        run: echo "Data er allerede oppdatert. Ingen commit nødvendig."
