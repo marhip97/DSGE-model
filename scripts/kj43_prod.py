@@ -98,11 +98,14 @@ post_std    = np.array([max(s[n]["std"], 0.001) for n in PARAM_NAMES])
 idx_psiR  = PARAM_NAMES.index('psi_R')
 idx_rhorp = PARAM_NAMES.index('rho_rp')
 idx_psiP1 = PARAM_NAMES.index('psi_P1')
+idx_phiI1 = PARAM_NAMES.index('phi_I1')
 
-# Klipper mot K&M-verdier
+# Klipper mot K&M-verdier — phi_I1 settes direkte siden kj41-posterior (0.50) er langt utenfor [12,13]
 theta_start[idx_psiR]  = np.clip(theta_start[idx_psiR], 0.64, 0.69)
 theta_start[idx_psiP1] = np.clip(theta_start[idx_psiP1], 0.20, 0.40)
+theta_start[idx_phiI1] = 12.5432
 post_std[idx_psiR]     = 0.001
+post_std[idx_phiI1]    = 0.001
 
 # ── Prior overrides ────────────────────────────────────────────────────────────
 prior_overrides = {
