@@ -248,6 +248,12 @@ PARAM_PRIORS = {
     # psi_R kj27: tak hevet fra 0.95→0.99. kj26 traff 0.9486 (std=0.001) — klart prior-tak.
     # Med K&M φ_I1=12.54 trenger modellen høy renteglattning for tilstrekkelig BNP-transmisjon.
     'psi_R':   ('beta',   2.0, 2.0, 0.50, 0.99),   # kj27: utvidet fra [0.50,0.95] (PE-godkjent 2026-05-29)
+    # psi_R2: AR(2) 2-periodes lagg (Alt. A2, PE-godkjent 2026-06-02).
+    # psi_R2 < 0 gir mean-reversion i IRF; psi_R2=0 → AR(1) (exitstrategi).
+    # Prior Normal(-0.10, 0.05, [-0.40, 0.00]): sentrert ved mild reversering.
+    # Stasjonaritetskrav: |psi_R + psi_R2| < 1 og røttene innenfor enhetssirkelen —
+    # med psi_R≈0.9 og psi_R2∈[-0.4,0] er røttene reelle og stabile.
+    'psi_R2':  ('normal', -0.10, 0.05, -0.40, 0.00),
     'psi_P1':  ('normal', 0.29, 0.10, 0.05, 1.50),
     'psi_Y':   ('normal', 0.24, 0.05, 0.01, 0.80),
     # gamma_p: Calvo-prisindeksasjon i hybrid NK Phillips-kurve (PE-godkjent 2026-05-24).
@@ -294,6 +300,7 @@ KM = {'rho_A':0.804,'rho_C':0.725,'rho_O':0.874,'rho_Ys':0.783,
       'sigma_O':0.079,'sigma_Ys':0.011,'sigma_rp':0.006,'sigma_i':0.0003,
       'sigma_P':0.003,'sigma_H':0.050,'psi_R':0.666,'psi_P1':0.292,
       'psi_Y':0.242,'h_c':0.938,'gamma_p':0.35,
+      'psi_R2':0.0,  # AR(2)-lagg; 0.0 = AR(1)-exit (Alt. A2, PE-godkjent 2026-06-02)
       'phi_I1':12.54,'phi_I2':165.66,'phi_u':0.2192,  # K&M complete doc. s.59: phi_I1=12.54, phi_I2=165.66
       'phi_PQ':669.0,'kappa_M':0.03,'rho_s':0.50,
       'phi_H1':60.73}  # K&M Tabell 8: boliginvesteringsjusteringskost.
