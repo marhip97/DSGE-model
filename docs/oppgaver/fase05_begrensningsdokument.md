@@ -130,7 +130,14 @@ til 0.9894 — *høyere* enn kj41s 0.949. Det forverret I_R-banen: I_R=[1.0, 0.9
 estimeringsvalg** — høyere psi_R gjør rentebanen enda mer persistent. Løsningen er en
 mean-reversion-kanal, ikke videre prior-/sampler-justering.
 
-**Planlagt løsning:** kj45+ med LQ/PLT-mekanisme — krever PE-godkjenning.
+**Forkastet løsning 2026-06-02 (kj45):** AR(2) Taylor-regel (psi_R2, NZ 49→50) ble testet
+som mean-reversion-mekanisme. psi_R2 estimert til −0.0003 (presset mot grensen 0.0) — data
+**forkaster AR(2)** entydig. I_R.q12 forble 0.848. Andregrads-lagget er en død tilstand.
+psi_R2 deaktivert (fast=0.0), infrastruktur beholdt som exit-mulighet.
+
+**Konklusjon:** I_R.q12-problemet er ikke løsbart innenfor ren autoregressiv struktur.
+En reell løsning krever en strukturell mekanisme (prisnivåmål/PLT eller eksogen reverserende
+kraft) — utenfor mimicking rule-rammeverket. Krever ny PE-runde før eventuell implementering.
 
 ---
 

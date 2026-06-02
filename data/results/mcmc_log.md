@@ -2405,3 +2405,40 @@ RMSE(korr NB) = **0.3642** (vs kj41 0.2771). by4=1.259 ✅, bpi4=1.824 ✅.
 
 **Anbefalt best-fit forblir kj41** (psi_R=0.9490, RMSE=0.2771) for IRF/FEVD-bruk.
 kj44 er en diagnostisk kjøring, ikke en ny produksjonsposterior.
+
+---
+
+## kj45 — Fase 2: AR(2) Taylor-regel (psi_R2) testet og forkastet (2026-06-02)
+
+**Forhåndsregistrert:** psi_R2 (2-periodes rentelagg, Alt. A2, NZ 49→50) estimert fritt
+med Normal(−0.10, 0.05, [−0.40, 0.00]), warm start kj44 + psi_R2=−0.05, seed=45.
+Hensikt: teste om mean-reversion (psi_R2 < 0) kan reprodusere NB I_R.q12=−0.15.
+Script: `scripts/kj45_fase2.py`.
+
+### Konvergens
+- PSRF = 1.007 (20/20 OK), ESS_min = 666 (ESS/n = 0.0033), acc = 0.249, 110 min
+
+### Hovedfunn: data forkaster AR(2) mean-reversion
+| Parameter | Start | Prior-senter | Posterior |
+|-----------|-------|--------------|-----------|
+| **psi_R2** | −0.05 | −0.10 | **−0.0003 ± 0.0003** |
+| psi_R | 0.9894 | — | 0.9894 |
+
+psi_R2 ble drevet fra både startverdi og prior-senter helt opp til **0.0** (øvre grense).
+Likelihood foretrekker entydig AR(1). AR(2)-leddet er en **død tilstand** — modellen
+oppfører seg eksakt som AR(1). Samme mønster som psi_R (presser mot grensen nærmest
+AR(1)-atferd), men her er grensen 0.0.
+
+### NB-benchmark (uendret fra kj44)
+RMSE = 0.3633. I_R = [1.0, 0.955, 0.898, **0.848**] vs NB [1.0, 0.55, 0.10, **−0.15**].
+**I_R.q12 reverserer ikke** — AR(2) løste ikke begrensning 6. by4=1.259 ✅, bpi4=1.825 ✅.
+
+### Konklusjon
+1. **AR(2)-hypotesen falsifisert.** I_R.q12-problemet (begrensning 6) kan ikke løses med et
+   andregrads autoregressivt lagg — data avviser mean-reversion via psi_R2.
+2. psi_R2 **deaktivert** fra estimering (mcmc.py), kalibrert fast = 0.0 (Parameters).
+   NZ=50-infrastrukturen beholdt som exit-mulighet (PE-instruks "bevar exitmulighet").
+3. Reell løsning på I_R.q12 må være en annen kanal (PLT/prisnivåmål, eller eksogen
+   reverserende kraft) — utenfor ren autoregressiv struktur. Krever ny PE-runde.
+
+**Best-fit for produksjon forblir kj41.** kj45 er diagnostisk.

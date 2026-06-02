@@ -249,11 +249,12 @@ PARAM_PRIORS = {
     # Med K&M φ_I1=12.54 trenger modellen høy renteglattning for tilstrekkelig BNP-transmisjon.
     'psi_R':   ('beta',   2.0, 2.0, 0.50, 0.99),   # kj27: utvidet fra [0.50,0.95] (PE-godkjent 2026-05-29)
     # psi_R2: AR(2) 2-periodes lagg (Alt. A2, PE-godkjent 2026-06-02).
-    # psi_R2 < 0 gir mean-reversion i IRF; psi_R2=0 → AR(1) (exitstrategi).
-    # Prior Normal(-0.10, 0.05, [-0.40, 0.00]): sentrert ved mild reversering.
-    # Stasjonaritetskrav: |psi_R + psi_R2| < 1 og røttene innenfor enhetssirkelen —
-    # med psi_R≈0.9 og psi_R2∈[-0.4,0] er røttene reelle og stabile.
-    'psi_R2':  ('normal', -0.10, 0.05, -0.40, 0.00),
+    # DEAKTIVERT etter kj45 (2026-06-02): estimert til -0.0003 (sd=0.0003) — presset mot
+    # øvre grense 0.0. Data forkaster mean-reversion entydig; AR(2)-leddet er en død tilstand
+    # (modellen oppfører seg eksakt som AR(1)). I_R.q12 forble 0.848 (NB: -0.15).
+    # Kalibreres fast = 0.0 (Parameters.psi_R2). NZ=50-infrastrukturen beholdt som exit-mulighet.
+    # Exit: gjenaktiver linjen under for å estimere psi_R2 på nytt.
+    # 'psi_R2':  ('normal', -0.10, 0.05, -0.40, 0.00),  # DEAKTIVERT etter kj45
     'psi_P1':  ('normal', 0.29, 0.10, 0.05, 1.50),
     'psi_Y':   ('normal', 0.24, 0.05, 0.01, 0.80),
     # gamma_p: Calvo-prisindeksasjon i hybrid NK Phillips-kurve (PE-godkjent 2026-05-24).
