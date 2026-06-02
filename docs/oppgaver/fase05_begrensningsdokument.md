@@ -56,6 +56,12 @@ sannsynligvis korrekte i retning, men konfidensbåndene er upresise.
 **Planlagt løsning:** Fase 2 — forbedret sampler (blokksampling eller HMC
 etter PE-godkjenning).
 
+**Oppdatering 2026-06-02 (kj44):** Logit-reparametrisering av psi_R (C5 §2) hevet
+ESS_min fra 646 (kj41) til 1077 (ESS/n=0.0054) — en forbedring, men fortsatt under
+kravet 0.02. Reparam løste *ikke* ESS-problemet fullt ut: posterioret for psi_R har en
+fet hale i logit-rom (presser mot 0.99) som gir treg miksing. Blokksampling eller HMC
+gjenstår som tiltak (krever PE-godkjenning). Se `data/results/mcmc_log.md` (kj44-seksjon).
+
 ---
 
 ### 3. TFP-sjokk gir negativ BNP-respons (åpen, lav prioritet)
@@ -111,15 +117,20 @@ Vurderes på nytt etter Fase 1 med oppdaterte data.
 
 ### 6. I_R.q12 feil fortegn vs. NB-benchmark (ny, 2026-06-01)
 
-Alle MCMC-kjøringer (kj41–43) gir I_R.q12 > 0, mens NB Memo 3/2024 Figur 1 viser -0.15 pp.
+Alle MCMC-kjøringer (kj41–44) gir I_R.q12 > 0, mens NB Memo 3/2024 Figur 1 viser -0.15 pp.
 
 **Årsak:** AR(1) Taylor-regel med høy psi_R≈0.95 gir geometrisk forfall uten reversering.
 Mean-reversion i styringsrenten krever en PLT/LQ-mekanisme eller ekstern reverserende kraft.
 
 **Implikasjon for bruk:** Pengepolitiske sjokkanalyser viser ikke korrekt rentenormalisering.
 
-**Planlagt løsning:** kj44+ med LQ/PLT-mekanisme — krever PE-godkjenning.
-Utsatt til etter Fase 1.
+**Bekreftet 2026-06-02 (kj44):** Da psi_R ble frigjort (logit-reparam) presset posterioret
+til 0.9894 — *høyere* enn kj41s 0.949. Det forverret I_R-banen: I_R=[1.0, 0.956, 0.90, 0.851]
+(q12=0.85 mot NB −0.15). Dette **bekrefter at problemet er strukturelt, ikke et
+estimeringsvalg** — høyere psi_R gjør rentebanen enda mer persistent. Løsningen er en
+mean-reversion-kanal, ikke videre prior-/sampler-justering.
+
+**Planlagt løsning:** kj45+ med LQ/PLT-mekanisme — krever PE-godkjenning.
 
 ---
 

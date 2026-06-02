@@ -2351,3 +2351,57 @@ RMSE(16pt) = 0.3797   B5: by4=0.035 ❌❌  bpi4=0.197 ❌
 RTS-smoother (analyse.py) kjørt over full periode (100 kvartaler inkl. COVID-hull).
 Nivå-HD beregnet via rekursiv T-propagasjon med pseudo-invers sjokk-recovery.
 Resultater: `data/results/kj41_hd.json` (level_pre/post + innov_pre/post).
+
+---
+
+## kj44 — Fase 2: Logit-reparametrisering av psi_R (2026-06-02)
+
+**Forhåndsregistrert prior-endring:** psi_R frigjort fra kj41s dogmatiske prior
+N(0.91, 0.008, [0.87, 0.95]) til default Beta(2,2,[0.50,0.99]), samplet i ubegrenset
+logit-rom (`use_reparam=True`, REPARAM_PARAMS=("psi_R",)). Øvrige prior-overrides
+identiske med kj41 for å isolere reparam-effekten. Script: `scripts/kj44_fase2.py`.
+Warm start kj41, seed=44, 200k produksjon + 30k burn-in, phi_PQ=150, lambda_pi4=0.0.
+
+### Konvergens
+- **PSRF = 1.005** (20/20 parametre OK, krav <1.10) ✅
+- **ESS_min = 1077** (ESS/n = 0.0054, krav >0.02) ❌ — 1.67× bedre enn kj41 (646), men fortsatt under mål
+- Akseptrate = 0.207, total tid 161 min, 10 rekalibreringer
+
+### Hovedfunn: psi_R presser genuint mot øvre grense
+| Rom | psi_R |
+|-----|-------|
+| kj41 (dogmatisk prior, cap 0.95) | 0.9490 |
+| **kj44 (fri, logit-reparam)** | **0.9894 ± 0.0004** |
+| kj44 logit-rom (unc) | mean=6.99, **max=11.39**, q975=8.79 |
+
+**Tolkning:** Logit-transformen fjerner grenserefleksjon ved å mappe (0.50, 0.99)→(−∞, ∞).
+Posterioret i logit-rom har en **lang høyrehale uten indre modus** (opp til 11.4, som mapper
+til psi_R≈0.99). Dette beviser at likelihood-ryggen **fortsetter inn i det ikke-tillatte
+området over 0.99** — psi_R presser genuint mot grensen, det er **ikke** en numerisk
+refleksjonsartefakt fra en avgrenset sampler. Kj41s 0.949 var derimot en artefakt av kj41s
+egen cap (0.95). Standardavviket på 0.0004 (10× lavere enn kj41) bekrefter at likelihood er
+svært skarp her.
+
+> Merk: Skriptets automatiske ett-linjes-etikett ("grenseartefakt", utløst av
+> |kj44−kj41|>0.02) er misvisende. Den korrekte konklusjonen er motsatt: kj44 viser at
+> *grensekonsentrasjonen er genuin*, mens kj41s lavere verdi var prior-styrt.
+
+### NB-benchmark (forverring)
+RMSE(korr NB) = **0.3642** (vs kj41 0.2771). by4=1.259 ✅, bpi4=1.824 ✅.
+- I_R: [1.0, 0.956, 0.90, 0.851] vs NB [1.0, 0.55, 0.10, −0.15]
+- Med psi_R=0.989 forfaller rentebanen knapt → **forverrer I_R.q12-problemet**
+  (begrensningsdokument pkt. 6). AR(1) Taylor-regelen mangler mean-reversion.
+
+### Konklusjon Fase 2 (C5 §2)
+1. **Diagnostisk mål oppnådd:** logit-reparam beviser at psi_R-grensekonsentrasjonen er en
+   genuin likelihood-egenskap, ikke sampling-artefakt. Hypotese 1 i CLAUDE.md
+   ("modellen *trenger* veldig høy persistens") bekreftet; hypotese 2 (svak identifikasjon)
+   avkreftet for psi_R (sd=0.0004, ESS=2247).
+2. **ESS-mål ikke nådd** (0.0054 < 0.02). Reparam halverte ikke autokorrelasjonen nok —
+   den fete halen i logit-rom gir treg miksing. Blokksampling/HMC vurderes (krever PE).
+3. **Å presse psi_R høyere forbedrer ikke modellen** — det forverrer NB-fit og I_R-reversering.
+   Den strukturelle løsningen er en PLT/LQ mean-reversion-kanal (begrensningsdokument pkt. 6),
+   ikke videre sampler-tuning. Krever PE-godkjenning.
+
+**Anbefalt best-fit forblir kj41** (psi_R=0.9490, RMSE=0.2771) for IRF/FEVD-bruk.
+kj44 er en diagnostisk kjøring, ikke en ny produksjonsposterior.
