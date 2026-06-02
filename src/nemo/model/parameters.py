@@ -239,6 +239,8 @@ class Parameters:
     psi_R    = 0.6663     # (EST) ψ_R  — renteglatting 1-periodes lagg
     psi_R2   = 0.0        # (EST) ψ_R2 — AR(2) 2-periodes lagg (< 0 → mean-reversion)
                            #             psi_R2=0 → eksakt AR(1) (exitstrategi, Alt. A2)
+    psi_PL   = 0.0        # (EST) ψ_PL — PLT prisnivåmål-koeffisient (Fase 2, 2026-06-02)
+                           #             psi_PL=0 → ren inflasjonsmål (exitstrategi)
     psi_P1   = 0.2921     # (EST) ψ_P1 — fremtidig inflasjon (4-kv. fremoverskuende)
     psi_Y    = 0.2417     # (EST) ψ_Y  — output mimicking rule
     psi_S    = 0.0159     # (EST) ψ_S  — reell valutakurs

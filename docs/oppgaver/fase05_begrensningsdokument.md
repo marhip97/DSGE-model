@@ -137,7 +137,14 @@ psi_R2 deaktivert (fast=0.0), infrastruktur beholdt som exit-mulighet.
 
 **Konklusjon:** I_R.q12-problemet er ikke løsbart innenfor ren autoregressiv struktur.
 En reell løsning krever en strukturell mekanisme (prisnivåmål/PLT eller eksogen reverserende
-kraft) — utenfor mimicking rule-rammeverket. Krever ny PE-runde før eventuell implementering.
+kraft) — utenfor mimicking rule-rammeverket.
+
+**PLT implementert 2026-06-02 (kj46, PE-godkjent "Test alt B, men bevar exitmulighet"):**
+`build_matrices_v3_plt` med `P_STAR_GAP` (index 50, NZ_PLT=51) er implementert.
+Taylor-regelen reagerer på `psi_PL·p_gap_t` der `p_gap_t = p_gap_{t-1} + π_t`.
+IRF-diagnose viser monoton reduksjon: I_R.q12 synker fra 0.52 (psi_PL=0) til 0.20 (psi_PL=0.50).
+Kj46 estimerer psi_PL fritt (prior N(0.10, 0.05, [0.00, 0.50])) for å avklare om I_R.q12 < 0.
+Exitstrategi beholdt: psi_PL=0 → eksakt AR(1)-atferd. Se `mcmc_log.md` (kj46-seksjon).
 
 ---
 

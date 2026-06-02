@@ -30,8 +30,8 @@ from scipy.special import betaln, gammaln
 
 from nemo.model.equations import (
     build_matrices_v3, build_matrices_pi4chain, build_matrices_altB,
-    build_matrices_v3_forward,
-    NZ, NZ_PI4, NZ_ALTB, NE,
+    build_matrices_v3_forward, build_matrices_v3_plt,
+    NZ, NZ_PI4, NZ_ALTB, NZ_PLT, NE,
     Y, C, INV, INV_H, X, M, PI, W, I_R, RER, S, PO, YS,
     Q_H, B_NW, C_NW, I_D, I_L_NW, L, MC,
     E_A, E_C, E_P, E_O, E_Ys, E_rp, E_i, E_H, E_phi_h
@@ -217,6 +217,16 @@ def build_H_altB() -> np.ndarray:
     return H
 
 
+def build_H_plt() -> np.ndarray:
+    """Observasjonsmatrise for PLT-modellen (NZ_PLT=51 kolonner).
+    P_STAR_GAP (index 50) er ikke direkte observert — ekstra null-kolonne.
+    """
+    H_50 = build_H()
+    H = np.zeros((N_OBS, NZ_PLT))
+    H[:, :NZ] = H_50
+    return H
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # PARAMETERE OG PRIOR
 # sigma_A er fjernet fra estimering — kalibreres fast
@@ -288,6 +298,10 @@ PARAM_PRIORS = {
     # Med φ_I1=12.54 mangler vår forenklede modell NB-kanalene — phi_H1 estimeres for å
     # la data avgjøre kompensasjonsgraden. Prior Normal(60.73, 40, [0.5, 200]) — bredt.
     'phi_H1': ('normal', 60.73,  5.0, 30.0, 100.0),  # kj28: strammet fra (40,[0.5,200]) → eliminerer bimodal
+    # psi_PL: PLT prisnivåmål-koeffisient (Fase 2, 2026-06-02, kj46).
+    # Normal(0.10, 0.05, [0.00, 0.50]): sentrert over typisk PLT-respons.
+    # psi_PL=0 → exitstrategi (ren inflasjonsmål). Gjenaktiver for kj46.
+    # 'psi_PL': ('normal', 0.10, 0.05, 0.00, 0.50),  # DEAKTIVERT — aktiver for kj46
 }
 PARAM_NAMES = list(PARAM_PRIORS.keys())
 N_PARAMS    = len(PARAM_NAMES)
@@ -302,6 +316,7 @@ KM = {'rho_A':0.804,'rho_C':0.725,'rho_O':0.874,'rho_Ys':0.783,
       'sigma_P':0.003,'sigma_H':0.050,'psi_R':0.666,'psi_P1':0.292,
       'psi_Y':0.242,'h_c':0.938,'gamma_p':0.35,
       'psi_R2':0.0,  # AR(2)-lagg; 0.0 = AR(1)-exit (Alt. A2, PE-godkjent 2026-06-02)
+      'psi_PL':0.0,  # PLT-koeffisient; 0.0 = ren inflasjonsmål (exitstrategi, Fase 2 2026-06-02)
       'phi_I1':12.54,'phi_I2':165.66,'phi_u':0.2192,  # K&M complete doc. s.59: phi_I1=12.54, phi_I2=165.66
       'phi_PQ':669.0,'kappa_M':0.03,'rho_s':0.50,
       'phi_H1':60.73}  # K&M Tabell 8: boliginvesteringsjusteringskost.

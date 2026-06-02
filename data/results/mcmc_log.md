@@ -2442,3 +2442,40 @@ RMSE = 0.3633. I_R = [1.0, 0.955, 0.898, **0.848**] vs NB [1.0, 0.55, 0.10, **�
    reverserende kraft) — utenfor ren autoregressiv struktur. Krever ny PE-runde.
 
 **Best-fit for produksjon forblir kj41.** kj45 er diagnostisk.
+
+---
+
+## kj46 — Fase 2: PLT-kanal implementert og forberedt for kjøring (2026-06-02)
+
+**PE-beslutning:** "Test alt B, men bevar exitmulighet" (2026-06-02).
+PLT = prisnivåmål (Price-Level Targeting), Woodford (2003).
+
+**Forhåndsregistrert prior:** psi_PL ~ Normal(0.10, 0.05, [0.00, 0.50]).
+Exitstrategi: psi_PL=0 → eksakt v3_forward-atferd (NZ_PLT=51 beholdes, P_STAR_GAP er dead state).
+
+**Strukturell begrunnelse:**
+- PLT-kanal: `p_gap_t = p_gap_{t-1} + π_t` (akkumulert prisnivå-gap)
+- Taylor-regel: `i_t = psi_R·i_{t-1} + (1−psi_R)·[psi_P1·π_t + psi_PL·p_gap_t + psi_Y·y_t + ...] + ε_i`
+- Etter strammende sjokk: π faller → p_gap akkumulerer negativt → psi_PL > 0 trekker i ned → mean-reversion ✓
+
+**Implementert (2026-06-02):**
+| Fil | Endring |
+|-----|---------|
+| `equations.py` | `P_STAR_GAP=50`, `NZ_PLT=51`, `build_matrices_v3_plt()` |
+| `parameters.py` | `psi_PL=0.0` (exitstrategi) |
+| `mcmc.py` | `build_H_plt()`, psi_PL kommentert i PARAM_PRIORS, KM-dict |
+| `tests/test_plt_kanal.py` | 7 tester — alle bestått |
+| `scripts/kj46_fase2.py` | Kjøreskript (monkey-patching av PARAM_NAMES → 21 param) |
+
+**IRF-diagnose med kj41 posterior (phi_PQ=150, lambda_pi4=0):**
+| psi_PL | I_R.q12 |
+|--------|---------|
+| 0.00 | 0.519 |
+| 0.10 | 0.397 |
+| 0.30 | 0.293 |
+| 0.50 | 0.196 |
+NB-benchmark: I_R.q12 = −0.15. PLT hjelper monotont, men kj41-parametere alene
+er ikke tilstrekkelige — MCMC-estimering av psi_PL vil finne optimal kombinasjon.
+
+**Status:** Klart for kjøring (kj46). Forventer ~2 timer på laptop.
+Warm start: kj41 + psi_PL=0.05, seed=46, 200k prod + 30k burn-in.

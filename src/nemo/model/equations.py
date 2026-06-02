@@ -114,6 +114,12 @@ EPS_PHI_H=45; EPS_PREM=46; EPS_I_ADJ=47  # siste plass: investeringssjokk
 U_K=48  # Alt. A: kapitalutnyttelse (utilization rate)
 I_R_LL=49  # Alt. A2: 2-periodes lagg av styringsrenten (i_{t-2}) for AR(2) Taylor
 
+# PLT (Fase 2, 2026-06-02): akkumulert prisnivå-gap for prisnivåmål-kanal (NZ 50→51)
+# p_gap_t = p_gap_{t-1} + π_t  →  mean-reversion i styringsrenten via psi_PL > 0
+# Exitstrategi: psi_PL=0 → eksakt v3_forward-atferd (NZ_PLT beholdes, gap er dead state)
+P_STAR_GAP = 50
+NZ_PLT     = 51
+
 # Alt B (PE-godkjent 2026-05-29): boliginvesteringskanal — separat INV_H + lagg (NZ 49→51)
 INV_H   = 49   # boliginvestering (Euler-ligning med phi_H1)
 INV_H_L = 50   # lagg av boliginvestering
@@ -1070,6 +1076,67 @@ def build_matrices_v3_forward(p=None, theta_H: float = 0.05,
         if np.max(np.abs(T_new - T_prev)) < tol:
             break
         T_prev = T_new
+
+    return G0, G1, Psi, Pi
+
+
+def build_matrices_v3_plt(p=None, theta_H: float = 0.05,
+                           lambda_pi4: float | None = None,
+                           n_iter: int = 30, tol: float = 1e-8):
+    """
+    NEMO v3 med PLT-kanal (prisnivåmål, Fase 2 2026-06-02).
+
+    Utvider build_matrices_v3_forward (NZ=50) med:
+      - P_STAR_GAP (index 50): akkumulert prisnivå-gap  p_gap_t = p_gap_{t-1} + π_t
+      - Taylor-regel: reagerer på psi_PL·p_gap (gir mean-reversion etter sjokk)
+
+    NZ_PLT = 51. Exitstrategi: psi_PL=0.0 → eksakt v3_forward-atferd.
+    Ref: Woodford (2003) — prisnivåmål i NK-modeller. PE-godkjent 2026-06-02.
+
+    Parametere
+    ----------
+    p          : Parameters-instans; psi_PL leses via getattr(p, 'psi_PL', 0.0)
+    theta_H    : Boligpris-forventningsparameter (videresendt til v3_forward)
+    lambda_pi4 : Hybrid-vekt for fremoverskuende Taylor (videresendt til v3_forward)
+    n_iter     : Maks iterasjoner for fixed-point (v3_forward)
+    tol        : Konvergenstoleranse (v3_forward)
+
+    Returnerer
+    ----------
+    G0, G1, Psi, Pi : (NZ_PLT×NZ_PLT), (NZ_PLT×NZ_PLT), (NZ_PLT×NE), (NZ_PLT×NZ_PLT)
+    """
+    if p is None:
+        from nemo.model.parameters import Parameters as _DefaultP
+        p = _DefaultP
+
+    # Hent (NZ=50)×(NZ=50) matriser fra v3_forward
+    G0_50, G1_50, Psi_50, Pi_50 = build_matrices_v3_forward(
+        p, theta_H=theta_H, lambda_pi4=lambda_pi4, n_iter=n_iter, tol=tol
+    )
+
+    # Utvid til (NZ_PLT=51)×(NZ_PLT=51)
+    G0  = np.zeros((NZ_PLT, NZ_PLT))
+    G1  = np.zeros((NZ_PLT, NZ_PLT))
+    Psi = np.zeros((NZ_PLT, NE))
+    Pi  = np.zeros((NZ_PLT, NZ_PLT))
+
+    G0[:NZ, :NZ] = G0_50
+    G1[:NZ, :NZ] = G1_50
+    Psi[:NZ, :]  = Psi_50
+    Pi[:NZ, :NZ] = Pi_50
+
+    # P_STAR_GAP-likning (rad 50): p_gap_t = p_gap_{t-1} + π_t
+    # G0: p_gap_t − π_t = p_gap_{t-1}
+    G0[P_STAR_GAP, P_STAR_GAP] =  1.0
+    G0[P_STAR_GAP, PI]         = -1.0
+    G1[P_STAR_GAP, P_STAR_GAP] =  1.0
+
+    # Legg PLT-ledd til Taylor-regel (rad 20)
+    psi_R  = p.psi_R
+    psi_R2 = p.psi_R2
+    psi_PL = float(getattr(p, 'psi_PL', 0.0))
+    _scale = 1.0 - psi_R - psi_R2   # langsiktig nøytralitetsbetingelse
+    G0[I_R, P_STAR_GAP] = -_scale * psi_PL
 
     return G0, G1, Psi, Pi
 
