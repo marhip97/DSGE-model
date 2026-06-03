@@ -276,11 +276,14 @@ PARAM_PRIORS = {
     'gamma_p': ('beta',   3.0, 3.0,  0.0,  0.95),
     # h_c er fjernet fra estimering — kalibreres fast til H_C_FIXED=0.938 (PE-godkjent 2026-05-18, C2 Alt A).
     # Posterior traff alltid 0.9995-grensen og drepte konsumkanalen. K&M-verdi gjenoppretter a3_W=0.032.
-    # phi_I1 kj28: reaktivert (PE fullmakt 2026-05-29). kj19 estimerte 0.103 (BNP-eksplosjon) med v3.
-    # Med Alt B (NZ=51) er lavere phi_I1 stabilt. LL-sweep viser: phi_I1=0.3→LL=-3235 (best);
-    # phi_I1=12.54→LL=-3262. B5-passing region: phi_I1∈[0.30,0.75] med psi_R≈0.99.
-    # Prior Normal(2.0,5.0,[0.1,25]) — dekker K&M=12.54 og B5-passing 0.3-0.75.
-    'phi_I1':  ('normal', 2.0,  5.0,  0.1, 25.0),   # kj28: reaktivert (var DEAKTIVERT etter kj19)
+    # phi_I1 kj48: LogNormal strammet mot K&M=12.54 (PE-godkjent 2026-06-03).
+    # kj47 kollapset phi_I1→0.10 (nedre grense) — gav statistisk lp-gevinst (~27 LL) men
+    # urealistisk IRF (BNP-respons ~10× NB). Data foretrekker lav phi_I1 (LL-sweep: 0.3→-3235,
+    # 12.54→-3262), men strukturell realisme krever K&M-nivå. LogNormal(log(12.54), 0.5)
+    # forankrer mot K&M med 95%-CI ≈ [4.7, 33.4] i nivå; sterk straff mot kollaps til 0.1
+    # (Δ log-prior ≈ 47 ved x=0.1 vs ~27 LL-gevinst → forhindrer kollaps).
+    # Exit: gjenaktiver ('normal', 2.0, 5.0, 0.1, 25.0) (kj28-47-prior) ved ny diagnose.
+    'phi_I1':  ('lognormal', np.log(12.54), 0.5, 0.1, 40.0),  # kj48: strammet mot K&M=12.54
     # phi_I2: kj25 prior Normal(8,4,[0.5,40]) truncerte K&M=165.66. kj26 åpner prioren:
     # Normal(50,50,[1,400]) lar data velge mellom kj25-estimat (~12) og K&M (166).
     'phi_I2':  ('normal', 50.0, 50.0, 1.0, 400.0),
@@ -352,6 +355,11 @@ def log_prior(theta, overrides=None):
             sh,sc = spec[1],spec[2]
             if x<=0: return -np.inf
             lp += sh*np.log(sc)-(sh+1)*np.log(x)-sc/x-gammaln(sh)
+        elif pt == 'lognormal':
+            # spec: ('lognormal', mu_log, sig_log, lb, ub). mu_log/sig_log i log-rom.
+            mu,sig = spec[1],spec[2]
+            if x<=0: return -np.inf
+            lp += -0.5*((np.log(x)-mu)/sig)**2-np.log(x*sig)-0.5*np.log(2*np.pi)
     return lp
 
 
