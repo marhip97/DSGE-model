@@ -143,8 +143,17 @@ kraft) — utenfor mimicking rule-rammeverket.
 `build_matrices_v3_plt` med `P_STAR_GAP` (index 50, NZ_PLT=51) er implementert.
 Taylor-regelen reagerer på `psi_PL·p_gap_t` der `p_gap_t = p_gap_{t-1} + π_t`.
 IRF-diagnose viser monoton reduksjon: I_R.q12 synker fra 0.52 (psi_PL=0) til 0.20 (psi_PL=0.50).
-Kj46 estimerer psi_PL fritt (prior N(0.10, 0.05, [0.00, 0.50])) for å avklare om I_R.q12 < 0.
-Exitstrategi beholdt: psi_PL=0 → eksakt AR(1)-atferd. Se `mcmc_log.md` (kj46-seksjon).
+Exitstrategi beholdt: psi_PL=0 → eksakt AR(1)-atferd.
+
+**Kj46 fullført 2026-06-03 — ENDELIG KONKLUSJON:**
+psi_PL = 0.0505 ± 0.020 (q5=0.024) — **PLT identifisert, men utilstrekkelig**.
+psi_R presser til 0.989 → PLT-effektvekt = (1−psi_R)×psi_PL ≈ 0.00056 → neglisjerbar.
+I_R.q12 = 0.838 (NB: −0.15). PSRF=1.003, ESS=1044. RMSE=0.3609.
+
+**Begrensning 6 er bekreftet strukturell.** Hverken AR(2), PLT, logit-reparam eller
+prior-justering kan løse rentepersistens-problemet innenfor mimicking rule-rammeverket.
+Vei B (aksepter begrensningen, dokumenter for brukere) er anbefalt konklusjon.
+Se `data/results/mcmc_log.md` (kj46-seksjon) for full dokumentasjon.
 
 ---
 

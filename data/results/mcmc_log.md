@@ -2479,3 +2479,54 @@ er ikke tilstrekkelige — MCMC-estimering av psi_PL vil finne optimal kombinasj
 
 **Status:** Klart for kjøring (kj46). Forventer ~2 timer på laptop.
 Warm start: kj41 + psi_PL=0.05, seed=46, 200k prod + 30k burn-in.
+
+---
+
+## kj46 — ENDELIGE RESULTATER (2026-06-03)
+
+**Kjørt:** 2026-06-03, seed=46, 200k produksjon + 30k burn-in, warm start kj41 + psi_PL=0.05.
+
+**Konvergens:**
+| Mål | Krav | kj46 |
+|-----|------|------|
+| PSRF max | < 1.10 | **1.003** ✅ |
+| ESS min | > 4 000 (0.02×200k) | **1044** ❌ (ESS/n=0.0052) |
+| acc rate | 0.15–0.35 | **0.184** ✅ |
+
+ESS=1044 er høyere enn kj44 (1077) men fortsatt under krav. Årsak: psi_R presser
+til 0.9893 (posterior fat hale i logit-rom) — samme årsak som kj44/kj45.
+
+**Posterior (utvalgte parametre):**
+| Parameter | Prior mean | kj46 posterior | sd |
+|-----------|-----------|---------------|----|
+| psi_R | 0.666 | **0.9893** | 0.0005 |
+| psi_PL | 0.10 | **0.0505** | 0.0197 |
+| psi_P1 | 0.292 | 0.6081 | 0.149 |
+| psi_Y | 0.242 | 0.3304 | 0.049 |
+| phi_I2 | 165.66 | 62.5 | 38.7 |
+| rho_s | 0.50 | 0.0029 | 0.003 |
+
+**PLT-diagnose:**
+psi_PL = 0.0505 (q5=0.024, q95=0.087) — **identifisert og positiv**, ikke prior-drevet.
+PLT-effektvekt = (1 − psi_R) × psi_PL = (1 − 0.989) × 0.051 ≈ 0.00056 — **neglisjerbar**.
+
+**I_R-bane vs NB Memo 3/2024:**
+| Kvartal | kj46 modell | NB benchmark |
+|---------|------------|--------------|
+| q1 | 1.000 | 1.000 |
+| q4 | 0.954 | 0.550 |
+| q8 | 0.893 | 0.100 |
+| q12 | **0.838** | **−0.150** |
+
+**RMSE:** 0.3609 (mot kj41: 0.2771 — noe høyere, sannsynligvis pga phi_I2 variabilitet).
+
+**Konklusjon:**
+PLT-kanalen er identifisert (psi_PL > 0, signifikant) men utilstrekkelig.
+psi_R presser til 0.989 → PLT-effektvekten er ~0.00056 → I_R.q12 = 0.838 vs NB −0.15.
+Begrensning 6 er bekreftet strukturell og ikke løsbar med PLT alene.
+Vei B (aksepter begrensningen) er riktig konklusjon per PE-notat 2026-06-02.
+
+**Filer lagret:**
+- `data/results/chain_kj46_prod.npy` (200k × 21)
+- `data/results/chain_kj46_prod_posterior.json`
+- `data/results/chain_kj46_prod_meta.json`
