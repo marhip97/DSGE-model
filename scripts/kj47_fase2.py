@@ -124,6 +124,12 @@ print()
 
 t0 = time.time()
 
+
+# Merk: blokksampling (BLOCK_INDICES) er deaktivert — MwG med 16 blokker/steg
+# er 16× tregere enn standard RWMH (17+ timer total). Prior-endringene
+# (rho_O strammet, phi_O fri) er det strukturelt viktige i kj47.
+# Blokksampling implementeres mer effektivt i en fremtidig kjøring.
+
 chain, lp_chain, meta = adaptive_mcmc_with_monitoring(
     Y_pre, Y_post, H, Sv,
     theta_init    = theta_start,
@@ -140,7 +146,7 @@ chain, lp_chain, meta = adaptive_mcmc_with_monitoring(
     verbose       = True,
     save_prefix   = SAVE_PREFIX,
     use_reparam   = True,        # logit for psi_R (kj44+)
-    block_indices = BLOCK_INDICES,
+    block_indices = None,        # MwG deaktivert — for tregt (16× overhead)
     build_fn      = _build_fn,
     prior_overrides = None,
 )
