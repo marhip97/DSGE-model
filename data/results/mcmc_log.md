@@ -2616,3 +2616,54 @@ Det er en fundamental spenning mellom statistisk passform (høy lp) og strukture
 - `data/results/chain_kj47_prod_lp.npy`
 - `data/results/chain_kj47_prod_posterior.json`
 - `data/results/chain_kj47_prod_meta.json`
+
+---
+
+## kj48 — ENDELIGE RESULTATER (2026-06-03)
+
+**Kjørt:** 2026-06-03, seed=48, 200k produksjon + 30k burn-in + 5 rekalibreringer. Total: 103.7 min.
+**Endring vs kj47:** phi_I1-prior strammet fra Normal(2.0,5.0,[0.1,25]) til
+**LogNormal(log(12.54), 0.5, [0.1, 40])** — forankret mot K&M=12.54 for å forhindre kollaps.
+Ny `lognormal`-fordeling lagt til i `log_prior()`. Warm start: kj47 posterior, phi_I1=12.54.
+
+**Konvergens:** PSRF max=1.005 ✅, ESS min=645 ❌ (rho-klusteret), acc=0.250 ✅.
+
+**RESULTAT — phi_I1 KOLLAPSET LIKEVEL:**
+| Parameter | K&M | kj47 | kj48 | Kommentar |
+|-----------|-----|------|------|-----------|
+| phi_I1 | 12.54 | 0.100 | **0.1001 ± 0.0001** | KOLLAPSET til nedre grense igjen |
+| phi_O | 0.15 | 0.255 | 0.2546 | Uendret |
+| rho_O | 0.874 | 0.108 | 0.1064 | Uendret |
+| psi_R | 0.666 | 0.989 | 0.9893 | Uendret |
+
+**RMSE(NB) = 0.6033** (identisk med kj47: 0.603). IRF identisk. I_R.q12 = 0.833.
+
+**Diagnose — prioren var for svak OG mis-sentrert:**
+1. **For svak:** phi_I1-posterior std = 0.0001 (pinnet til grensen). Likelihood-draget mot
+   phi_I1→0 er overveldende — langt sterkere enn LogNormal-straffen (~42 log-enheter ved x=0.1).
+   lp settlet på −2474 (kun ~40 verre enn kj47's −2435 → prioren kostet ~40, men holdt ikke).
+2. **Mis-sentrert (kritisk oppdagelse):** Beste baseline **kj41 (RMSE=0.277) brukte
+   phi_I1 ≈ 0.50** (std=0.001 — effektivt pinnet), IKKE K&M=12.54. Prosjektets B5-passing
+   region er **phi_I1 ∈ [0.30, 0.75]** (jf. mcmc.py linje 60, 281), ikke K&M-verdien.
+
+**Tre regimer for phi_I1 (mot NB-benchmark):**
+| phi_I1 | BNP-respons | RMSE | Kilde |
+|--------|------------|------|-------|
+| 0.10 | eksploderer (~3.5× NB) | 0.60 | kj47, kj48 |
+| **0.50** | **~1.16× NB (passer B5)** | **0.277** | **kj41, kj31** |
+| 12.54 (K&M) | for liten | — | aldri kjørt fritt |
+
+**Konklusjon:**
+LogNormal-anker ved K&M=12.54 var feil premiss. Likelihood drar phi_I1 nedover, og siden
+12.54 ligger langt over den gode sonen [0.30,0.75], passerte kjeden rett gjennom den
+optimale regionen ned til nedre grense 0.10. **phi_I1 kan ikke estimeres fritt** — verken
+med svak normal-prior (kj47) eller LogNormal ved K&M (kj48). Beste baseline pinnet phi_I1≈0.50.
+
+**Neste steg — PE-beslutning eskalert** (premiss endret fra godkjent K&M-anker):
+Riktig anker er ~0.50 (B5-passing), ikke 12.54. Se PE-spørsmål.
+
+**Filer lagret:**
+- `data/results/chain_kj48_prod.npy` (200k × 20)
+- `data/results/chain_kj48_prod_lp.npy`
+- `data/results/chain_kj48_prod_posterior.json`
+- `data/results/chain_kj48_prod_meta.json`
