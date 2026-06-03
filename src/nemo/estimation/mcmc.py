@@ -236,10 +236,11 @@ PARAM_PRIORS = {
     # PE-godkjent 2026-05-16: Beta(2,2) — symmetrisk; data støtter ikke K&M rho_A=0.804
     'rho_A':   ('beta',     2.0,  2.0,  0.01, 0.9995),
     'rho_C':   ('beta',     2.0,  0.5,  0.01, 0.9995),
-    # rho_O: kj47: strammet prior mot empirisk Brent-persistens (PE-godkjent 2026-06-03).
-    # kj46 estimerte 0.244 (K&M: 0.874) — misidentifisert pga. manglende oljepris-ankerfeste.
-    # Beta(6,1.5,[0.50,0.9995]) → mean=0.80 med 95%-CI≈[0.60,0.95]. Oppr.: Beta(2,0.5).
-    'rho_O':   ('beta',     6.0,  1.5,  0.50, 0.9995),
+    # rho_O: kj47: prior tilbake til original Beta(2,0.5,[0.01,0.9995]) etter at
+    # strammet Beta(6,1.5,[0.50,0.9995]) ga PSRF=11.8 (likelihood-klippe ved 0.50).
+    # Data vil ha rho_O≈0.24 — dette er en genuin modell-egenskap, ikke misidentifikasjon.
+    # Alt C (stram rho_O-prior) forlatt; phi_O-estimering (Alt A) beholdes.
+    'rho_O':   ('beta',     2.0,  0.5,  0.01, 0.9995),
     'rho_Ys':  ('beta',     2.0,  0.5,  0.01, 0.9995),
     'rho_rp':  ('beta',     2.0,  0.5,  0.01, 0.9995),
     'rho_H':   ('beta',     5.0,  3.0,  0.30, 0.95),   # kj28: fikset fra Beta(2,0.5) → mode=0.667≈K&M=0.694
