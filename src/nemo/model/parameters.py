@@ -115,7 +115,7 @@ class Parameters:
     # Oppr. est. under bugget INV-ligning (G1-lag, 2-periodes). Etter A4a-fix
     # (G0-lag, korrekt 1-periode) er disse verdiene inkonsistente.
     # Rekalibrert 2026-05-15: phi_I1=4, phi_I2=8 → INV std≈3.8 % (data: 4.1 %).
-    phi_I1   = 4.0        # (CAL) φ_I1 — SS-justeringskost., rekalibrert etter A4a
+    phi_I1   = 0.50       # (CAL) φ_I1 — fast=0.50 kj49 (PE-godkjent 2026-06-03); B5-passing [0.30,0.75]
     phi_I2   = 8.0        # (CAL) φ_I2 — periode-justeringskost., rekalibrert etter A4a
     phi_H1   = 60.7278    # (EST) φ_H1 — Tabell 8: boligi nvestering (SS-avvik)
     phi_H2   = 199.6549   # (EST) φ_H2 — Tabell 8: boliginvestering (periode-avvik)

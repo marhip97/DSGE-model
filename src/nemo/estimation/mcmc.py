@@ -79,7 +79,7 @@ PSI_R_KJ25_FIXED = 0.90
 # og φ_PQ=300 er 2× for lav vs K&M=669. Disse korrigeres i kj26 for å eliminere systematisk feil.
 # Dessuten: rho_s=0 hardkoding i log_posterior (linje 334) gjorde at kj25 aldri estimerte rho_s
 # fra data (posterior var prior-dominert). kj26 fjerner dette og estimerer rho_s genuint.
-PHI_I1_KJ26_FIXED = 12.54   # K&M Tabell 8 (complete doc. s.59): kj25 brukte 0.50 (25× for lav)
+PHI_I1_KJ26_FIXED = 0.50    # kj49: B5-passing verdi (kj31/kj41 posterior ≈ 0.50); K&M=12.54 kollapser estimation
 PHI_PQ_KJ26_FIXED = 669.0   # K&M Tabell 8 (complete doc. s.59): kj25 brukte 300 (2× for lav)
 PHI_PQ_KJ38_FIXED = 200.0   # Sandkasse kj38+: kappa_P=0.15, forbedrer PI.q4≈NB
 # lambda_pi4: vekt på samtid π i hybrid Taylor-regel (0=ren E_t[π_{t+4}], 1=samtid)
@@ -276,14 +276,13 @@ PARAM_PRIORS = {
     'gamma_p': ('beta',   3.0, 3.0,  0.0,  0.95),
     # h_c er fjernet fra estimering — kalibreres fast til H_C_FIXED=0.938 (PE-godkjent 2026-05-18, C2 Alt A).
     # Posterior traff alltid 0.9995-grensen og drepte konsumkanalen. K&M-verdi gjenoppretter a3_W=0.032.
-    # phi_I1 kj48: LogNormal strammet mot K&M=12.54 (PE-godkjent 2026-06-03).
-    # kj47 kollapset phi_I1→0.10 (nedre grense) — gav statistisk lp-gevinst (~27 LL) men
-    # urealistisk IRF (BNP-respons ~10× NB). Data foretrekker lav phi_I1 (LL-sweep: 0.3→-3235,
-    # 12.54→-3262), men strukturell realisme krever K&M-nivå. LogNormal(log(12.54), 0.5)
-    # forankrer mot K&M med 95%-CI ≈ [4.7, 33.4] i nivå; sterk straff mot kollaps til 0.1
-    # (Δ log-prior ≈ 47 ved x=0.1 vs ~27 LL-gevinst → forhindrer kollaps).
-    # Exit: gjenaktiver ('normal', 2.0, 5.0, 0.1, 25.0) (kj28-47-prior) ved ny diagnose.
-    'phi_I1':  ('lognormal', np.log(12.54), 0.5, 0.1, 40.0),  # kj48: strammet mot K&M=12.54
+    # phi_I1 kj49: DEAKTIVERT — kalibreres fast=0.50 (PE-godkjent 2026-06-03).
+    # kj47/kj48: phi_I1 kollapset til nedre grense 0.10 (std=0.0001) — likelihood-drag
+    # overveldende (~800+ log-enheter). LogNormal(log(12.54),0.5)-prior (kj48) holdt ikke.
+    # Beste baseline kj41 (RMSE=0.277) brukte phi_I1≈0.50 effektivt fast.
+    # B5-passing region: phi_I1∈[0.30,0.75]. 0.50 er sentrum, strukturelt validert.
+    # Exit: gjenaktiver med LogNormal(log(0.50),0.15,[0.30,0.75]) dersom identifikasjonsproblem løses.
+    # 'phi_I1':  ('lognormal', np.log(12.54), 0.5, 0.1, 40.0),  # DEAKTIVERT kj49
     # phi_I2: kj25 prior Normal(8,4,[0.5,40]) truncerte K&M=165.66. kj26 åpner prioren:
     # Normal(50,50,[1,400]) lar data velge mellom kj25-estimat (~12) og K&M (166).
     'phi_I2':  ('normal', 50.0, 50.0, 1.0, 400.0),
