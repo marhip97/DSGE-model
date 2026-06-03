@@ -2667,3 +2667,73 @@ Riktig anker er ~0.50 (B5-passing), ikke 12.54. Se PE-spørsmål.
 - `data/results/chain_kj48_prod_lp.npy`
 - `data/results/chain_kj48_prod_posterior.json`
 - `data/results/chain_kj48_prod_meta.json`
+
+---
+
+## kj49 — ENDELIGE RESULTATER (2026-06-03)
+
+**Kjørt:** 2026-06-03, seed=49, 200k produksjon + 30k burn-in + 5 rekalibreringer. Total: 143.7 min.
+**Endringer vs kj48:** phi_I1 deaktivert fra estimering, kalibrert fast=0.50 (B5-passing). N_PARAMS=19.
+Warm start: kj47 posterior (bevarer phi_O≈0.255). phi_I1 resatt til 0.50 i warm start.
+
+**Konvergens:** PSRF max=1.004 ✅, ESS min=1099 ✅ (best hittil i Fase 2), acc=0.290 ✅.
+ESS=1099 er første gang ESS-kravet (>1000) er innfridd siden kj41. phi_I1 fast eliminerte
+den viktigste ESS-bottlenecken.
+
+**Posterior (utvalgte parametre):**
+| Parameter | K&M | kj41 | kj49 | Kommentar |
+|-----------|-----|------|------|-----------|
+| phi_O | 0.150 | 0.150 (fast) | **0.2057 ± 0.015** | Identifisert ✅ |
+| rho_O | 0.874 | — | **0.0983** | Fortsatt svært lav |
+| psi_R | 0.666 | 0.949 | **0.9893** | Uendret — begrensning 6 |
+| phi_I1 | 12.54 | 0.50 (fast) | **0.50 (fast)** | Kalibrert — ikke estimert |
+| phi_I2 | 165.66 | — | 63.63 | |
+| sigma_P | 0.003 | — | 0.0086 | |
+| gamma_p | 0.350 | — | 0.763 | |
+
+**RMSE-sammenligning (16-punkt NB-benchmark):**
+| Kjøring | phi_I1 | phi_O | RMSE | Δ vs kj41 |
+|---------|--------|-------|------|-----------|
+| kj41 | 0.50 (fast) | 0.15 (fast) | **0.277** | baseline |
+| kj49 | 0.50 (fast) | 0.206 (fri) | **0.375** | +0.098 |
+| kj47/48 | 0.10 (kollapset) | 0.255 (fri) | 0.603 | +0.326 |
+
+**IRF ved posterior mean:**
+| Variabel | kj49 | NB benchmark | kj47 |
+|---------|------|--------------|------|
+| Y (q1) | −0.439 | −0.12 | −1.157 |
+| Y (q4) | −0.535 | −0.47 | −1.632 |
+| Y (q8) | −0.430 | −0.40 | −1.348 |
+| PI (q4) | −0.068 | −0.14 | −0.160 |
+| PI (q8) | −0.065 | −0.22 | −0.166 |
+| I_R (q12) | **0.861** | **−0.150** | 0.834 |
+| RER (q4) | −0.869 | −1.00 | −0.942 |
+
+**Analyse:**
+1. **Y-dynamikk: massivt forbedret** fra kj47 (−1.632→−0.535 ved q4; nær NB −0.47). phi_I1=0.50
+   gjenoppretter realistisk investeringsrespons.
+2. **phi_O overlevde**: 0.2057 (K&M: 0.15, kj47: 0.255) — identifisert og hevet, men noe lavere
+   enn kj47 fordi phi_I1-regimet endrer likelihood-landskapet.
+3. **PI-respons for flat**: [−0.045,−0.068,−0.065,−0.045] vs NB [−0.03,−0.14,−0.22,−0.22].
+   PI-dynamikken er den primære årsaken til RMSE=0.375 > kj41's 0.277.
+4. **psi_R=0.989 uendret** — begrensning 6 består. I_R.q12=0.861 vs −0.15.
+5. **rho_O=0.098** (enda lavere enn kj47's 0.108) — olje-RER-kanalen neglisjerbar tross phi_O↑.
+   Akkumulert effekt: 0.206 × 0.098^4 ≈ 0.000019.
+
+**Konklusjon:**
+phi_O-frigjøring forbedrer Y-dynamikk indirekte (via endret posteriorlandskap), men
+phi_O-kanalen alene løser ikke RMSE-gapet mot kj41. Primære drivere for RMSE=0.375 vs 0.277:
+- PI-respons for flat (gamma_p=0.763, prisinflasjon dempes for mye)
+- psi_R=0.989 (I_R tilbakevender for sent)
+- rho_O=0.098 (olje-kanal neglisjerbar)
+
+phi_O er realøkonomisk identifisert (0.206 > K&M 0.15, ESS=2047) men har begrenset
+strukturell effekt på pengepolitikk-IRF i dette parameterregimet.
+
+**BK-stabilt:** True, max|eig(T)|=0.989.
+
+**Filer lagret:**
+- `data/results/chain_kj49_prod.npy` (200k × 19)
+- `data/results/chain_kj49_prod_lp.npy`
+- `data/results/chain_kj49_prod_posterior.json`
+- `data/results/chain_kj49_prod_meta.json`
