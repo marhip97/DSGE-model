@@ -23,7 +23,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parent.parent
 
 from nemo.estimation.mcmc import (
-    PARAM_NAMES, N_PARAMS, KM,
+    PARAM_NAMES, N_PARAMS, KM, PARAM_PRIORS,
     build_H, build_Sv, OBS_NAMES,
     adaptive_mcmc_with_monitoring,
 )
@@ -76,6 +76,17 @@ for i, name in enumerate(PARAM_NAMES):
 phi_O_idx = PARAM_NAMES.index('phi_O')
 theta_start[phi_O_idx] = 0.15
 post_std_init[phi_O_idx] = 0.05
+
+# Klipp startverdi til prior-grenser (beskytter mot ny rho_O-grense [0.50,0.9995])
+for i, name in enumerate(PARAM_NAMES):
+    if name in PARAM_PRIORS:
+        spec = PARAM_PRIORS[name]
+        lb, ub = float(spec[-2]), float(spec[-1])
+        eps = 1e-6
+        old = theta_start[i]
+        theta_start[i] = float(np.clip(theta_start[i], lb + eps, ub - eps))
+        if abs(theta_start[i] - old) > 1e-8:
+            print(f"  KLIPPING {name}: {old:.4f} → {theta_start[i]:.4f} (grenser [{lb},{ub}])")
 
 print(f"\nWarm start (kj41 posterior + phi_O=0.15):")
 for i, n in enumerate(PARAM_NAMES):
