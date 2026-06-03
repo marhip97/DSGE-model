@@ -236,7 +236,10 @@ PARAM_PRIORS = {
     # PE-godkjent 2026-05-16: Beta(2,2) — symmetrisk; data støtter ikke K&M rho_A=0.804
     'rho_A':   ('beta',     2.0,  2.0,  0.01, 0.9995),
     'rho_C':   ('beta',     2.0,  0.5,  0.01, 0.9995),
-    'rho_O':   ('beta',     2.0,  0.5,  0.01, 0.9995),
+    # rho_O: kj47: strammet prior mot empirisk Brent-persistens (PE-godkjent 2026-06-03).
+    # kj46 estimerte 0.244 (K&M: 0.874) — misidentifisert pga. manglende oljepris-ankerfeste.
+    # Beta(6,1.5,[0.50,0.9995]) → mean=0.80 med 95%-CI≈[0.60,0.95]. Oppr.: Beta(2,0.5).
+    'rho_O':   ('beta',     6.0,  1.5,  0.50, 0.9995),
     'rho_Ys':  ('beta',     2.0,  0.5,  0.01, 0.9995),
     'rho_rp':  ('beta',     2.0,  0.5,  0.01, 0.9995),
     'rho_H':   ('beta',     5.0,  3.0,  0.30, 0.95),   # kj28: fikset fra Beta(2,0.5) → mode=0.667≈K&M=0.694
@@ -289,10 +292,14 @@ PARAM_PRIORS = {
     # 'phi_PQ':  ('normal', 669.0, 300.0, 50.0, 2000.0),  # DEAKTIVERT etter kj13
     # kappa_M kj14: data vil ha LAVERE kappa_M (0.0175 < K&M=0.030) → KPI 0.13× NB. Ikke estimer på nytt.
     # 'kappa_M': ('normal', 0.03, 0.03, 0.005, 0.20),   # DEAKTIVERT etter kj13
-    # rho_s kj19: posterior=0.009 med gammel spec. kj25 reaktiverer: ny model (κ_P-fix, phi_u-fix)
-    # gir annet identifikasjonsmiljø. RMSE-diagnose: rho_s≈0.50 halverer RER-avvik fra 2×→0.7×NB.
-    # PE-godkjent 2026-05-28. Beta(2,2,[0.05,0.90]) sentrert ~0.50.
-    'rho_s':  ('beta', 2.0, 2.0, 0.05, 0.90),   # Reaktivert kj25
+    # rho_s: DEAKTIVERT kj47 (2026-06-03, PE-godkjent). kj46 estimerte 0.003±0.003 — degenerert
+    # posterior nær null. Kalibreres fast = 0.00 i parameters.py. ESS-bottleneck eliminert.
+    # Exit: gjenaktiver Beta(2,2,[0.05,0.90]) ved ny diagnose.
+    # 'rho_s': ('beta', 2.0, 2.0, 0.05, 0.90),  # DEAKTIVERT kj47
+    # phi_O: frigjort for estimering kj47 (PE-godkjent 2026-06-03, Alt. A).
+    # Kalibrert fast=0.15 (K&M Tabell 8) i alle kjøringer t.o.m. kj46. Frigjøres for å la
+    # data velge olje→RER-styrke. Normal(0.15,0.10,[0.01,0.80]) — sentrert på K&M med brede haler.
+    'phi_O':  ('normal', 0.15, 0.10, 0.01, 0.80),  # Aktivert kj47
     # phi_H1 kj27 (Alt B, PE-godkjent 2026-05-29): boliginvesteringsjusteringskost.
     # K&M Tabell 8: 60.73. phi_H1-sweep viser at K&M-verdi gir BNP q4=0.33× (mål 0.8×).
     # Med φ_I1=12.54 mangler vår forenklede modell NB-kanalene — phi_H1 estimeres for å
@@ -318,7 +325,8 @@ KM = {'rho_A':0.804,'rho_C':0.725,'rho_O':0.874,'rho_Ys':0.783,
       'psi_R2':0.0,  # AR(2)-lagg; 0.0 = AR(1)-exit (Alt. A2, PE-godkjent 2026-06-02)
       'psi_PL':0.0,  # PLT-koeffisient; 0.0 = ren inflasjonsmål (exitstrategi, Fase 2 2026-06-02)
       'phi_I1':12.54,'phi_I2':165.66,'phi_u':0.2192,  # K&M complete doc. s.59: phi_I1=12.54, phi_I2=165.66
-      'phi_PQ':669.0,'kappa_M':0.03,'rho_s':0.50,
+      'phi_PQ':669.0,'kappa_M':0.03,'rho_s':0.00,  # rho_s: kj47 fast=0.00
+      'phi_O':0.15,   # K&M Tabell 8: olje→RER-kanal; frigjort kj47
       'phi_H1':60.73}  # K&M Tabell 8: boliginvesteringsjusteringskost.
 
 def log_prior(theta, overrides=None):

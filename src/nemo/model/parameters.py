@@ -150,8 +150,8 @@ class Parameters:
     # Olje-valuta-kanal i UIP (PE-godkjent 2026-05-20)
     # Kalibrert fra historisk NOK/olje-korrelasjon ~0.7:
     # +10% oljepris → ~1.5% NOK-appresiering → phi_O ≈ 0.15
-    phi_O    = 0.15       # (CAL) direkte olje→RER-kanal i UIP
-    rho_s    = 0.0        # (EST) AR(1)-glatting av RER i UIP; 0=ren UIP (Fase 1B)
+    phi_O    = 0.15       # (EST) direkte olje→RER-kanal i UIP — frigjort kj47 (PE-godkjent 2026-06-03)
+    rho_s    = 0.0        # (CAL) AR(1)-glatting av RER i UIP; kj47: fast=0.00 (kj46 posterior=0.003)
 
     # Nasjonalregnskapsandeler (Norske data 2001–2019)
     # CY+IY+IHY+GY+XY-MY = 1.00 (Spor A5 rettelse, 2026-05-15)
