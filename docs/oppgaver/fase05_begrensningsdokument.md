@@ -155,6 +155,25 @@ prior-justering kan løse rentepersistens-problemet innenfor mimicking rule-ramm
 Vei B (aksepter begrensningen, dokumenter for brukere) er anbefalt konklusjon.
 Se `data/results/mcmc_log.md` (kj46-seksjon) for full dokumentasjon.
 
+**kj47 fullført 2026-06-03 — phi_O frigjort (PE-godkjent):**
+phi_O estimert fritt (prior Normal(0.15,0.10,[0.01,0.80])). N_PARAMS=20, rho_s fast=0.00.
+PSRF=1.004, ESS=702. RMSE(NB) = **0.6034** (FORVERRET fra kj41: 0.277, kj46: 0.361).
+
+Nye kritiske funn:
+- **phi_I1=0.1001 (nedre grense):** K&M=12.54 → 125× lavere. Nær-null investeringstreg heter
+  → monetært sjokk gir umiddelbar investeringskollaps → Y-respons ~10× for stor vs NB.
+- **rho_O=0.108** (falt fra 0.244 i kj46): phi_O↑ men rho_O↓ → olje-RER-kanal neglisjerbar
+- **lp=−2435** (+840 log-enheter vs kj41/kj46): MCMC fant nytt statistisk modus med
+  realistisk phi_O men urealistiske AR(1)-parametre (rho_A=0.016, rho_C=0.069)
+- **psi_R=0.989** uendret — begrensning 6 består
+
+**Konklusjon kj47:** phi_O-frigjøring forbedret statistisk passform men forverret strukturell
+realisme. Spenning mellom likelihood-modus (lp=−2435) og NB-benchmarkfit (RMSE=0.603).
+
+**Nødvendig tiltak for kj48:** Tett phi_I1-prior nær K&M=12.54 (f.eks. LogNormal) for å
+forhindre phi_I1-kollaps og gjenopprette realistiske investeringsdynamikker.
+Se `data/results/mcmc_log.md` (kj47-seksjon) for full dokumentasjon.
+
 ---
 
 ## Anbefalte begrensninger på bruk (frem til Fase 2)

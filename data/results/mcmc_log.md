@@ -2530,3 +2530,89 @@ Vei B (aksepter begrensningen) er riktig konklusjon per PE-notat 2026-06-02.
 - `data/results/chain_kj46_prod.npy` (200k × 21)
 - `data/results/chain_kj46_prod_posterior.json`
 - `data/results/chain_kj46_prod_meta.json`
+
+---
+
+## kj47 — ENDELIGE RESULTATER (2026-06-03)
+
+**Kjørt:** 2026-06-03, seed=47, 200k produksjon + 30k burn-in + 5 rekalibreringer (5×15k = 75k ekstra). Total tid: 102.3 min.
+**Endringer vs kj46:** rho_s fast=0.00 (var 0.003 ± 0.003), phi_O fri estimert Normal(0.15,0.10,[0.01,0.80]) (var kalibrert 0.15). N_PARAMS=20. Warm start: kj41 posterior.
+
+**Konvergens:**
+| Mål | Krav | kj47 |
+|-----|------|------|
+| PSRF max | < 1.10 | **1.004** ✅ |
+| ESS min | > 4 000 (0.02×200k) | **702** ❌ (ESS/n=0.0035) |
+| acc rate | 0.15–0.35 | **0.250** ✅ |
+
+ESS=702 < krav. Bottleneck: rho-klusteret (rho_A, rho_C, rho_O, rho_Ys, rho_rp, rho_H) — alle med ESS < 1000.
+5 rekalibreringer nødvendig i burn-in; PSRF forbedret fra 4.5→1.18 før produksjon.
+
+**Posterior (utvalgte parametre):**
+| Parameter | K&M | kj47 posterior | sd | [5%,95%] | ESS |
+|-----------|-----|---------------|----|---------|-----|
+| phi_O | 0.150 | **0.2548** | 0.020 | [0.224, 0.288] | 1421 |
+| rho_O | 0.874 | **0.1082** | 0.060 | [0.031, 0.223] | 1725 |
+| psi_R | 0.666 | **0.9893** | 0.001 | [0.988, 0.990] | 1494 |
+| phi_I1 | 12.540 | **0.1001** | 0.000 | [0.100, 0.100] | 2194 |
+| rho_A | 0.804 | **0.0157** | 0.004 | [0.011, 0.024] | 1004 |
+| rho_C | 0.725 | **0.0685** | 0.043 | [0.020, 0.152] | 1014 |
+| rho_rp | 0.737 | **0.9405** | 0.029 | [0.888, 0.982] | 2405 |
+| sigma_H | 0.050 | **0.2890** | 0.026 | [0.249, 0.335] | 1745 |
+| gamma_p | 0.350 | **0.8077** | 0.068 | [0.684, 0.904] | 1214 |
+
+**Statistisk passform:**
+Log-posterior ved posterior mean: lp ≈ −2435 (vs kj41: −3274, kj46: −3279).
+Forbedring på **840 log-enheter** fra kj41/kj46 — massiv forbedring i datapassform.
+
+**phi_O-diagnose:**
+phi_O = 0.2548 (K&M: 0.15) — HEVET som forventet. Posterior signifikant over K&M-kalibrering.
+rho_O = 0.1082 — FALT ytterligere fra kj46's 0.244. Akkumulert oljekanaleffekt:
+  phi_O × rho_O^4 ≈ 0.255 × 0.108^4 ≈ 0.000034 (neglisjerbar — verre enn kj46!)
+
+**Kritisk funn — phi_I1 ved nedre grense:**
+phi_I1 = 0.1001 med std=0.0001 og q5=q95=0.100 — stuck at prior lower bound (0.10).
+K&M-kalibrering er 12.54 — MCMC estimerer 125× lavere.
+Konsekvens: nær-null investeringstregheter → monetært sjokk gir umiddelbar og massiv
+investeringskollaps → Y-respons ~10× for stor vs NB-benchmark.
+
+**I_R-bane vs NB Memo 3/2024:**
+| Kvartal | kj47 modell | NB benchmark |
+|---------|------------|--------------|
+| q1 | 1.000 | 1.000 |
+| q4 | 0.951 | 0.550 |
+| q8 | 0.889 | 0.100 |
+| q12 | **0.834** | **−0.150** |
+
+**RMSE(16-punkt NB-benchmark):**
+| Variabel | kj47 | NB |
+|---------|------|-----|
+| Y (q1,q4,q8,q12) | −1.157, −1.632, −1.348, −0.993 | −0.12, −0.47, −0.40, −0.25 |
+| PI | −0.087, −0.160, −0.166, −0.125 | −0.03, −0.14, −0.22, −0.22 |
+| I_R | 1.000, 0.951, 0.889, 0.834 | 1.00, 0.55, 0.10, −0.15 |
+| RER | −1.084, −0.942, −0.531, −0.119 | −1.50, −1.00, −0.50, −0.20 |
+
+**RMSE = 0.6034** (kj41: 0.2771, kj46: 0.3609 — **FORVERRET**)
+
+**Analyse — likelihoodmodus vs strukturell realisme:**
+kj47 fant et nytt likelihoodmodus (lp=−2435 vs −3274) i en parameterregion med:
+- phi_I1→0.10 (nedre grense): investeringsfrisksjoner eliminert
+- rho_A=0.016, rho_C=0.069: nær-null AR(1)-persistens for teknologi og konsum
+- psi_R=0.989: renteglatting uendret fra kj46
+
+Denne modus passer dataene bedre statistisk, men gir strukturelt urealistiske IRF-dynamikker.
+Det er en fundamental spenning mellom statistisk passform (høy lp) og strukturell realisme
+(lav RMSE vs NB-benchmark).
+
+**Konklusjon:**
+1. phi_O frigjøring: bekreftet identifisert (0.255 > 0.15), men rho_O falt ytterligere
+2. phi_I1-problemet er nytt og kritisk: K&M=12.54 vs posterior=0.10 → IRF urealistisk
+3. RMSE=0.603 er VERRE enn kj41 (0.277) — phi_O-frigjøring alene løser ikke problemet
+4. Neste steg: tett phi_I1-prior nær K&M (f.eks. LogNormal(μ=log(12.5), σ=0.5)) i kj48
+5. BK-stabilt: True, max|eig(T)|=0.989
+
+**Filer lagret:**
+- `data/results/chain_kj47_prod.npy` (200k × 20)
+- `data/results/chain_kj47_prod_lp.npy`
+- `data/results/chain_kj47_prod_posterior.json`
+- `data/results/chain_kj47_prod_meta.json`
