@@ -74,22 +74,40 @@ reestimering (PE-godkjenning) og ville skille (1) fra et identifikasjonsproblem.
 
 ## 3. Strukturelt valg — eskaleres til PE
 
-Alle reelle fikser endrer UIP-likningen i `equations.py` og/eller krever
-reestimering. Disse er på eskaleringslisten (AGENTER.md):
+### 3.0 KORREKSJON (2026-06-04): sigma_rp er allerede fast og irrelevant for IRF-gapet
 
-| Alternativ | Endring | Eskaleringspunkt | Reversibel? |
-|-----------|---------|------------------|-------------|
-| **A. Endogen risikopremie** | UIP-premie = f(rentedifferanse/stand) + AR(1). Ny tilstand. | NZ-endring + reestimering | Ny bygger ved siden av v3 (ja) |
-| **B. Habit/nivåledd i RER** | Legg `rer_{t-1}`-vane med eget vekt-ledd (utover rho_s). Ev. ny tilstand. | equations.py + reestimering | Ny bygger (ja) |
-| **C. sigma_rp-fastpunktstest først (Spor C3)** | Fest sigma_rp=0.006, reestimer øvrige. Diagnostisk, ingen strukturendring. | Reestimering (~2t MCMC) | Helt (ja) |
-| **D. Aksepter begrensning** | Ingen endring; dokumentér RER som kjent begrensning, gå videre til Fase 3/4. | Ingen | — |
+Ved nærmere ettersyn (empirisk verifisert):
 
-**PL-anbefaling:** **C før A/B.** Spor C3 (sigma_rp-fastpunkt) er den billigste
-neste testen som faktisk skiller hypotesene: faller likelihood drastisk →
-modellen *trenger* høy sigma_rp (strukturproblem → A/B berettiget). Er den
-omtrent uendret → sigma_rp er absorberende (identifikasjon → A/B kan gjøre
-vondt verre uten flere observabler, jf. C6). C krever kun PE-godkjenning for én
-reestimering, ikke strukturendring.
+1. **`sigma_rp` er allerede fiksert til 0.006** (K&M) i `mcmc.py`
+   (`SIGMA_RP_FIXED=0.006`, PE-godkjent kj10 2026-05-24). kj41s `PARAM_NAMES`
+   inkluderer **ikke** sigma_rp. Det opprinnelige C3-eksperimentet (0.017→0.006)
+   er altså **allerede gjennomført** — kj41 *er* «sigma_rp fast = K&M».
+2. **`sigma_rp` påvirker ikke pengepolitikk-IRF-en i det hele tatt.** RER-IRF for
+   et pengepolitikksjokk er **identisk** for sigma_rp ∈ {0.006, 0.017, 0.05}.
+   Grunn: sigma_rp skalerer kun risikopremiesjokket (`E_rp`); under et
+   pengepolitikksjokk er `E_rp=0`, så sigma_rp inngår aldri i `R[:,E_i]`-banen.
+   FEVD-andelen (88 % av RER-varians) gjelder *ubetinget varians* drevet av
+   risikopremiesjokk — et **annet objekt** enn IRF-gapet mot NB Figur 1.
+
+**Følge:** En ny «fest sigma_rp=0.006 og reestimer» (opprinnelig spor C) ville
+bare reprodusere kj41 og kan **ikke** lukke det diagnostiserte
+monetær-IRF-RER-gapet. Spor C er derfor strøket som tiltak mot dette avviket.
+
+### 3.1 Reelle alternativer
+
+| Alternativ | Endring | Eskaleringspunkt | Adresserer monetær RER-IRF? |
+|-----------|---------|------------------|------------------------------|
+| **A. Endogen risikopremie** | UIP-premie reagerer på rentestand/-differanse (+AR(1)). Ny tilstand. v3 urørt. | NZ-endring + reestimering | **Ja** — kan holde RER appresiert mens renten er høy (uten å drepe impact) |
+| **B. Habit/nivåledd i RER** | `rer_{t-1}`-vane utover rho_s. | equations.py + reestimering | Delvis — samme avveiing som rho_s (bakoverledd → impact↓) |
+| **C′. Fri sigma_rp (varians-test)** | Frigjør sigma_rp, se om data vil ha den høy. Diagnostisk for FEVD, **ikke** for IRF-gapet. | Reestimering (~2t) | Nei (IRF uendret); kun varians/FEVD-diagnose |
+| **D. Aksepter begrensning** | Dokumentér RER som kjent begrensning, gå til Fase 3/4. | Ingen | — |
+
+**PL-anbefaling (revidert):** **A.** Det monetære RER-gapet er strukturelt i
+UIP og uavhengig av sigma_rp. `rho_s`-sweepen viste at et rent bakoverledd (≈ B)
+avveier impact mot persistens. En endogen risikopremie (A) som stiger med
+rentestanden kan gi *både* stort impact og treg hale, og er teoretisk forankret
+(Mæhlum 2025, Staff Memo 3/2025, UIP og valutakurs). A bygges som ny bygger ved
+siden av v3 (samme mønster som GEORG), med exitstrategi og K&M/Mæhlum-referanse.
 
 ---
 
