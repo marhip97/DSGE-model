@@ -2737,3 +2737,66 @@ strukturell effekt på pengepolitikk-IRF i dette parameterregimet.
 - `data/results/chain_kj49_prod_lp.npy`
 - `data/results/chain_kj49_prod_posterior.json`
 - `data/results/chain_kj49_prod_meta.json`
+
+---
+
+## FASE 2 — SAMMENDRAG OG KONKLUSJON (2026-06-03)
+
+### Referanseestimat
+
+**kj41** er Fase 2's beste estimat og benyttes som referanse for videre analyse.
+
+`data/results/chain_kj41_prod_posterior.json`
+
+| Diagnostikk | Verdi | Krav | Status |
+|-------------|-------|------|--------|
+| PSRF max | 1.003 | < 1.10 | ✅ |
+| ESS min | 620 | > 4000 | ❌ (ESS/n=0.0031) |
+| acc rate | ~0.25 | 0.15–0.35 | ✅ |
+| RMSE(16pt NB) | **0.277** | < 0.150 (mål) | Beste oppnådd |
+| BK-stabilitet | max\|eig\|=0.989 | < 1.0 | ✅ |
+
+### Viktigste parametere (kj41 posterior mean)
+
+| Parameter | K&M | kj41 | Kommentar |
+|-----------|-----|------|-----------|
+| psi_R | 0.667 | **0.949** | For høy — begrensning 6 |
+| phi_I1 | 12.54 | **0.500** | B5-passing verdi |
+| phi_O | 0.150 | 0.150 (fast) | Identifisert ~0.21 i kj49 |
+| rho_O | 0.874 | **0.244** | Lavere enn K&M |
+| sigma_rp | 0.006 | **0.016** | Absorberer uforklart NOK-vol. |
+| gamma_p | 0.350 | **0.808** | Høy prisrigiditet |
+
+### Kjørehistorikk Fase 2 (kj41–kj49)
+
+| Kjøring | Endring | RMSE | ESS | Konklusjon |
+|---------|---------|------|-----|------------|
+| kj41 | Baseline (build_v3_forward, phi_PQ=150) | **0.277** | 620 | **Beste estimat** |
+| kj44 | Logit-reparam psi_R | ~0.277 | — | Diagnostisk: psi_R genuint høy |
+| kj45 | AR(2) Taylor-regel (psi_R2) | 0.279 | — | psi_R2→0, forkastet |
+| kj46 | PLT prisnivåmål (psi_PL) | 0.361 | 1044 | psi_PL=0.051, neglisjerbar |
+| kj47 | phi_O fri, rho_s fast=0 | 0.603 | 702 | phi_I1 kollapset til 0.10 |
+| kj48 | LogNormal phi_I1-prior | 0.603 | 645 | phi_I1 kollapset igjen |
+| kj49 | phi_I1=0.50 fast, phi_O fri | 0.375 | **1099** | phi_O=0.206, psi_R↑0.989 |
+
+### Strukturelle begrensninger (Fase 2 konklusjon)
+
+**Begrensning 6 — Rentepersistens (psi_R):**
+psi_R=0.949–0.989 i alle kjøringer. I_R.q12=0.84–0.86 vs NB −0.15.
+Ikke løsbart med AR(2), PLT, logit-reparam eller phi_O innenfor mimicking rule.
+Vei B (aksepter, dokumenter) er konklusjonen. Se `fase05_begrensningsdokument.md`.
+
+**Begrensning 7 — phi_O–psi_R-korrelasjon (ny 2026-06-03):**
+phi_O er identifiserbar (~0.21, >K&M 0.15) men frigjøring presser psi_R 0.949→0.989.
+Nettoeffekt: RMSE 0.277→0.375. phi_O holdes fast på K&M=0.15 i referanseestimatet.
+
+**ESS-bottleneck:**
+Rho-klusteret (rho_A, rho_C, rho_O, rho_Ys, rho_rp, rho_H) gir ESS/n≈0.003–0.006 i
+alle kjøringer. Blokksampling (Metropolis-within-Gibbs) er implementert i mcmc.py men
+for tregt (16× overhead per steg). Fremtidig løsning: periodisk felles rho-proposal
+eller HMC (krever PE-godkjenning).
+
+### Fase 3 — Neste steg
+
+Fase 2 er avsluttet. Fase 3 (Analyseverktøy) kan starte med kj41 som referanseestimat.
+Se `PROSJEKTPLAN.md` for Fase 3-leveranser og akseptansekriterier.

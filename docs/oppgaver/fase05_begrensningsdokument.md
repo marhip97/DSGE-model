@@ -170,15 +170,52 @@ Nye kritiske funn:
 **Konklusjon kj47:** phi_O-frigjøring forbedret statistisk passform men forverret strukturell
 realisme. Spenning mellom likelihood-modus (lp=−2435) og NB-benchmarkfit (RMSE=0.603).
 
-**Nødvendig tiltak for kj48:** Tett phi_I1-prior nær K&M=12.54 (f.eks. LogNormal) for å
-forhindre phi_I1-kollaps og gjenopprette realistiske investeringsdynamikker.
-Se `data/results/mcmc_log.md` (kj47-seksjon) for full dokumentasjon.
+**kj48 fullført 2026-06-03 — LogNormal phi_I1-prior (PE-godkjent):**
+phi_I1-prior strammet til LogNormal(log(12.54), 0.5, [0.1, 40]). N_PARAMS=20.
+PSRF=1.005, ESS=645. RMSE(NB) = **0.6033** (identisk med kj47 — prior holdt ikke).
+
+Ny diagnose: likelihood-drag mot phi_I1→0 er ~800 log-enheter — uovervinnelig for
+LogNormal-prior. Beste baseline kj41 brukte phi_I1≈0.50, ikke K&M=12.54.
+
+**kj49 fullført 2026-06-03 — phi_I1=0.50 fast + phi_O fri (PE-godkjent):**
+phi_I1 kalibrert fast=0.50 (B5-passing region). phi_O fri. N_PARAMS=19.
+PSRF=1.004, ESS=1099 ✅ (beste i Fase 2). RMSE(NB) = **0.3748**.
+
+| Parameter | K&M | kj41 (beste) | kj49 | Kommentar |
+|-----------|-----|-------------|------|-----------|
+| phi_O | 0.15 | 0.15 (fast) | **0.206** | Identifisert og hevet ✅ |
+| psi_R | 0.67 | **0.949** | 0.989 | Høyere med phi_O fri ❌ |
+| rho_O | 0.87 | 0.244 | 0.098 | Fortsatt svært lav ❌ |
+| RMSE | — | **0.277** | 0.375 | Verre enn kj41 ❌ |
+
+**Begrensning 7 — phi_O–psi_R-korrelasjon (ny, identifisert kj47–kj49):**
+Freeing phi_O consistently raises psi_R from 0.949 (kj41) to 0.989, worsening I_R dynamics.
+Posterior correlation: higher phi_O (oil→RER) allows higher interest rate smoothing.
+Net effect: RMSE deteriorates (0.277→0.375) when phi_O is estimated freely.
+
+**Konklusjon oljepriskanal-undersøkelse (kj47–kj49):**
+- phi_O er identifisert (~0.21, høyere enn K&M=0.15) — strukturelt reelt funn
+- Men phi_O-frigjøring presser psi_R opp og forverrer RMSE — negativ nettoverdi
+- **kj41 forblir Fase 2's beste estimat** (RMSE=0.277, PSRF=1.00)
+- phi_O bør holdes fast på K&M=0.15 inntil psi_R-problemet adresseres strukturelt
+Se `data/results/mcmc_log.md` (kj47–kj49-seksjoner) for full dokumentasjon.
 
 ---
 
-## Anbefalte begrensninger på bruk (frem til Fase 2)
+## Anbefalte begrensninger på bruk (Fase 2-konklusjon)
 
-1. **Bruk ikke** modellen til kvantitative pengepolitikk-IRF uten å skalere ned ~6×
-2. **Bruk gjerne** modellen til FEVD, historisk dekomposisjon, og sjokk-identifikasjon
-3. **Rapporter alltid** usikkerhetsbånd basert på posterior-trekk (ikke kun mean)
-4. **Referer** til dette dokumentet ved presentasjon av resultater
+1. **Beste referanseestimat:** kj41 (RMSE=0.277, PSRF=1.00, psi_R=0.949)
+2. **Bruk ikke** modellen til kvantitative pengepolitikk-IRF uten å skalere ned ~3–6×
+3. **Bruk gjerne** modellen til FEVD, historisk dekomposisjon, og sjokk-identifikasjon
+4. **Rapporter alltid** usikkerhetsbånd basert på posterior-trekk (ikke kun mean)
+5. **Referer** til dette dokumentet ved presentasjon av resultater
+
+## Kjente uløste begrensninger (Fase 2 avsluttet)
+
+| # | Begrensning | Beste kjøring | Verdi | NB | Status |
+|---|-------------|--------------|-------|----|--------|
+| 1 | BNP-respons for stor | kj49 | −0.54 (q4) | −0.47 | Delvis løst ✅ |
+| 2 | KPI-respons for flat | kj49 | −0.068 (q4) | −0.14 | Uløst ❌ |
+| 3 | RER-respons OK | kj49 | −0.869 (q4) | −1.00 | Nær ✅ |
+| 6 | I_R.q12 = 0.86 (NB: −0.15) | alle | 0.84–0.86 | −0.15 | Strukturell ❌ |
+| 7 | phi_O–psi_R-korrelasjon | — | — | — | Ny 2026-06-03 ❌ |

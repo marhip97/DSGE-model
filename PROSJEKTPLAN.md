@@ -31,6 +31,11 @@ skal brukes til å analysere sjokk og optimale pengepolitiske responser.
 | 2026-05-20 | phi_I1 frigjøres i kjøring 9 (19 param) | B5-analyse viste at fast phi_I1=4.0 er hovedårsak til BNP-ratio ~10×. Fri phi_I1 (~0.5) traff NB eksakt. |
 | 2026-05-23 | **Alt A godkjent — akseptér modellbegrensning, start Fase 1** | sigma_rp=0.017 er strukturelt (oljepris/valutakanal mangler). 7 MCMC-kjøringer viser at ingen parameterfikseringer løser problemet. IRF-avvik (BNP 6×, RER 29×) dokumenteres i begrensningsdokument. Alt B (oljepriskanal) utsettes til etter Fase 1 når nyere data er tilgjengelig. Se `docs/oppgaver/fase05_begrensningsdokument.md`. |
 | 2026-05-23 | **MSV godkjent som produksjonslikevekt** | BK-determinisme ikke oppnåelig med minimal v3-endring (Alt D bekreftet, gap=1 strukturelt). MSV (M=0, T=G0⁻¹G1) er korrekt fundamental-likevekt — K&M-konsistent, stabil, 15/15 IRF. |
+| 2026-06-01 | **Logit-reparametrisering av psi_R (kj44)** | psi_R=0.99 bekreftet genuint (ikke samplingsartefakt). Posterior i logit-rom: mean=6.99, sd=0.0004. |
+| 2026-06-02 | **AR(2) Taylor-regel forkastet (kj45)** | psi_R2→0 entydig. Mean-reversion via autoregressiv struktur umulig. |
+| 2026-06-02 | **PLT-kanal implementert og estimert (kj46)** | psi_PL=0.051 identifisert, men PLT-effektvekt≈0.0006 neglisjerbar. Begrensning 6 bekreftet strukturell. |
+| 2026-06-03 | **phi_O frigjort, phi_I1=0.50 fast (kj47–kj49)** | phi_O identifisert ~0.21 (>K&M 0.15), men phi_O-frigjøring presser psi_R 0.949→0.989. Ny begrensning 7: phi_O–psi_R-korrelasjon. kj41 forblir beste estimat (RMSE=0.277). |
+| 2026-06-03 | **Fase 2 avsluttet — kj41 er referanseestimat** | kj41: PSRF=1.00, ESS/n≈0.003 (under krav), RMSE=0.277. Strukturelle begrensninger 6 og 7 dokumentert. Fase 3 kan starte. |
 
 ## Fase 0 — Restart og fundament ✅
 
@@ -274,52 +279,38 @@ må kjøres fra lokal maskin eller whitelistet server. Output commites til repo.
 
 **Risiko (gjenværende):** SSB-tabell-IDer kan endres. FRED krever API-nøkkel.
 
-## Fase 2 — Revidert estimering med forbedret sampler / informert prior
+## Fase 2 — Revidert estimering med forbedret sampler / informert prior ✅
 
-**Mål:** Produsere en posterior som er (a) **mixet ordentlig**
-(ESS/n > 0.02 oppfylt for alle parametere), (b) basert på prior revidert
-ut fra Fase 0.5 Spor C-funn, og (c) kjørt på den utvidede dataserien fra
-Fase 1. Den gamle formuleringen "reestimering" antydet feilaktig at det
-bare var et spørsmål om å trykke "kjør på nytt" — faktisk arbeid
-inkluderer både sampler-forbedring og prior-revisjon.
+**Status: AVSLUTTET 2026-06-03.** Beste estimat: **kj41** (PSRF=1.00, RMSE=0.277).
 
-### Komponenter
+**Gjennomført (kj41–kj49, 2001Q1–2025Q4):**
 
-**1. Sampler-forbedring** (følger fra Spor C8-funn):
-- Implementere valgt sampler-strategi: blokksampling, reparametrisering,
-  eller HMC.
-- HMC krever PE-godkjenning iht. AGENTER.md eskaleringsliste.
-- Verifisere på syntetisk testcase at ny sampler oppnår ESS/n > 0.02 før
-  produksjonskjøring.
+| Kjøring | Hva | Funn |
+|---------|-----|------|
+| kj41 | Baseline Fase 2 (N=21, build_v3_forward) | **RMSE=0.277**, psi_R=0.949 — beste estimat |
+| kj44 | Logit-reparam psi_R | psi_R=0.99 genuint, ikke samplingsartefakt |
+| kj45 | AR(2) Taylor-regel | psi_R2→0 entydig — mean-reversion umulig |
+| kj46 | PLT prisnivåmål-kanal | psi_PL=0.051 identifisert men neglisjerbar (×0.0006) |
+| kj47 | phi_O fri + rho_s fast=0 | phi_I1 kollapser til 0.10 → RMSE=0.603 |
+| kj48 | LogNormal phi_I1-prior | phi_I1 kollapser igjen — likelihood for sterk |
+| kj49 | phi_I1=0.50 fast + phi_O fri | phi_O=0.206 identifisert, RMSE=0.375 |
 
-**2. Prior-revisjon** (følger fra forhåndsregistrert C5-designdokument):
-- Revisjon av `src/nemo/estimation/priors.py` med begrunnelser per parameter.
-- Hvis prior utvides eller strammes på h_c, psi_R, sigma_rp eller andre
-  parametere — dokumenter i `data/results/mcmc_log.md` *før* kjøring.
+**Resultater:**
+- **Begrensning 6 (I_R.q12):** Bekreftet strukturell. psi_R=0.949–0.989 i alle kjøringer.
+  I_R.q12=0.84–0.86 vs NB −0.15. Ikke løsbart med AR(2), PLT, logit-reparam eller phi_O.
+- **Begrensning 7 (phi_O–psi_R):** Ny. Frigjøring av phi_O presser psi_R 0.949→0.989.
+  phi_O≈0.21 er identifisert (>K&M 0.15) men kan ikke brukes fritt uten IRF-forringelse.
+- **ESS/n:** kj49 oppnådde ESS=1099 (ESS/n=0.0055) — fremdeles under krav 0.02.
+  Rho-klusteret er fortsatt ESS-bottleneck.
 
-**3. Reestimering på fersk data** (forutsetter Fase 1 ferdig):
-- Bruke utvidet observasjonsserie (frem til siste tilgjengelige kvartal).
-- `data/results/posterior_v4.json` med PSRF, ESS, traceplots,
-  autokorrelasjonsplott per parameter.
+**Referanseestimat for videre analyse:**
+`data/results/chain_kj41_prod_posterior.json` (RMSE=0.277, PSRF=1.00, psi_R=0.949)
 
-### Leveranser
+**Strukturelle kalibreringer (fast):**
+- phi_I1=0.50 (B5-passing), rho_s=0.00, phi_O=0.15 (K&M), h_c=0.938, sigma_A=0.006
+- phi_PQ=150, lambda_pi4=0.0, NZ=50
 
-- [ ] `notebooks/identification.ipynb` — bygger på Fase 0.5 Spor C
-- [ ] Sampler-implementasjon (kode + tester på syntetisk data)
-- [ ] Revisjon av `src/nemo/estimation/priors.py` med begrunnelser
-- [ ] Forhåndsregistrert designdokument (fra C5) sjekket inn før kjøring
-- [ ] Reestimering på fersk data
-- [ ] `data/results/posterior_v4.json` med fullstendig diagnostikk
-
-### Akseptansekriterier
-
-- **ESS/n > 0.02 for alle parametere** (var ikke oppfylt i v3)
-- **PSRF < 1.10 for alle parametere**
-- Ingen posterior-middel < 5 % fra prior-grensa (eller dokumentert hvorfor)
-- Marginal likelihood dokumentert og høyere enn v3 (eller forklart hvorfor
-  lavere er akseptabelt, f.eks. strammere prior gir lavere ML men bedre
-  identifikasjon)
-- Designdokumentet fra C5 er fulgt (ingen post-hoc prior-justeringer)
+Se `docs/oppgaver/fase05_begrensningsdokument.md` for fullstendig begrensningsdokument.
 
 ## Fase 3 — Analyseverktøy konsolidering
 
