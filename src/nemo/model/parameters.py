@@ -153,6 +153,15 @@ class Parameters:
     phi_O    = 0.15       # (EST) direkte olje→RER-kanal i UIP — frigjort kj47 (PE-godkjent 2026-06-03)
     rho_s    = 0.0        # (CAL) AR(1)-glatting av RER i UIP; kj47: fast=0.00 (kj46 posterior=0.003)
 
+    # Endogen risikopremie i UIP (PE-godkjent 2026-06-04, transmisjonsdiagnose).
+    # Adresserer monetær RER-IRF-gap: NB Figur 1 har stort RER-utslag som henger
+    # appresiert, mens vår RER overshooter til positivt. En persistent premie som
+    # reagerer på rentedifferansen gir både større impact og treg hale (forward
+    # premium puzzle; Mæhlum 2025, Staff Memo 3/2025). Brukes av build_matrices_rpendo.
+    # Exitstrategi: kappa_rp_endo=0 → eksakt v3_forward-atferd.
+    kappa_rp_endo = 0.0   # (EST) premie-respons på rentedifferanse (i_D − i*); 0=av
+    rho_rp_endo   = 0.90  # (EST) persistens i endogen risikopremie
+
     # Nasjonalregnskapsandeler (Norske data 2001–2019)
     # CY+IY+IHY+GY+XY-MY = 1.00 (Spor A5 rettelse, 2026-05-15)
     # Opprinnelig MY=0.34 inkluderte olje-sektoren; fastland ~28 %.

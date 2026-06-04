@@ -122,5 +122,44 @@ siden av v3 (samme mønster som GEORG), med exitstrategi og K&M/Mæhlum-referans
 
 ---
 
-*Neste handling: PE velger strukturelt spor (§3). Diagnosen er rent
-analysearbeid og krever ingen godkjenning; alle videre steg gjør det.*
+## 5. Resultat — Alt A implementert og kalibreringstestet (2026-06-04)
+
+PE valgte **A: endogen risikopremie** (2026-06-04). Implementert som ny bygger
+`build_matrices_rpendo` ved siden av v3_forward (v3/v3_forward **urørt**):
+
+- Ny tilstand `RP_ENDO` (NZ_RPENDO=51): `RP_ENDO_t = ρ_pe·RP_ENDO_{t-1} + κ_pe·(i_D − i*)`.
+- UIP rad 15 utvidet: `rer_t = … − (1−ρ_s)·RP_ENDO_t`.
+- Fremoverskuende Taylor (fixed-point) løst på det utvidede 51-systemet → sammenliknbar med kj41.
+- Parametere `kappa_rp_endo`, `rho_rp_endo` i `parameters.py`. Exit: κ_pe=0 → eksakt v3_forward (verifisert, atol=1e-8).
+- `tests/test_rpendo.py`: 7 tester (dim, RP_ENDO-lov, UIP-kobling, BK, IRF-fortegn, appresiering, exit). Full suite: **113 passed, 3 xfailed**.
+
+### Kalibreringstest mot NB (kj41-transmisjon, IKKE reestimert)
+
+RER-IRF (normalisert, pengepolitikksjokk):
+
+| (κ_pe, ρ_pe) | RER q1 | q4 | q8 | q12 | RMSE(16pt) vs NB |
+|--------------|--------|----|----|-----|------------------|
+| (0, –) = kj41 | −1.04 | −0.72 | −0.24 | +0.12 | 0.295 |
+| (0.2, 0.7) | −1.25 | −1.13 | −0.48 | +0.11 | **0.263** |
+| (0.4, 0.0) | −1.45 | −0.99 | −0.30 | +0.19 | 0.272 |
+| NB Figur 1 | −1.50 | −1.00 | −0.50 | −0.20 | — |
+
+**Funn:** En **moderat** endogen premie (κ≈0.2–0.4) løfter RER-impact mot NBs
+−1.50 og forbedrer q4/q8 vesentlig. **16-punkts NB-RMSE faller fra 0.295 til
+0.263** (≈11 %), BK-stabil i hele området. Den dypeste resten — RER-fortegnet
+ved q12 (NB −0.20, vår fortsatt svakt positiv) — reduseres men forsvinner ikke.
+Mekanismen virker altså i riktig retning og er teoriforankret, men er foreløpig
+**håndkalibrert** mot NB, ikke estimert.
+
+### Neste steg — krever PE-godkjenning (reestimering)
+
+Den håndkalibrerte testen viser at mekanismen er lovende. For å avgjøre om
+**data** støtter en endogen premie (og hvilke κ_pe/ρ_pe), kreves reestimering
+med `build_matrices_rpendo` og κ_pe/ρ_pe frie — ~2t MCMC, forhåndsregistreres i
+`mcmc_log.md`. **Eskaleringspunkt:** reestimering (AGENTER.md pkt. 10) + utvidet
+parameterrom. Ikke startet uten eksplisitt godkjenning.
+
+---
+
+*Status: Alt A implementert og kalibreringsverifisert. Reestimering avventer
+PE-godkjenning.*

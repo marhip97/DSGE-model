@@ -157,6 +157,11 @@ GEORG_S_L7   = 62   # s_{t-7}
 GEORG_Z      = 63   # AR(1) pengepolitikksjokk Z_t
 NZ_GEORG     = 64
 
+# Endogen risikopremie i UIP (PE-godkjent 2026-06-04). Bygger på v3_forward (NZ=50),
+# +1 tilstand for persistent premie. Exit: kappa_rp_endo=0 → v3_forward.
+RP_ENDO   = 50      # endogen risikopremie (AR(1) drevet av rentedifferanse)
+NZ_RPENDO = 51
+
 # ── Sjokk-indekser ───────────────────────────────────────────────────────────
 E_A=0; E_C=1; E_H=2; E_G=3; E_O=4; E_Ys=5; E_rp=6
 E_i=7; E_P=8; E_phi_h=9; E_prem=10; E_I=11; E_piS=12
@@ -1446,6 +1451,118 @@ def build_matrices_georg(p=None, theta_H: float = 0.05,
 
         if np.max(np.abs(T_new - T_prev)) < tol:
             T_prev = T_new
+            break
+        T_prev = T_new
+
+    return G0, G1, Psi, Pi
+
+
+def build_matrices_rpendo(p=None, theta_H: float = 0.05,
+                           lambda_pi4: float | None = None,
+                           n_iter: int = 60, tol: float = 1e-9):
+    """
+    NEMO v3 med endogen risikopremie i UIP (PE-godkjent 2026-06-04).
+
+    Adresserer det monetære RER-IRF-gapet (transmisjonsdiagnose,
+    `docs/oppgaver/transmisjon_rer_diagnose.md`): NB Figur 1 viser et stort
+    RER-utslag som henger appresiert, mens v3 gir for lite utslag som overshooter
+    til positivt. En persistent risikopremie som reagerer på rentedifferansen
+    gir både større impact og tregere hale (forward premium puzzle;
+    Mæhlum 2025, Staff Memo 3/2025 «Monetary Policy and the Exchange Rate in
+    Norway»).
+
+    Ny tilstand (NZ_RPENDO = 51):
+        RP_ENDO_t = ρ_pe·RP_ENDO_{t-1} + κ_pe·(i_D_t − i*_t)
+    UIP-likningen (rad 15) utvides med −(1−ρ_s)·RP_ENDO (appresieringspress):
+        rer_t = … − (1−ρ_s)·RP_ENDO_t
+    κ_pe = `kappa_rp_endo`, ρ_pe = `rho_rp_endo` (parameters.py).
+
+    Bygger på den fremoverskuende Taylor-regelen (samme fixed-point som
+    `build_matrices_v3_forward`), nå løst på det utvidede 51-systemet, slik at
+    den er sammenliknbar med kj41-referansen. v3/v3_forward er **urørt**.
+
+    Exitstrategi: κ_pe = 0 → RP_ENDO blir frakoblet UIP (dead state) og kjernen
+    er eksakt v3_forward.
+
+    Parametere
+    ----------
+    p          : Parameters-instans (defaults hvis None)
+    theta_H    : Boligpris-forventningsparameter (videresendt til v3)
+    lambda_pi4 : Hybrid-vekt for fremoverskuende Taylor (som v3_forward)
+    n_iter     : Maks iterasjoner for fixed-point
+    tol        : Konvergenstoleranse
+
+    Returnerer
+    ----------
+    G0, G1, Psi, Pi : (NZ_RPENDO×NZ_RPENDO), (·×NE), … matriser
+    """
+    from nemo.solver.blanchard_kahn import solve as _solve
+
+    if p is None:
+        p = Parameters
+
+    lam = lambda_pi4
+    if lam is None:
+        lam = float(getattr(p, 'lambda_pi4', 0.5))
+
+    kappa_pe = float(getattr(p, 'kappa_rp_endo', 0.0))
+    rho_pe   = float(getattr(p, 'rho_rp_endo', 0.90))
+    rho_s    = float(getattr(p, 'rho_s', 0.0))
+    _w       = 1.0 - rho_s
+
+    # ── Bygg utvidet v3 (NZ=50 → 51) ──────────────────────────────────────────
+    G0_50, G1_50, Psi_50, Pi_50 = build_matrices_v3(p, theta_H=theta_H)
+    G0  = np.zeros((NZ_RPENDO, NZ_RPENDO))
+    G1  = np.zeros((NZ_RPENDO, NZ_RPENDO))
+    Psi = np.zeros((NZ_RPENDO, NE))
+    Pi  = np.zeros((NZ_RPENDO, NZ_RPENDO))
+    G0[:NZ, :NZ] = G0_50
+    G1[:NZ, :NZ] = G1_50
+    Psi[:NZ, :]  = Psi_50
+    Pi[:NZ, :NZ] = Pi_50
+
+    # ── Lov for endogen risikopremie ──────────────────────────────────────────
+    # RP_ENDO_t = ρ_pe·RP_ENDO_{t-1} + κ_pe·(i_D_t − i*_t)
+    G0[RP_ENDO, RP_ENDO] =  1.0
+    G0[RP_ENDO, I_D]     = -kappa_pe
+    G0[RP_ENDO, I_STAR]  = +kappa_pe
+    G1[RP_ENDO, RP_ENDO] =  rho_pe
+
+    # ── Koble premien inn i UIP (rad 15): rer_t = … − (1−ρ_s)·RP_ENDO ─────────
+    # Positiv premie ved renteoppgang → ekstra appresiering (rer ned).
+    G0[15, RP_ENDO] = _w
+
+    # ── Fremoverskuende Taylor via fixed-point (mirror v3_forward) ────────────
+    psi_R  = p.psi_R
+    psi_R2 = p.psi_R2
+    psi_P1 = p.psi_P1
+    _scale = 1.0 - psi_R - psi_R2
+
+    G0_row20_base = G0[20, :].copy()
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        T_prev, _, d = _solve(G0, G1, Psi, Pi, verbose=False)
+    if not d.get("stable", False):
+        return G0, G1, Psi, Pi   # fallback (v3-bakover Taylor på utvidet system)
+
+    e_PI = np.zeros(NZ_RPENDO)
+    e_PI[PI] = 1.0
+
+    for _ in range(n_iter):
+        T4_PI = e_PI @ np.linalg.matrix_power(T_prev, 4)
+        G0[20, :] = G0_row20_base.copy()
+        G0[20, PI] = -_scale * psi_P1 * lam
+        G0[20, :] -= _scale * psi_P1 * (1.0 - lam) * T4_PI
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            T_new, _, d_new = _solve(G0, G1, Psi, Pi, verbose=False)
+        if not d_new.get("stable", False):
+            G0[20, :] = G0_row20_base.copy()
+            return G0, G1, Psi, Pi
+
+        if np.max(np.abs(T_new - T_prev)) < tol:
             break
         T_prev = T_new
 
