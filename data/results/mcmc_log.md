@@ -2800,3 +2800,33 @@ eller HMC (krever PE-godkjenning).
 
 Fase 2 er avsluttet. Fase 3 (Analyseverktøy) kan starte med kj41 som referanseestimat.
 Se `PROSJEKTPLAN.md` for Fase 3-leveranser og akseptansekriterier.
+
+## kj50 — Endogen risikopremie i UIP (Alt A) — FORHÅNDSREGISTRERT 2026-06-04
+
+**PE-godkjent** 2026-06-04 (transmisjonsdiagnose, valg A).
+
+**Hypotese:** Data støtter en persistent risikopremie som reagerer på
+rentedifferansen og lukker (helt/delvis) det monetære RER-IRF-gapet mot NB
+Figur 1. Håndkalibrert test (kj41-transmisjon, ikke estimert): 16pt-RMSE
+0.295→0.263 ved κ≈0.2, ρ≈0.5–0.7.
+
+**Modell:** `build_matrices_rpendo` (NZ_RPENDO=51). Ny tilstand RP_ENDO:
+`RP_ENDO_t = ρ_pe·RP_ENDO_{t-1} + κ_pe·(i_D−i*)`; UIP rad 15:
+`rer_t = … − (1−ρ_s)·RP_ENDO`. v3/v3_forward urørt. Exit: κ_pe=0 → v3_forward.
+
+**Frie parametere (N=21):** kj41-19 + nye:
+- `kappa_rp_endo`: prior Normal(0.20, 0.15, [0.0, 1.0]) — nedre grense 0 = exit.
+- `rho_rp_endo`:   prior Beta(2, 2, [0.05, 0.95]).
+
+**Faste kalibreringer (= kj41):** phi_I1=0.50, rho_s=0.00, sigma_rp=0.006,
+sigma_A=0.006, h_c=0.938, phi_u=0.2192, kappa_M=0.030, phi_PQ=150,
+lambda_pi4=0.0. phi_O fri (Normal(0.15,0.10,[0.01,0.80])).
+
+**Data:** `nemo_data_kpi_jae.csv`, pre ≤2019Q4, post ≥2022Q1 (COVID-hull).
+**Sampler:** adaptive RWMH + logit-reparam(psi_R), seed=50, n_prod=200k,
+burnin=30k. Warm start: kj41 posterior; nye param på prior-mean.
+**Suksesskriterium:** PSRF<1.10; rapporter ESS/n; 16pt-RMSE vs kj41 (0.295);
+κ_pe-posterior (om data vil ha premien > 0).
+**Forhåndsforpliktelse:** Resultatet rapporteres uansett utfall (også hvis
+κ_pe→0, dvs. data forkaster premien). Ingen prior-justering etter å ha sett
+posterior uten ny PE-godkjenning.

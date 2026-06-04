@@ -31,7 +31,7 @@ from scipy.special import betaln, gammaln
 from nemo.model.equations import (
     build_matrices_v3, build_matrices_pi4chain, build_matrices_altB,
     build_matrices_v3_forward, build_matrices_v3_plt,
-    NZ, NZ_PI4, NZ_ALTB, NZ_PLT, NZ_GEORG, NE,
+    NZ, NZ_PI4, NZ_ALTB, NZ_PLT, NZ_GEORG, NZ_RPENDO, NE,
     Y, C, INV, INV_H, X, M, PI, W, I_R, RER, S, PO, YS,
     Q_H, B_NW, C_NW, I_D, I_L_NW, L, MC,
     E_A, E_C, E_P, E_O, E_Ys, E_rp, E_i, E_H, E_phi_h
@@ -238,6 +238,17 @@ def build_H_georg() -> np.ndarray:
     return H
 
 
+def build_H_rpendo() -> np.ndarray:
+    """Observasjonsmatrise for endogen-risikopremie-modellen (NZ_RPENDO=51 kol.).
+    RP_ENDO (index 50) er ikke observert — ekstra null-kolonne. Første NZ
+    kolonner matcher build_H().
+    """
+    H_50 = build_H()
+    H = np.zeros((N_OBS, NZ_RPENDO))
+    H[:, :NZ] = H_50
+    return H
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # PARAMETERE OG PRIOR
 # sigma_A er fjernet fra estimering — kalibreres fast
@@ -319,6 +330,13 @@ PARAM_PRIORS = {
     # Med φ_I1=12.54 mangler vår forenklede modell NB-kanalene — phi_H1 estimeres for å
     # la data avgjøre kompensasjonsgraden. Prior Normal(60.73, 40, [0.5, 200]) — bredt.
     'phi_H1': ('normal', 60.73,  5.0, 30.0, 100.0),  # kj28: strammet fra (40,[0.5,200]) → eliminerer bimodal
+    # Endogen risikopremie i UIP (kj50, Alt A, PE-godkjent 2026-06-04).
+    # Adresserer monetær RER-IRF-gap (transmisjonsdiagnose). Brukes med
+    # build_matrices_rpendo. Exit: kappa_rp_endo=0 → eksakt v3_forward.
+    # Prior sentrert på håndkalibrert NB-treffende verdi (κ≈0.2, ρ≈0.5-0.7);
+    # nedre grense 0 lar data forkaste premien hvis den ikke trengs.
+    'kappa_rp_endo': ('normal', 0.20, 0.15, 0.0, 1.0),
+    'rho_rp_endo':   ('beta',   2.0,  2.0,  0.05, 0.95),
     # psi_PL: PLT prisnivåmål-koeffisient (Fase 2, 2026-06-02, kj46).
     # Normal(0.10, 0.05, [0.00, 0.50]): sentrert over typisk PLT-respons.
     # psi_PL=0 → exitstrategi (ren inflasjonsmål). Gjenaktiver for kj46.
@@ -341,7 +359,9 @@ KM = {'rho_A':0.804,'rho_C':0.725,'rho_O':0.874,'rho_Ys':0.783,
       'phi_I1':12.54,'phi_I2':165.66,'phi_u':0.2192,  # K&M complete doc. s.59: phi_I1=12.54, phi_I2=165.66
       'phi_PQ':669.0,'kappa_M':0.03,'rho_s':0.00,  # rho_s: kj47 fast=0.00
       'phi_O':0.15,   # K&M Tabell 8: olje→RER-kanal; frigjort kj47
-      'phi_H1':60.73}  # K&M Tabell 8: boliginvesteringsjusteringskost.
+      'phi_H1':60.73,  # K&M Tabell 8: boliginvesteringsjusteringskost.
+      # Endogen risikopremie (kj50, ikke i K&M) — referansepunkt = håndkalibrert NB-treff
+      'kappa_rp_endo':0.20, 'rho_rp_endo':0.50}
 
 def log_prior(theta, overrides=None):
     """
