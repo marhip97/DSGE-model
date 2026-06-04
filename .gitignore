@@ -51,3 +51,9 @@ docs/references/*.pdf
 # MCMC-kjørelogger (midlertidige, ikke versjonskontrollert)
 data/results/*.log
 data/results/*.txt
+
+# kj50 mellomresultater (committes når kjøringen er ferdig)
+data/results/chain_kj50_prod.npy
+data/results/chain_kj50_prod_unc.npy
+data/results/chain_kj50_prod_lp.npy
+data/results/kj50_run.log
