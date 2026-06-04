@@ -345,5 +345,74 @@ NEMO-fidelitet, prioritert etter GEORG-konklusjonen:
 
 ---
 
-*Neste handling: PE tar stilling til §8 (NZ-utvidelse + 8-kv.-implementering).
-Implementering (§3, §5) starter først etter klarsignal.*
+*PE godkjente 2026-06-04 (Godkjenn+implementer, full 8-kv.-window).
+Implementering fullført — se §11.*
+
+---
+
+## 11. Resultat — implementering og IRF-funn (2026-06-04)
+
+### Implementering
+
+- `build_matrices_georg()` lagt til i `equations.py` ved siden av v3 (v3,
+  v3_forward og mimicking rule **urørt**). NZ_GEORG = **64** (14 nye tilstander:
+  π_{t-2}, 2×πW-lagg, 3×a-lagg, 7×s-lagg for full 8-kv. window, AR(1)-Z).
+- GEORG-koeffisienter (Tabell 4) + λ_Z=0.75 lagt til `parameters.py`.
+- `build_H_georg()` i `mcmc.py`. `tests/test_georg.py`: 9 tester, alle grønne.
+  Full suite: **106 passed, 3 xfailed** (uendret).
+- BK-stabil med Tabell 4-koeffisientene: max|eig(T)| = **0.9890**.
+- Exitstrategi verifisert: `use_georg=False` reproduserer v3_forward-kjernen
+  eksakt (atol=1e-8).
+
+### IRF for pengepolitikksjokk — GEORG vs vår mimicking rule
+
+Normalisert til styringsrente-topp = 1 (jf. Spor B5-konvensjon):
+
+| Variabel | q0 (G\|M) | q4 (G\|M) | q8 (G\|M) | q12 (G\|M) | Topp GEORG |
+|----------|-----------|-----------|-----------|------------|------------|
+| I_R  | +0.68\|+1.00 | +0.77\|+0.14 | +0.25\|+0.02 | +0.17\|+0.02 | +1.00 @ q2 |
+| π    | −0.06\|−0.08 | −0.07\|−0.01 | +0.00\|+0.01 | +0.02\|+0.01 | −0.09 @ q2 |
+| Y    | −0.31\|−0.45 | −0.44\|−0.07 | −0.05\|+0.04 | +0.04\|+0.05 | −0.55 @ q2 |
+| q_H  | −0.74\|−1.08 | −1.84\|−0.48 | −0.13\|+0.33 | +0.74\|+0.48 | −2.02 @ q3 |
+| RER  | −0.73\|−1.08 | −0.61\|+0.01 | +0.21\|+0.20 | +0.36\|+0.19 | −1.02 @ q1 |
+| w    | +0.03\|+0.05 | +0.10\|+0.03 | −0.06\|−0.08 | −0.26\|−0.15 | −0.48 @ q19 |
+
+(G = GEORG, M = mimicking rule / `build_matrices_v3_forward`, kj41-kalibrering.)
+
+### Konklusjon — politikkregel vs. transmisjon (BLANDET utfall)
+
+**Begge spiller en rolle — utfallet er det «blandede» scenariet i §9:**
+
+1. **Politikkregelen forklarer rentebanens FORM.** GEORG gir en **pukkelformet,
+   persistent** rentebane (topp ved q2, fortsatt +0.77 ved q4, +0.25 ved q8),
+   mens mimicking rule topper umiddelbart (q0) og faller raskt (+0.14 ved q4).
+   Den pukkelformede, gradualistiske banen er nettopp signaturen til NBs
+   fremoverskuende optimale politikk. Vår mimicking rule var altså for
+   front-lastet — **en betydelig del av NB-avviket var drevet av regelen.**
+   Output- og boligpris-responsen blir tilsvarende større og mer forsinket,
+   konsistent med en mer persistent rentebane.
+
+2. **Transmisjonen forklarer rest-avviket ved lang horisont.** Begrensning 6
+   (I_R.q12): NB Memo 3/2024 Figur 1 viser at renten snur svakt *negativt*
+   (~−0.15) ved q12. GEORG gir I_R.q12 = **+0.17** (mimicking +0.02). GEORG
+   flytter altså i riktig retning (mer persistens) men **reproduserer ikke
+   fortegnsskiftet** ved lang horisont. Denne rest-avviket — og den vedvarende
+   RER-responsen — består uavhengig av regelen og peker mot **transmisjonen**
+   (mest sannsynlig UIP/`sigma_rp` og manglende mean-reversion-kanal).
+
+### Implikasjon for neste fase
+
+Todelt (jf. §9, «GEORG delvis nærmere NB»):
+
+- **(a) Adoptér GEORG/optimal-politikk-banen** for rente-responsen — den
+  pukkelformede banen er en reell forbedring mot NB og bør være referanse
+  fremfor AR(1)-mimicking rule. Begrensning 6 revurderes: den er *delvis*
+  artefakt av mimicking rule (forma), men *ikke fullt* (fortegnsskiftet består).
+- **(b) Fiks transmisjonskanalene** der avviket består: I_R.q12-fortegnsskiftet
+  og RER-magnitude → prioriter UIP/`sigma_rp`-diagnosen (oljesektor/GPFG-kanal)
+  og likningsaudit mot complete documentation.
+
+**Forbehold:** Sammenligningen mot NB Figur 1 er kvalitativ (figuren finnes ikke
+som rådata i repoet; q12≈−0.15 er hentet fra B5-/begrensningsdokumentet).
+GEORG-koeffisientene er NBs IRF-matchede verdier mot *deres* NEMO; en framtidig
+re-matching mot *vår* modell ville være et separat (eskalerings)steg.

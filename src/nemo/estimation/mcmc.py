@@ -31,7 +31,7 @@ from scipy.special import betaln, gammaln
 from nemo.model.equations import (
     build_matrices_v3, build_matrices_pi4chain, build_matrices_altB,
     build_matrices_v3_forward, build_matrices_v3_plt,
-    NZ, NZ_PI4, NZ_ALTB, NZ_PLT, NE,
+    NZ, NZ_PI4, NZ_ALTB, NZ_PLT, NZ_GEORG, NE,
     Y, C, INV, INV_H, X, M, PI, W, I_R, RER, S, PO, YS,
     Q_H, B_NW, C_NW, I_D, I_L_NW, L, MC,
     E_A, E_C, E_P, E_O, E_Ys, E_rp, E_i, E_H, E_phi_h
@@ -223,6 +223,17 @@ def build_H_plt() -> np.ndarray:
     """
     H_50 = build_H()
     H = np.zeros((N_OBS, NZ_PLT))
+    H[:, :NZ] = H_50
+    return H
+
+
+def build_H_georg() -> np.ndarray:
+    """Observasjonsmatrise for GEORG-modellen (NZ_GEORG=64 kolonner).
+    De 14 GEORG-tilstandene (lagg + AR(1)-Z) er ikke direkte observert —
+    ekstra null-kolonner. Første NZ kolonner matcher build_H().
+    """
+    H_50 = build_H()
+    H = np.zeros((N_OBS, NZ_GEORG))
     H[:, :NZ] = H_50
     return H
 

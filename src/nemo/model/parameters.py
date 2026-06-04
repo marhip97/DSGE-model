@@ -250,6 +250,20 @@ class Parameters:
     # Diskontfaktor sentralbank
     beta_p   = 0.99       # (CAL) β_p
 
+    # ─── GEORG-politikkregel (Almlid, Haltia & Robstad 2025, Staff Memo 15/2025) ──
+    # "Ganske Enkel Optimal ReGel" — IRF-matchet mot tapsfunksjonsbasert optimal
+    # politikk i NEMO. Koeffisienter fra Tabell 4 (annualiserte). Brukes av
+    # build_matrices_georg() som læringssteg for å isolere politikkregel vs.
+    # transmisjon i NB Memo 3/2024 Figur 1-avviket. Estimeres IKKE mot data her.
+    georg_omega_r  = 0.74    # ω_r  — renteglatting (lign. 1)
+    georg_omega_pi = 1.17    # ω_π  — inflasjon (4-kv. KPI-JAE-vekst)
+    georg_omega_y  = 1.27    # ω_y  — outputgap
+    georg_omega_phi = 1.25   # ω_ϕ  — lønnskostnadsvekst-gap (4-kv. ULC)
+    georg_omega_S  = 0.13    # ω_S  — valutakursvekst-gap (8-kv. I-44)
+    georg_omega_rf = 0.25    # ω_rf — utenlandsk rente-gap
+    georg_omega_mu = -1.00   # ω_μ  — pengemarkedspremie-gap
+    georg_lambda_Z = 0.75    # λ_Z  — persistens pengepolitikksjokk Z_t (lign. 2)
+
     # ═══════════════════════════════════════════════════════════════════════
     # BLOKK G: UTENLANDSSEKTOR
     # NEMO seksjon 2.10–2.12 | Tabell 8

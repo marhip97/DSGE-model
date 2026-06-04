@@ -36,6 +36,7 @@ skal brukes til å analysere sjokk og optimale pengepolitiske responser.
 | 2026-06-02 | **PLT-kanal implementert og estimert (kj46)** | psi_PL=0.051 identifisert, men PLT-effektvekt≈0.0006 neglisjerbar. Begrensning 6 bekreftet strukturell. |
 | 2026-06-03 | **phi_O frigjort, phi_I1=0.50 fast (kj47–kj49)** | phi_O identifisert ~0.21 (>K&M 0.15), men phi_O-frigjøring presser psi_R 0.949→0.989. Ny begrensning 7: phi_O–psi_R-korrelasjon. kj41 forblir beste estimat (RMSE=0.277). |
 | 2026-06-03 | **Fase 2 avsluttet — kj41 er referanseestimat** | kj41: PSRF=1.00, ESS/n≈0.003 (under krav), RMSE=0.277. Strukturelle begrensninger 6 og 7 dokumentert. Fase 3 kan starte. |
+| 2026-06-04 | **GEORG-læringssteg godkjent og implementert (NZ_GEORG=64)** | `build_matrices_georg()` lagt til ved siden av v3 (urørt) for å isolere om NB-avviket skyldes politikkregel eller transmisjon. Funn: BLANDET — GEORG gir pukkelformet/persistent rentebane (regelen forklarer formen, betydelig forbedring mot NB), men reproduserer ikke I_R.q12-fortegnsskiftet (begrensning 6 består → transmisjon). Se `docs/oppgaver/GEORG_laeringssteg_plan.md` §11. |
 
 ## Fase 0 — Restart og fundament ✅
 

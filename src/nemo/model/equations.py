@@ -134,6 +134,29 @@ NZ_V4 = 56
 PI_E1=49; PI_E2=50; PI_E3=51; PI_E4=52
 NZ_PI4 = 53
 
+# GEORG (PE-godkjent 2026-06-04): NBs enkle optimale regel (Staff Memo 15/2025).
+# Bygger ved siden av v3_forward (NZ=50). 14 nye tilstander for regelens indikatorer:
+#   - π_{t-2}-lagg (4-kv. inflasjon; pi_lag=36 gir π_{t-1})
+#   - 2 πW-lagg + 3 a-lagg (4-kv. lønnskostnadsvekst-gap ϕ̂)
+#   - 7 s-lagg (8-kv. valutakursvekst-gap Ŝ — full window, PE-valg 2026-06-04)
+#   - AR(1) pengepolitikksjokk Z_t (λ_Z), erstatter i.i.d. E_i i regelen
+# Exitstrategi: use_georg=False → build_matrices_v3_forward (nye states er dead).
+GEORG_PI_L2  = 50   # π_{t-2}
+GEORG_PIW_L1 = 51   # πW_{t-1}
+GEORG_PIW_L2 = 52   # πW_{t-2}
+GEORG_A_L1   = 53   # a_{t-1}
+GEORG_A_L2   = 54   # a_{t-2}
+GEORG_A_L3   = 55   # a_{t-3}
+GEORG_S_L1   = 56   # s_{t-1}
+GEORG_S_L2   = 57   # s_{t-2}
+GEORG_S_L3   = 58   # s_{t-3}
+GEORG_S_L4   = 59   # s_{t-4}
+GEORG_S_L5   = 60   # s_{t-5}
+GEORG_S_L6   = 61   # s_{t-6}
+GEORG_S_L7   = 62   # s_{t-7}
+GEORG_Z      = 63   # AR(1) pengepolitikksjokk Z_t
+NZ_GEORG     = 64
+
 # ── Sjokk-indekser ───────────────────────────────────────────────────────────
 E_A=0; E_C=1; E_H=2; E_G=3; E_O=4; E_Ys=5; E_rp=6
 E_i=7; E_P=8; E_phi_h=9; E_prem=10; E_I=11; E_piS=12
@@ -1234,5 +1257,196 @@ def build_matrices_altB(p=None, theta_H: float = 0.05):
     # Ligning 17 har identisk ressursbetingelse
     G0[X, INV]   = -IY
     G0[X, INV_H] = -IHY
+
+    return G0, G1, Psi, Pi
+
+
+def build_matrices_georg(p=None, theta_H: float = 0.05,
+                          use_georg: bool = True,
+                          n_iter: int = 60, tol: float = 1e-9):
+    """
+    NEMO med GEORG-politikkregel (Almlid, Haltia & Robstad 2025, Staff Memo 15/2025).
+
+    GEORG ("Ganske Enkel Optimal ReGel") er NBs enkle regel som via IRF-matching
+    reproduserer den tapsfunksjonsbaserte optimale politikken i NEMO. Denne
+    byggeren erstatter mimicking rule (rad 20) med GEORG og brukes som
+    *læringssteg*: ved å sammenligne pengepolitikk-IRF for GEORG mot (a) NB Memo
+    3/2024 Figur 1 og (b) vår mimicking-rule-IRF, isolerer vi om NB-avviket er
+    drevet av politikkregelen eller av transmisjonen.
+
+    Regelen (lign. 1+3, alle variabler som gap):
+        i_R_t = ω_r·i_R_{t-1} + (1-ω_r)·X_t + Z_t
+        X_t   = E_t[ ω_π·π̂_{t+1} + ω_y·ŷ_{t+1} + ω_ϕ·ϕ̂_{t+1}
+                     + ω_S·Ŝ_{t+1} + ω_rf·r̂^f_{t+1} ] + ω_μ·μ̂_t
+        Z_{t+1} = λ_Z·Z_t + ε   (lign. 2)
+
+    Indikatorene (Staff Memo 15/2025 §2):
+        π̂  : 1-kv. frem-anslag av 4-kv. KPI-JAE-vekst  (PI + lagg + forventning)
+        ŷ  : outputgap                                  (Y, forventning via T)
+        ϕ̂  : 4-kv. enhetslønnskostnad-vekst-gap          (πW-sum − Δ(4)a)
+        Ŝ  : 8-kv. nominell valutakursvekst-gap          (Σ_{j=0}^{7} s_{t-j})
+        r̂^f: utenlandsk rente-gap                        (I_STAR, forventning via T)
+        μ̂  : pengemarkedspremie-gap (samtid)             (EPS_PREM)
+
+    Forventnings-maskineri (gjenbruk fra build_matrices_v3_forward):
+        E_t[X_{t+1}] = (e_X @ T) · z_t beregnes via fixed-point på T-matrisen.
+
+    Annualisering (egen tilpasning, dokumentert):
+        GEORG-koeffisientene (Tabell 4) er annualiserte; modellens i_R/π er
+        kvartalsrater. Regelen skrives for annualisert rente og konverteres til
+        kvartal (÷4). 4-kv./8-kv. vekst-summer er allerede annuelle (sum av
+        kvartalsrater). Rate-type indikatorer (r̂^f, μ̂) annualiseres ×4 og
+        kanselleres mot ÷4 → netto koeffisient ω. Nivå-gap (ŷ) og vekst-summer
+        (π̂4, ϕ̂4, Ŝ8) skaleres ÷4. Konvensjonen påvirker magnitude, ikke fortegn;
+        IRF-nivå normaliseres mot styringsrente-toppen (jf. Spor B5).
+
+    Produktivitet i ϕ̂ (egen tilpasning): ULC-vekst = nominell lønnsvekst (πW)
+        minus TFP-vekst (Δa). I gap-form er trend-leddet konstant og faller ut.
+
+    Exitstrategi:
+        use_georg=False → returnerer build_matrices_v3_forward (NZ=50) utvidet med
+        de 14 GEORG-tilstandene som *dead states* (lagg-identiteter uten
+        tilbakekobling til rad 20). Kjernedynamikken er da eksakt v3_forward.
+
+    Parametere
+    ----------
+    p          : Parameters-instans (bruker defaults hvis None)
+    theta_H    : Boligpris-forventningsparameter (videresendt til v3)
+    use_georg  : True = GEORG-regel; False = exit til v3_forward (padded)
+    n_iter     : Maks iterasjoner for fixed-point
+    tol        : Konvergenstoleranse (||T_new − T_prev||_max)
+
+    Returnerer
+    ----------
+    G0, G1, Psi, Pi : (NZ_GEORG×NZ_GEORG), (·×NZ_GEORG), (·×NE), (·×NZ_GEORG)
+    """
+    from nemo.solver.blanchard_kahn import solve as _solve
+
+    if p is None:
+        p = Parameters
+
+    # ── Bygg utvidede matriser fra v3 (NZ=50) ─────────────────────────────────
+    G0_50, G1_50, Psi_50, Pi_50 = build_matrices_v3(p, theta_H=theta_H)
+
+    G0  = np.zeros((NZ_GEORG, NZ_GEORG))
+    G1  = np.zeros((NZ_GEORG, NZ_GEORG))
+    Psi = np.zeros((NZ_GEORG, NE))
+    Pi  = np.zeros((NZ_GEORG, NZ_GEORG))
+
+    G0[:NZ, :NZ] = G0_50
+    G1[:NZ, :NZ] = G1_50
+    Psi[:NZ, :]  = Psi_50
+    Pi[:NZ, :NZ] = Pi_50    # ingen nye jump-variabler — Pi uendret
+
+    # ── Lagg-identiteter for de nye tilstandene: X_t = src_{t-1} ──────────────
+    # G0[k,k]=1, G1[k,src]=1  ⇒  k_t = src_{t-1}
+    for k, src in [
+        (GEORG_PI_L2,  PI_L),         # π_{t-2}  (PI_L=pi_lag gir π_{t-1})
+        (GEORG_PIW_L1, PIW),          # πW_{t-1}
+        (GEORG_PIW_L2, GEORG_PIW_L1), # πW_{t-2}
+        (GEORG_A_L1,   A),            # a_{t-1}
+        (GEORG_A_L2,   GEORG_A_L1),   # a_{t-2}
+        (GEORG_A_L3,   GEORG_A_L2),   # a_{t-3}
+        (GEORG_S_L1,   S),            # s_{t-1}
+        (GEORG_S_L2,   GEORG_S_L1),
+        (GEORG_S_L3,   GEORG_S_L2),
+        (GEORG_S_L4,   GEORG_S_L3),
+        (GEORG_S_L5,   GEORG_S_L4),
+        (GEORG_S_L6,   GEORG_S_L5),
+        (GEORG_S_L7,   GEORG_S_L6),   # s_{t-7}
+    ]:
+        G0[k, k]   = 1.0
+        G1[k, src] = 1.0
+
+    # AR(1) pengepolitikksjokk:  Z_t = λ_Z·Z_{t-1} + ε_i
+    lambda_Z = float(getattr(p, 'georg_lambda_Z', 0.75))
+    G0[GEORG_Z, GEORG_Z] = 1.0
+    G1[GEORG_Z, GEORG_Z] = lambda_Z
+    Psi[GEORG_Z, E_i]    = 1.0
+
+    # ── Exit: returner v3_forward (padded med dead states) ────────────────────
+    if not use_georg:
+        G0f, G1f, Psif, Pif = build_matrices_v3_forward(p, theta_H=theta_H)
+        # Overskriv kjerneblokk (rad/kol 0..49) med v3_forward; behold lagg-states.
+        # I.i.d. policy-sjokket beholdes i v3_forward-rad 20 (Z er dead her).
+        G0[:NZ, :NZ] = G0f
+        G1[:NZ, :NZ] = G1f
+        Psi[:NZ, :]  = Psif
+        Pi[:NZ, :NZ] = Pif
+        # Nøytraliser AR(1)-Z slik at den ikke introduserer ekstra dynamikk i
+        # kjernen (den er uansett frakoblet rad 20 her).
+        Psi[GEORG_Z, E_i] = 0.0
+        return G0, G1, Psi, Pi
+
+    # ── GEORG-koeffisienter (Tabell 4) ────────────────────────────────────────
+    w_r  = float(getattr(p, 'georg_omega_r',   0.74))
+    w_pi = float(getattr(p, 'georg_omega_pi',  1.17))
+    w_y  = float(getattr(p, 'georg_omega_y',   1.27))
+    w_ph = float(getattr(p, 'georg_omega_phi', 1.25))
+    w_S  = float(getattr(p, 'georg_omega_S',   0.13))
+    w_rf = float(getattr(p, 'georg_omega_rf',  0.25))
+    w_mu = float(getattr(p, 'georg_omega_mu', -1.00))
+
+    # ── Statisk del av X_t (uavhengig av T) som rad-vektor over tilstandene ────
+    # Konvensjon (annualisering): vekst-summer og nivå-gap ÷4; rate-gap netto ω.
+    x_static = np.zeros(NZ_GEORG)
+    # π̂4 (samtid + 2 lagg-ledd; forventningsleddet legges til i fixed-point): /4
+    x_static[PI]          += w_pi / 4.0    # π_t
+    x_static[PI_L]        += w_pi / 4.0    # π_{t-1}
+    x_static[GEORG_PI_L2] += w_pi / 4.0    # π_{t-2}
+    # ϕ̂4 (samtid + lagg): πW-ledd + a_{t-3}-ledd: /4
+    x_static[PIW]          += w_ph / 4.0   # πW_t
+    x_static[GEORG_PIW_L1] += w_ph / 4.0   # πW_{t-1}
+    x_static[GEORG_PIW_L2] += w_ph / 4.0   # πW_{t-2}
+    x_static[GEORG_A_L3]   += w_ph / 4.0   # + a_{t-3}  (−(a_{t+1}−a_{t-3}))
+    # Ŝ8 (samtid + 6 lagg; forventningsleddet i fixed-point): /4
+    x_static[S]          += w_S / 4.0      # s_t
+    for k in (GEORG_S_L1, GEORG_S_L2, GEORG_S_L3,
+              GEORG_S_L4, GEORG_S_L5, GEORG_S_L6):
+        x_static[k] += w_S / 4.0
+    # μ̂_t (samtid, rate-type → netto ω): pengemarkedspremie-gap
+    x_static[EPS_PREM] += w_mu
+
+    # ── Basisrad 20 (uten forventningsledd) ───────────────────────────────────
+    row20_base = np.zeros(NZ_GEORG)
+    row20_base[I_R]     =  1.0
+    row20_base[I_R_L]   = -w_r            # ω_r·i_R_{t-1}
+    row20_base[GEORG_Z] = -1.0            # + Z_t
+    row20_base += -(1.0 - w_r) * x_static
+    Psi[20, :]  = 0.0                     # sjokket går nå via AR(1)-Z (rad GEORG_Z)
+
+    # ── Fixed-point på T for forventningsleddene ──────────────────────────────
+    # E_t[X_{t+1}]-bidrag = rad X i T (e_X @ T = T[X, :]).
+    G0[20, :] = row20_base.copy()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        T_prev, _, d = _solve(G0, G1, Psi, Pi, verbose=False)
+    if not d.get("stable", False):
+        return G0, G1, Psi, Pi    # fallback: rad 20 uten forventningsledd
+
+    for _ in range(n_iter):
+        # Forventnings-rad: ω_π·E[π_{t+1}]/4 + ω_y·E[y_{t+1}]/4
+        #   + ω_ϕ·(E[πW_{t+1}] − E[a_{t+1}])/4 + ω_S·E[s_{t+1}]/4 + ω_rf·E[i*_{t+1}]
+        x_fwd = (
+            (w_pi / 4.0) * T_prev[PI, :]
+            + (w_y / 4.0) * T_prev[Y, :]
+            + (w_ph / 4.0) * (T_prev[PIW, :] - T_prev[A, :])
+            + (w_S / 4.0) * T_prev[S, :]
+            + w_rf * T_prev[I_STAR, :]
+        )
+        G0[20, :] = row20_base.copy()
+        G0[20, :] += -(1.0 - w_r) * x_fwd
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            T_new, _, d_new = _solve(G0, G1, Psi, Pi, verbose=False)
+        if not d_new.get("stable", False):
+            G0[20, :] = row20_base.copy()   # reverter til stabil basisrad
+            return G0, G1, Psi, Pi
+
+        if np.max(np.abs(T_new - T_prev)) < tol:
+            T_prev = T_new
+            break
+        T_prev = T_new
 
     return G0, G1, Psi, Pi
