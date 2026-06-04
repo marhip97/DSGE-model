@@ -33,7 +33,7 @@ prosjekteier.
 
 ## Aktiv fase
 
-Per 2026-06-01: **Fase 2 — Revidert estimering**. Fase 0.5, 0.75 og 1 avsluttet.
+Per 2026-06-04: **Fase 2 — Revidert estimering** (avsluttet). Fase 0.5, 0.75 og 1 avsluttet.
 Beste estimering: kj41 (psi_R=0.9490, RMSE=0.2771). Data: 2001Q1–2025Q4.
 Se `PROSJEKTPLAN.md` for full beskrivelse, og `docs/oppgaver/` for konkrete oppgaver.
 
