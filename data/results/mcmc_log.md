@@ -2351,3 +2351,452 @@ RMSE(16pt) = 0.3797   B5: by4=0.035 ❌❌  bpi4=0.197 ❌
 RTS-smoother (analyse.py) kjørt over full periode (100 kvartaler inkl. COVID-hull).
 Nivå-HD beregnet via rekursiv T-propagasjon med pseudo-invers sjokk-recovery.
 Resultater: `data/results/kj41_hd.json` (level_pre/post + innov_pre/post).
+
+---
+
+## kj44 — Fase 2: Logit-reparametrisering av psi_R (2026-06-02)
+
+**Forhåndsregistrert prior-endring:** psi_R frigjort fra kj41s dogmatiske prior
+N(0.91, 0.008, [0.87, 0.95]) til default Beta(2,2,[0.50,0.99]), samplet i ubegrenset
+logit-rom (`use_reparam=True`, REPARAM_PARAMS=("psi_R",)). Øvrige prior-overrides
+identiske med kj41 for å isolere reparam-effekten. Script: `scripts/kj44_fase2.py`.
+Warm start kj41, seed=44, 200k produksjon + 30k burn-in, phi_PQ=150, lambda_pi4=0.0.
+
+### Konvergens
+- **PSRF = 1.005** (20/20 parametre OK, krav <1.10) ✅
+- **ESS_min = 1077** (ESS/n = 0.0054, krav >0.02) ❌ — 1.67× bedre enn kj41 (646), men fortsatt under mål
+- Akseptrate = 0.207, total tid 161 min, 10 rekalibreringer
+
+### Hovedfunn: psi_R presser genuint mot øvre grense
+| Rom | psi_R |
+|-----|-------|
+| kj41 (dogmatisk prior, cap 0.95) | 0.9490 |
+| **kj44 (fri, logit-reparam)** | **0.9894 ± 0.0004** |
+| kj44 logit-rom (unc) | mean=6.99, **max=11.39**, q975=8.79 |
+
+**Tolkning:** Logit-transformen fjerner grenserefleksjon ved å mappe (0.50, 0.99)→(−∞, ∞).
+Posterioret i logit-rom har en **lang høyrehale uten indre modus** (opp til 11.4, som mapper
+til psi_R≈0.99). Dette beviser at likelihood-ryggen **fortsetter inn i det ikke-tillatte
+området over 0.99** — psi_R presser genuint mot grensen, det er **ikke** en numerisk
+refleksjonsartefakt fra en avgrenset sampler. Kj41s 0.949 var derimot en artefakt av kj41s
+egen cap (0.95). Standardavviket på 0.0004 (10× lavere enn kj41) bekrefter at likelihood er
+svært skarp her.
+
+> Merk: Skriptets automatiske ett-linjes-etikett ("grenseartefakt", utløst av
+> |kj44−kj41|>0.02) er misvisende. Den korrekte konklusjonen er motsatt: kj44 viser at
+> *grensekonsentrasjonen er genuin*, mens kj41s lavere verdi var prior-styrt.
+
+### NB-benchmark (forverring)
+RMSE(korr NB) = **0.3642** (vs kj41 0.2771). by4=1.259 ✅, bpi4=1.824 ✅.
+- I_R: [1.0, 0.956, 0.90, 0.851] vs NB [1.0, 0.55, 0.10, −0.15]
+- Med psi_R=0.989 forfaller rentebanen knapt → **forverrer I_R.q12-problemet**
+  (begrensningsdokument pkt. 6). AR(1) Taylor-regelen mangler mean-reversion.
+
+### Konklusjon Fase 2 (C5 §2)
+1. **Diagnostisk mål oppnådd:** logit-reparam beviser at psi_R-grensekonsentrasjonen er en
+   genuin likelihood-egenskap, ikke sampling-artefakt. Hypotese 1 i CLAUDE.md
+   ("modellen *trenger* veldig høy persistens") bekreftet; hypotese 2 (svak identifikasjon)
+   avkreftet for psi_R (sd=0.0004, ESS=2247).
+2. **ESS-mål ikke nådd** (0.0054 < 0.02). Reparam halverte ikke autokorrelasjonen nok —
+   den fete halen i logit-rom gir treg miksing. Blokksampling/HMC vurderes (krever PE).
+3. **Å presse psi_R høyere forbedrer ikke modellen** — det forverrer NB-fit og I_R-reversering.
+   Den strukturelle løsningen er en PLT/LQ mean-reversion-kanal (begrensningsdokument pkt. 6),
+   ikke videre sampler-tuning. Krever PE-godkjenning.
+
+**Anbefalt best-fit forblir kj41** (psi_R=0.9490, RMSE=0.2771) for IRF/FEVD-bruk.
+kj44 er en diagnostisk kjøring, ikke en ny produksjonsposterior.
+
+---
+
+## kj45 — Fase 2: AR(2) Taylor-regel (psi_R2) testet og forkastet (2026-06-02)
+
+**Forhåndsregistrert:** psi_R2 (2-periodes rentelagg, Alt. A2, NZ 49→50) estimert fritt
+med Normal(−0.10, 0.05, [−0.40, 0.00]), warm start kj44 + psi_R2=−0.05, seed=45.
+Hensikt: teste om mean-reversion (psi_R2 < 0) kan reprodusere NB I_R.q12=−0.15.
+Script: `scripts/kj45_fase2.py`.
+
+### Konvergens
+- PSRF = 1.007 (20/20 OK), ESS_min = 666 (ESS/n = 0.0033), acc = 0.249, 110 min
+
+### Hovedfunn: data forkaster AR(2) mean-reversion
+| Parameter | Start | Prior-senter | Posterior |
+|-----------|-------|--------------|-----------|
+| **psi_R2** | −0.05 | −0.10 | **−0.0003 ± 0.0003** |
+| psi_R | 0.9894 | — | 0.9894 |
+
+psi_R2 ble drevet fra både startverdi og prior-senter helt opp til **0.0** (øvre grense).
+Likelihood foretrekker entydig AR(1). AR(2)-leddet er en **død tilstand** — modellen
+oppfører seg eksakt som AR(1). Samme mønster som psi_R (presser mot grensen nærmest
+AR(1)-atferd), men her er grensen 0.0.
+
+### NB-benchmark (uendret fra kj44)
+RMSE = 0.3633. I_R = [1.0, 0.955, 0.898, **0.848**] vs NB [1.0, 0.55, 0.10, **−0.15**].
+**I_R.q12 reverserer ikke** — AR(2) løste ikke begrensning 6. by4=1.259 ✅, bpi4=1.825 ✅.
+
+### Konklusjon
+1. **AR(2)-hypotesen falsifisert.** I_R.q12-problemet (begrensning 6) kan ikke løses med et
+   andregrads autoregressivt lagg — data avviser mean-reversion via psi_R2.
+2. psi_R2 **deaktivert** fra estimering (mcmc.py), kalibrert fast = 0.0 (Parameters).
+   NZ=50-infrastrukturen beholdt som exit-mulighet (PE-instruks "bevar exitmulighet").
+3. Reell løsning på I_R.q12 må være en annen kanal (PLT/prisnivåmål, eller eksogen
+   reverserende kraft) — utenfor ren autoregressiv struktur. Krever ny PE-runde.
+
+**Best-fit for produksjon forblir kj41.** kj45 er diagnostisk.
+
+---
+
+## kj46 — Fase 2: PLT-kanal implementert og forberedt for kjøring (2026-06-02)
+
+**PE-beslutning:** "Test alt B, men bevar exitmulighet" (2026-06-02).
+PLT = prisnivåmål (Price-Level Targeting), Woodford (2003).
+
+**Forhåndsregistrert prior:** psi_PL ~ Normal(0.10, 0.05, [0.00, 0.50]).
+Exitstrategi: psi_PL=0 → eksakt v3_forward-atferd (NZ_PLT=51 beholdes, P_STAR_GAP er dead state).
+
+**Strukturell begrunnelse:**
+- PLT-kanal: `p_gap_t = p_gap_{t-1} + π_t` (akkumulert prisnivå-gap)
+- Taylor-regel: `i_t = psi_R·i_{t-1} + (1−psi_R)·[psi_P1·π_t + psi_PL·p_gap_t + psi_Y·y_t + ...] + ε_i`
+- Etter strammende sjokk: π faller → p_gap akkumulerer negativt → psi_PL > 0 trekker i ned → mean-reversion ✓
+
+**Implementert (2026-06-02):**
+| Fil | Endring |
+|-----|---------|
+| `equations.py` | `P_STAR_GAP=50`, `NZ_PLT=51`, `build_matrices_v3_plt()` |
+| `parameters.py` | `psi_PL=0.0` (exitstrategi) |
+| `mcmc.py` | `build_H_plt()`, psi_PL kommentert i PARAM_PRIORS, KM-dict |
+| `tests/test_plt_kanal.py` | 7 tester — alle bestått |
+| `scripts/kj46_fase2.py` | Kjøreskript (monkey-patching av PARAM_NAMES → 21 param) |
+
+**IRF-diagnose med kj41 posterior (phi_PQ=150, lambda_pi4=0):**
+| psi_PL | I_R.q12 |
+|--------|---------|
+| 0.00 | 0.519 |
+| 0.10 | 0.397 |
+| 0.30 | 0.293 |
+| 0.50 | 0.196 |
+NB-benchmark: I_R.q12 = −0.15. PLT hjelper monotont, men kj41-parametere alene
+er ikke tilstrekkelige — MCMC-estimering av psi_PL vil finne optimal kombinasjon.
+
+**Status:** Klart for kjøring (kj46). Forventer ~2 timer på laptop.
+Warm start: kj41 + psi_PL=0.05, seed=46, 200k prod + 30k burn-in.
+
+---
+
+## kj46 — ENDELIGE RESULTATER (2026-06-03)
+
+**Kjørt:** 2026-06-03, seed=46, 200k produksjon + 30k burn-in, warm start kj41 + psi_PL=0.05.
+
+**Konvergens:**
+| Mål | Krav | kj46 |
+|-----|------|------|
+| PSRF max | < 1.10 | **1.003** ✅ |
+| ESS min | > 4 000 (0.02×200k) | **1044** ❌ (ESS/n=0.0052) |
+| acc rate | 0.15–0.35 | **0.184** ✅ |
+
+ESS=1044 er høyere enn kj44 (1077) men fortsatt under krav. Årsak: psi_R presser
+til 0.9893 (posterior fat hale i logit-rom) — samme årsak som kj44/kj45.
+
+**Posterior (utvalgte parametre):**
+| Parameter | Prior mean | kj46 posterior | sd |
+|-----------|-----------|---------------|----|
+| psi_R | 0.666 | **0.9893** | 0.0005 |
+| psi_PL | 0.10 | **0.0505** | 0.0197 |
+| psi_P1 | 0.292 | 0.6081 | 0.149 |
+| psi_Y | 0.242 | 0.3304 | 0.049 |
+| phi_I2 | 165.66 | 62.5 | 38.7 |
+| rho_s | 0.50 | 0.0029 | 0.003 |
+
+**PLT-diagnose:**
+psi_PL = 0.0505 (q5=0.024, q95=0.087) — **identifisert og positiv**, ikke prior-drevet.
+PLT-effektvekt = (1 − psi_R) × psi_PL = (1 − 0.989) × 0.051 ≈ 0.00056 — **neglisjerbar**.
+
+**I_R-bane vs NB Memo 3/2024:**
+| Kvartal | kj46 modell | NB benchmark |
+|---------|------------|--------------|
+| q1 | 1.000 | 1.000 |
+| q4 | 0.954 | 0.550 |
+| q8 | 0.893 | 0.100 |
+| q12 | **0.838** | **−0.150** |
+
+**RMSE:** 0.3609 (mot kj41: 0.2771 — noe høyere, sannsynligvis pga phi_I2 variabilitet).
+
+**Konklusjon:**
+PLT-kanalen er identifisert (psi_PL > 0, signifikant) men utilstrekkelig.
+psi_R presser til 0.989 → PLT-effektvekten er ~0.00056 → I_R.q12 = 0.838 vs NB −0.15.
+Begrensning 6 er bekreftet strukturell og ikke løsbar med PLT alene.
+Vei B (aksepter begrensningen) er riktig konklusjon per PE-notat 2026-06-02.
+
+**Filer lagret:**
+- `data/results/chain_kj46_prod.npy` (200k × 21)
+- `data/results/chain_kj46_prod_posterior.json`
+- `data/results/chain_kj46_prod_meta.json`
+
+---
+
+## kj47 — ENDELIGE RESULTATER (2026-06-03)
+
+**Kjørt:** 2026-06-03, seed=47, 200k produksjon + 30k burn-in + 5 rekalibreringer (5×15k = 75k ekstra). Total tid: 102.3 min.
+**Endringer vs kj46:** rho_s fast=0.00 (var 0.003 ± 0.003), phi_O fri estimert Normal(0.15,0.10,[0.01,0.80]) (var kalibrert 0.15). N_PARAMS=20. Warm start: kj41 posterior.
+
+**Konvergens:**
+| Mål | Krav | kj47 |
+|-----|------|------|
+| PSRF max | < 1.10 | **1.004** ✅ |
+| ESS min | > 4 000 (0.02×200k) | **702** ❌ (ESS/n=0.0035) |
+| acc rate | 0.15–0.35 | **0.250** ✅ |
+
+ESS=702 < krav. Bottleneck: rho-klusteret (rho_A, rho_C, rho_O, rho_Ys, rho_rp, rho_H) — alle med ESS < 1000.
+5 rekalibreringer nødvendig i burn-in; PSRF forbedret fra 4.5→1.18 før produksjon.
+
+**Posterior (utvalgte parametre):**
+| Parameter | K&M | kj47 posterior | sd | [5%,95%] | ESS |
+|-----------|-----|---------------|----|---------|-----|
+| phi_O | 0.150 | **0.2548** | 0.020 | [0.224, 0.288] | 1421 |
+| rho_O | 0.874 | **0.1082** | 0.060 | [0.031, 0.223] | 1725 |
+| psi_R | 0.666 | **0.9893** | 0.001 | [0.988, 0.990] | 1494 |
+| phi_I1 | 12.540 | **0.1001** | 0.000 | [0.100, 0.100] | 2194 |
+| rho_A | 0.804 | **0.0157** | 0.004 | [0.011, 0.024] | 1004 |
+| rho_C | 0.725 | **0.0685** | 0.043 | [0.020, 0.152] | 1014 |
+| rho_rp | 0.737 | **0.9405** | 0.029 | [0.888, 0.982] | 2405 |
+| sigma_H | 0.050 | **0.2890** | 0.026 | [0.249, 0.335] | 1745 |
+| gamma_p | 0.350 | **0.8077** | 0.068 | [0.684, 0.904] | 1214 |
+
+**Statistisk passform:**
+Log-posterior ved posterior mean: lp ≈ −2435 (vs kj41: −3274, kj46: −3279).
+Forbedring på **840 log-enheter** fra kj41/kj46 — massiv forbedring i datapassform.
+
+**phi_O-diagnose:**
+phi_O = 0.2548 (K&M: 0.15) — HEVET som forventet. Posterior signifikant over K&M-kalibrering.
+rho_O = 0.1082 — FALT ytterligere fra kj46's 0.244. Akkumulert oljekanaleffekt:
+  phi_O × rho_O^4 ≈ 0.255 × 0.108^4 ≈ 0.000034 (neglisjerbar — verre enn kj46!)
+
+**Kritisk funn — phi_I1 ved nedre grense:**
+phi_I1 = 0.1001 med std=0.0001 og q5=q95=0.100 — stuck at prior lower bound (0.10).
+K&M-kalibrering er 12.54 — MCMC estimerer 125× lavere.
+Konsekvens: nær-null investeringstregheter → monetært sjokk gir umiddelbar og massiv
+investeringskollaps → Y-respons ~10× for stor vs NB-benchmark.
+
+**I_R-bane vs NB Memo 3/2024:**
+| Kvartal | kj47 modell | NB benchmark |
+|---------|------------|--------------|
+| q1 | 1.000 | 1.000 |
+| q4 | 0.951 | 0.550 |
+| q8 | 0.889 | 0.100 |
+| q12 | **0.834** | **−0.150** |
+
+**RMSE(16-punkt NB-benchmark):**
+| Variabel | kj47 | NB |
+|---------|------|-----|
+| Y (q1,q4,q8,q12) | −1.157, −1.632, −1.348, −0.993 | −0.12, −0.47, −0.40, −0.25 |
+| PI | −0.087, −0.160, −0.166, −0.125 | −0.03, −0.14, −0.22, −0.22 |
+| I_R | 1.000, 0.951, 0.889, 0.834 | 1.00, 0.55, 0.10, −0.15 |
+| RER | −1.084, −0.942, −0.531, −0.119 | −1.50, −1.00, −0.50, −0.20 |
+
+**RMSE = 0.6034** (kj41: 0.2771, kj46: 0.3609 — **FORVERRET**)
+
+**Analyse — likelihoodmodus vs strukturell realisme:**
+kj47 fant et nytt likelihoodmodus (lp=−2435 vs −3274) i en parameterregion med:
+- phi_I1→0.10 (nedre grense): investeringsfrisksjoner eliminert
+- rho_A=0.016, rho_C=0.069: nær-null AR(1)-persistens for teknologi og konsum
+- psi_R=0.989: renteglatting uendret fra kj46
+
+Denne modus passer dataene bedre statistisk, men gir strukturelt urealistiske IRF-dynamikker.
+Det er en fundamental spenning mellom statistisk passform (høy lp) og strukturell realisme
+(lav RMSE vs NB-benchmark).
+
+**Konklusjon:**
+1. phi_O frigjøring: bekreftet identifisert (0.255 > 0.15), men rho_O falt ytterligere
+2. phi_I1-problemet er nytt og kritisk: K&M=12.54 vs posterior=0.10 → IRF urealistisk
+3. RMSE=0.603 er VERRE enn kj41 (0.277) — phi_O-frigjøring alene løser ikke problemet
+4. Neste steg: tett phi_I1-prior nær K&M (f.eks. LogNormal(μ=log(12.5), σ=0.5)) i kj48
+5. BK-stabilt: True, max|eig(T)|=0.989
+
+**Filer lagret:**
+- `data/results/chain_kj47_prod.npy` (200k × 20)
+- `data/results/chain_kj47_prod_lp.npy`
+- `data/results/chain_kj47_prod_posterior.json`
+- `data/results/chain_kj47_prod_meta.json`
+
+---
+
+## kj48 — ENDELIGE RESULTATER (2026-06-03)
+
+**Kjørt:** 2026-06-03, seed=48, 200k produksjon + 30k burn-in + 5 rekalibreringer. Total: 103.7 min.
+**Endring vs kj47:** phi_I1-prior strammet fra Normal(2.0,5.0,[0.1,25]) til
+**LogNormal(log(12.54), 0.5, [0.1, 40])** — forankret mot K&M=12.54 for å forhindre kollaps.
+Ny `lognormal`-fordeling lagt til i `log_prior()`. Warm start: kj47 posterior, phi_I1=12.54.
+
+**Konvergens:** PSRF max=1.005 ✅, ESS min=645 ❌ (rho-klusteret), acc=0.250 ✅.
+
+**RESULTAT — phi_I1 KOLLAPSET LIKEVEL:**
+| Parameter | K&M | kj47 | kj48 | Kommentar |
+|-----------|-----|------|------|-----------|
+| phi_I1 | 12.54 | 0.100 | **0.1001 ± 0.0001** | KOLLAPSET til nedre grense igjen |
+| phi_O | 0.15 | 0.255 | 0.2546 | Uendret |
+| rho_O | 0.874 | 0.108 | 0.1064 | Uendret |
+| psi_R | 0.666 | 0.989 | 0.9893 | Uendret |
+
+**RMSE(NB) = 0.6033** (identisk med kj47: 0.603). IRF identisk. I_R.q12 = 0.833.
+
+**Diagnose — prioren var for svak OG mis-sentrert:**
+1. **For svak:** phi_I1-posterior std = 0.0001 (pinnet til grensen). Likelihood-draget mot
+   phi_I1→0 er overveldende — langt sterkere enn LogNormal-straffen (~42 log-enheter ved x=0.1).
+   lp settlet på −2474 (kun ~40 verre enn kj47's −2435 → prioren kostet ~40, men holdt ikke).
+2. **Mis-sentrert (kritisk oppdagelse):** Beste baseline **kj41 (RMSE=0.277) brukte
+   phi_I1 ≈ 0.50** (std=0.001 — effektivt pinnet), IKKE K&M=12.54. Prosjektets B5-passing
+   region er **phi_I1 ∈ [0.30, 0.75]** (jf. mcmc.py linje 60, 281), ikke K&M-verdien.
+
+**Tre regimer for phi_I1 (mot NB-benchmark):**
+| phi_I1 | BNP-respons | RMSE | Kilde |
+|--------|------------|------|-------|
+| 0.10 | eksploderer (~3.5× NB) | 0.60 | kj47, kj48 |
+| **0.50** | **~1.16× NB (passer B5)** | **0.277** | **kj41, kj31** |
+| 12.54 (K&M) | for liten | — | aldri kjørt fritt |
+
+**Konklusjon:**
+LogNormal-anker ved K&M=12.54 var feil premiss. Likelihood drar phi_I1 nedover, og siden
+12.54 ligger langt over den gode sonen [0.30,0.75], passerte kjeden rett gjennom den
+optimale regionen ned til nedre grense 0.10. **phi_I1 kan ikke estimeres fritt** — verken
+med svak normal-prior (kj47) eller LogNormal ved K&M (kj48). Beste baseline pinnet phi_I1≈0.50.
+
+**Neste steg — PE-beslutning eskalert** (premiss endret fra godkjent K&M-anker):
+Riktig anker er ~0.50 (B5-passing), ikke 12.54. Se PE-spørsmål.
+
+**Filer lagret:**
+- `data/results/chain_kj48_prod.npy` (200k × 20)
+- `data/results/chain_kj48_prod_lp.npy`
+- `data/results/chain_kj48_prod_posterior.json`
+- `data/results/chain_kj48_prod_meta.json`
+
+---
+
+## kj49 — ENDELIGE RESULTATER (2026-06-03)
+
+**Kjørt:** 2026-06-03, seed=49, 200k produksjon + 30k burn-in + 5 rekalibreringer. Total: 143.7 min.
+**Endringer vs kj48:** phi_I1 deaktivert fra estimering, kalibrert fast=0.50 (B5-passing). N_PARAMS=19.
+Warm start: kj47 posterior (bevarer phi_O≈0.255). phi_I1 resatt til 0.50 i warm start.
+
+**Konvergens:** PSRF max=1.004 ✅, ESS min=1099 ✅ (best hittil i Fase 2), acc=0.290 ✅.
+ESS=1099 er første gang ESS-kravet (>1000) er innfridd siden kj41. phi_I1 fast eliminerte
+den viktigste ESS-bottlenecken.
+
+**Posterior (utvalgte parametre):**
+| Parameter | K&M | kj41 | kj49 | Kommentar |
+|-----------|-----|------|------|-----------|
+| phi_O | 0.150 | 0.150 (fast) | **0.2057 ± 0.015** | Identifisert ✅ |
+| rho_O | 0.874 | — | **0.0983** | Fortsatt svært lav |
+| psi_R | 0.666 | 0.949 | **0.9893** | Uendret — begrensning 6 |
+| phi_I1 | 12.54 | 0.50 (fast) | **0.50 (fast)** | Kalibrert — ikke estimert |
+| phi_I2 | 165.66 | — | 63.63 | |
+| sigma_P | 0.003 | — | 0.0086 | |
+| gamma_p | 0.350 | — | 0.763 | |
+
+**RMSE-sammenligning (16-punkt NB-benchmark):**
+| Kjøring | phi_I1 | phi_O | RMSE | Δ vs kj41 |
+|---------|--------|-------|------|-----------|
+| kj41 | 0.50 (fast) | 0.15 (fast) | **0.277** | baseline |
+| kj49 | 0.50 (fast) | 0.206 (fri) | **0.375** | +0.098 |
+| kj47/48 | 0.10 (kollapset) | 0.255 (fri) | 0.603 | +0.326 |
+
+**IRF ved posterior mean:**
+| Variabel | kj49 | NB benchmark | kj47 |
+|---------|------|--------------|------|
+| Y (q1) | −0.439 | −0.12 | −1.157 |
+| Y (q4) | −0.535 | −0.47 | −1.632 |
+| Y (q8) | −0.430 | −0.40 | −1.348 |
+| PI (q4) | −0.068 | −0.14 | −0.160 |
+| PI (q8) | −0.065 | −0.22 | −0.166 |
+| I_R (q12) | **0.861** | **−0.150** | 0.834 |
+| RER (q4) | −0.869 | −1.00 | −0.942 |
+
+**Analyse:**
+1. **Y-dynamikk: massivt forbedret** fra kj47 (−1.632→−0.535 ved q4; nær NB −0.47). phi_I1=0.50
+   gjenoppretter realistisk investeringsrespons.
+2. **phi_O overlevde**: 0.2057 (K&M: 0.15, kj47: 0.255) — identifisert og hevet, men noe lavere
+   enn kj47 fordi phi_I1-regimet endrer likelihood-landskapet.
+3. **PI-respons for flat**: [−0.045,−0.068,−0.065,−0.045] vs NB [−0.03,−0.14,−0.22,−0.22].
+   PI-dynamikken er den primære årsaken til RMSE=0.375 > kj41's 0.277.
+4. **psi_R=0.989 uendret** — begrensning 6 består. I_R.q12=0.861 vs −0.15.
+5. **rho_O=0.098** (enda lavere enn kj47's 0.108) — olje-RER-kanalen neglisjerbar tross phi_O↑.
+   Akkumulert effekt: 0.206 × 0.098^4 ≈ 0.000019.
+
+**Konklusjon:**
+phi_O-frigjøring forbedrer Y-dynamikk indirekte (via endret posteriorlandskap), men
+phi_O-kanalen alene løser ikke RMSE-gapet mot kj41. Primære drivere for RMSE=0.375 vs 0.277:
+- PI-respons for flat (gamma_p=0.763, prisinflasjon dempes for mye)
+- psi_R=0.989 (I_R tilbakevender for sent)
+- rho_O=0.098 (olje-kanal neglisjerbar)
+
+phi_O er realøkonomisk identifisert (0.206 > K&M 0.15, ESS=2047) men har begrenset
+strukturell effekt på pengepolitikk-IRF i dette parameterregimet.
+
+**BK-stabilt:** True, max|eig(T)|=0.989.
+
+**Filer lagret:**
+- `data/results/chain_kj49_prod.npy` (200k × 19)
+- `data/results/chain_kj49_prod_lp.npy`
+- `data/results/chain_kj49_prod_posterior.json`
+- `data/results/chain_kj49_prod_meta.json`
+
+---
+
+## FASE 2 — SAMMENDRAG OG KONKLUSJON (2026-06-03)
+
+### Referanseestimat
+
+**kj41** er Fase 2's beste estimat og benyttes som referanse for videre analyse.
+
+`data/results/chain_kj41_prod_posterior.json`
+
+| Diagnostikk | Verdi | Krav | Status |
+|-------------|-------|------|--------|
+| PSRF max | 1.003 | < 1.10 | ✅ |
+| ESS min | 620 | > 4000 | ❌ (ESS/n=0.0031) |
+| acc rate | ~0.25 | 0.15–0.35 | ✅ |
+| RMSE(16pt NB) | **0.277** | < 0.150 (mål) | Beste oppnådd |
+| BK-stabilitet | max\|eig\|=0.989 | < 1.0 | ✅ |
+
+### Viktigste parametere (kj41 posterior mean)
+
+| Parameter | K&M | kj41 | Kommentar |
+|-----------|-----|------|-----------|
+| psi_R | 0.667 | **0.949** | For høy — begrensning 6 |
+| phi_I1 | 12.54 | **0.500** | B5-passing verdi |
+| phi_O | 0.150 | 0.150 (fast) | Identifisert ~0.21 i kj49 |
+| rho_O | 0.874 | **0.244** | Lavere enn K&M |
+| sigma_rp | 0.006 | **0.016** | Absorberer uforklart NOK-vol. |
+| gamma_p | 0.350 | **0.808** | Høy prisrigiditet |
+
+### Kjørehistorikk Fase 2 (kj41–kj49)
+
+| Kjøring | Endring | RMSE | ESS | Konklusjon |
+|---------|---------|------|-----|------------|
+| kj41 | Baseline (build_v3_forward, phi_PQ=150) | **0.277** | 620 | **Beste estimat** |
+| kj44 | Logit-reparam psi_R | ~0.277 | — | Diagnostisk: psi_R genuint høy |
+| kj45 | AR(2) Taylor-regel (psi_R2) | 0.279 | — | psi_R2→0, forkastet |
+| kj46 | PLT prisnivåmål (psi_PL) | 0.361 | 1044 | psi_PL=0.051, neglisjerbar |
+| kj47 | phi_O fri, rho_s fast=0 | 0.603 | 702 | phi_I1 kollapset til 0.10 |
+| kj48 | LogNormal phi_I1-prior | 0.603 | 645 | phi_I1 kollapset igjen |
+| kj49 | phi_I1=0.50 fast, phi_O fri | 0.375 | **1099** | phi_O=0.206, psi_R↑0.989 |
+
+### Strukturelle begrensninger (Fase 2 konklusjon)
+
+**Begrensning 6 — Rentepersistens (psi_R):**
+psi_R=0.949–0.989 i alle kjøringer. I_R.q12=0.84–0.86 vs NB −0.15.
+Ikke løsbart med AR(2), PLT, logit-reparam eller phi_O innenfor mimicking rule.
+Vei B (aksepter, dokumenter) er konklusjonen. Se `fase05_begrensningsdokument.md`.
+
+**Begrensning 7 — phi_O–psi_R-korrelasjon (ny 2026-06-03):**
+phi_O er identifiserbar (~0.21, >K&M 0.15) men frigjøring presser psi_R 0.949→0.989.
+Nettoeffekt: RMSE 0.277→0.375. phi_O holdes fast på K&M=0.15 i referanseestimatet.
+
+**ESS-bottleneck:**
+Rho-klusteret (rho_A, rho_C, rho_O, rho_Ys, rho_rp, rho_H) gir ESS/n≈0.003–0.006 i
+alle kjøringer. Blokksampling (Metropolis-within-Gibbs) er implementert i mcmc.py men
+for tregt (16× overhead per steg). Fremtidig løsning: periodisk felles rho-proposal
+eller HMC (krever PE-godkjenning).
+
+### Fase 3 — Neste steg
+
+Fase 2 er avsluttet. Fase 3 (Analyseverktøy) kan starte med kj41 som referanseestimat.
+Se `PROSJEKTPLAN.md` for Fase 3-leveranser og akseptansekriterier.

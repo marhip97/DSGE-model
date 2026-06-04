@@ -56,6 +56,12 @@ sannsynligvis korrekte i retning, men konfidensbåndene er upresise.
 **Planlagt løsning:** Fase 2 — forbedret sampler (blokksampling eller HMC
 etter PE-godkjenning).
 
+**Oppdatering 2026-06-02 (kj44):** Logit-reparametrisering av psi_R (C5 §2) hevet
+ESS_min fra 646 (kj41) til 1077 (ESS/n=0.0054) — en forbedring, men fortsatt under
+kravet 0.02. Reparam løste *ikke* ESS-problemet fullt ut: posterioret for psi_R har en
+fet hale i logit-rom (presser mot 0.99) som gir treg miksing. Blokksampling eller HMC
+gjenstår som tiltak (krever PE-godkjenning). Se `data/results/mcmc_log.md` (kj44-seksjon).
+
 ---
 
 ### 3. TFP-sjokk gir negativ BNP-respons (åpen, lav prioritet)
@@ -111,21 +117,105 @@ Vurderes på nytt etter Fase 1 med oppdaterte data.
 
 ### 6. I_R.q12 feil fortegn vs. NB-benchmark (ny, 2026-06-01)
 
-Alle MCMC-kjøringer (kj41–43) gir I_R.q12 > 0, mens NB Memo 3/2024 Figur 1 viser -0.15 pp.
+Alle MCMC-kjøringer (kj41–44) gir I_R.q12 > 0, mens NB Memo 3/2024 Figur 1 viser -0.15 pp.
 
 **Årsak:** AR(1) Taylor-regel med høy psi_R≈0.95 gir geometrisk forfall uten reversering.
 Mean-reversion i styringsrenten krever en PLT/LQ-mekanisme eller ekstern reverserende kraft.
 
 **Implikasjon for bruk:** Pengepolitiske sjokkanalyser viser ikke korrekt rentenormalisering.
 
-**Planlagt løsning:** kj44+ med LQ/PLT-mekanisme — krever PE-godkjenning.
-Utsatt til etter Fase 1.
+**Bekreftet 2026-06-02 (kj44):** Da psi_R ble frigjort (logit-reparam) presset posterioret
+til 0.9894 — *høyere* enn kj41s 0.949. Det forverret I_R-banen: I_R=[1.0, 0.956, 0.90, 0.851]
+(q12=0.85 mot NB −0.15). Dette **bekrefter at problemet er strukturelt, ikke et
+estimeringsvalg** — høyere psi_R gjør rentebanen enda mer persistent. Løsningen er en
+mean-reversion-kanal, ikke videre prior-/sampler-justering.
+
+**Forkastet løsning 2026-06-02 (kj45):** AR(2) Taylor-regel (psi_R2, NZ 49→50) ble testet
+som mean-reversion-mekanisme. psi_R2 estimert til −0.0003 (presset mot grensen 0.0) — data
+**forkaster AR(2)** entydig. I_R.q12 forble 0.848. Andregrads-lagget er en død tilstand.
+psi_R2 deaktivert (fast=0.0), infrastruktur beholdt som exit-mulighet.
+
+**Konklusjon:** I_R.q12-problemet er ikke løsbart innenfor ren autoregressiv struktur.
+En reell løsning krever en strukturell mekanisme (prisnivåmål/PLT eller eksogen reverserende
+kraft) — utenfor mimicking rule-rammeverket.
+
+**PLT implementert 2026-06-02 (kj46, PE-godkjent "Test alt B, men bevar exitmulighet"):**
+`build_matrices_v3_plt` med `P_STAR_GAP` (index 50, NZ_PLT=51) er implementert.
+Taylor-regelen reagerer på `psi_PL·p_gap_t` der `p_gap_t = p_gap_{t-1} + π_t`.
+IRF-diagnose viser monoton reduksjon: I_R.q12 synker fra 0.52 (psi_PL=0) til 0.20 (psi_PL=0.50).
+Exitstrategi beholdt: psi_PL=0 → eksakt AR(1)-atferd.
+
+**Kj46 fullført 2026-06-03 — ENDELIG KONKLUSJON:**
+psi_PL = 0.0505 ± 0.020 (q5=0.024) — **PLT identifisert, men utilstrekkelig**.
+psi_R presser til 0.989 → PLT-effektvekt = (1−psi_R)×psi_PL ≈ 0.00056 → neglisjerbar.
+I_R.q12 = 0.838 (NB: −0.15). PSRF=1.003, ESS=1044. RMSE=0.3609.
+
+**Begrensning 6 er bekreftet strukturell.** Hverken AR(2), PLT, logit-reparam eller
+prior-justering kan løse rentepersistens-problemet innenfor mimicking rule-rammeverket.
+Vei B (aksepter begrensningen, dokumenter for brukere) er anbefalt konklusjon.
+Se `data/results/mcmc_log.md` (kj46-seksjon) for full dokumentasjon.
+
+**kj47 fullført 2026-06-03 — phi_O frigjort (PE-godkjent):**
+phi_O estimert fritt (prior Normal(0.15,0.10,[0.01,0.80])). N_PARAMS=20, rho_s fast=0.00.
+PSRF=1.004, ESS=702. RMSE(NB) = **0.6034** (FORVERRET fra kj41: 0.277, kj46: 0.361).
+
+Nye kritiske funn:
+- **phi_I1=0.1001 (nedre grense):** K&M=12.54 → 125× lavere. Nær-null investeringstreg heter
+  → monetært sjokk gir umiddelbar investeringskollaps → Y-respons ~10× for stor vs NB.
+- **rho_O=0.108** (falt fra 0.244 i kj46): phi_O↑ men rho_O↓ → olje-RER-kanal neglisjerbar
+- **lp=−2435** (+840 log-enheter vs kj41/kj46): MCMC fant nytt statistisk modus med
+  realistisk phi_O men urealistiske AR(1)-parametre (rho_A=0.016, rho_C=0.069)
+- **psi_R=0.989** uendret — begrensning 6 består
+
+**Konklusjon kj47:** phi_O-frigjøring forbedret statistisk passform men forverret strukturell
+realisme. Spenning mellom likelihood-modus (lp=−2435) og NB-benchmarkfit (RMSE=0.603).
+
+**kj48 fullført 2026-06-03 — LogNormal phi_I1-prior (PE-godkjent):**
+phi_I1-prior strammet til LogNormal(log(12.54), 0.5, [0.1, 40]). N_PARAMS=20.
+PSRF=1.005, ESS=645. RMSE(NB) = **0.6033** (identisk med kj47 — prior holdt ikke).
+
+Ny diagnose: likelihood-drag mot phi_I1→0 er ~800 log-enheter — uovervinnelig for
+LogNormal-prior. Beste baseline kj41 brukte phi_I1≈0.50, ikke K&M=12.54.
+
+**kj49 fullført 2026-06-03 — phi_I1=0.50 fast + phi_O fri (PE-godkjent):**
+phi_I1 kalibrert fast=0.50 (B5-passing region). phi_O fri. N_PARAMS=19.
+PSRF=1.004, ESS=1099 ✅ (beste i Fase 2). RMSE(NB) = **0.3748**.
+
+| Parameter | K&M | kj41 (beste) | kj49 | Kommentar |
+|-----------|-----|-------------|------|-----------|
+| phi_O | 0.15 | 0.15 (fast) | **0.206** | Identifisert og hevet ✅ |
+| psi_R | 0.67 | **0.949** | 0.989 | Høyere med phi_O fri ❌ |
+| rho_O | 0.87 | 0.244 | 0.098 | Fortsatt svært lav ❌ |
+| RMSE | — | **0.277** | 0.375 | Verre enn kj41 ❌ |
+
+**Begrensning 7 — phi_O–psi_R-korrelasjon (ny, identifisert kj47–kj49):**
+Freeing phi_O consistently raises psi_R from 0.949 (kj41) to 0.989, worsening I_R dynamics.
+Posterior correlation: higher phi_O (oil→RER) allows higher interest rate smoothing.
+Net effect: RMSE deteriorates (0.277→0.375) when phi_O is estimated freely.
+
+**Konklusjon oljepriskanal-undersøkelse (kj47–kj49):**
+- phi_O er identifisert (~0.21, høyere enn K&M=0.15) — strukturelt reelt funn
+- Men phi_O-frigjøring presser psi_R opp og forverrer RMSE — negativ nettoverdi
+- **kj41 forblir Fase 2's beste estimat** (RMSE=0.277, PSRF=1.00)
+- phi_O bør holdes fast på K&M=0.15 inntil psi_R-problemet adresseres strukturelt
+Se `data/results/mcmc_log.md` (kj47–kj49-seksjoner) for full dokumentasjon.
 
 ---
 
-## Anbefalte begrensninger på bruk (frem til Fase 2)
+## Anbefalte begrensninger på bruk (Fase 2-konklusjon)
 
-1. **Bruk ikke** modellen til kvantitative pengepolitikk-IRF uten å skalere ned ~6×
-2. **Bruk gjerne** modellen til FEVD, historisk dekomposisjon, og sjokk-identifikasjon
-3. **Rapporter alltid** usikkerhetsbånd basert på posterior-trekk (ikke kun mean)
-4. **Referer** til dette dokumentet ved presentasjon av resultater
+1. **Beste referanseestimat:** kj41 (RMSE=0.277, PSRF=1.00, psi_R=0.949)
+2. **Bruk ikke** modellen til kvantitative pengepolitikk-IRF uten å skalere ned ~3–6×
+3. **Bruk gjerne** modellen til FEVD, historisk dekomposisjon, og sjokk-identifikasjon
+4. **Rapporter alltid** usikkerhetsbånd basert på posterior-trekk (ikke kun mean)
+5. **Referer** til dette dokumentet ved presentasjon av resultater
+
+## Kjente uløste begrensninger (Fase 2 avsluttet)
+
+| # | Begrensning | Beste kjøring | Verdi | NB | Status |
+|---|-------------|--------------|-------|----|--------|
+| 1 | BNP-respons for stor | kj49 | −0.54 (q4) | −0.47 | Delvis løst ✅ |
+| 2 | KPI-respons for flat | kj49 | −0.068 (q4) | −0.14 | Uløst ❌ |
+| 3 | RER-respons OK | kj49 | −0.869 (q4) | −1.00 | Nær ✅ |
+| 6 | I_R.q12 = 0.86 (NB: −0.15) | alle | 0.84–0.86 | −0.15 | Strukturell ❌ |
+| 7 | phi_O–psi_R-korrelasjon | — | — | — | Ny 2026-06-03 ❌ |

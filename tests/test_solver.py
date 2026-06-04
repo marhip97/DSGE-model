@@ -67,8 +67,8 @@ def test_g0_full_rang():
 
 
 def test_modell_dimensjonskonstanter():
-    """NZ=49 (etter Alt. A: variabel kapitalutnyttelse) og NE=13."""
-    assert NZ == 49, f"NZ = {NZ}, forventet 49 (Alt. A 2026-05-15)"
+    """NZ=50 (etter Alt. A2: AR(2) Taylor-regel, PE-godkjent 2026-06-02) og NE=13."""
+    assert NZ == 50, f"NZ = {NZ}, forventet 50 (Alt. A2 2026-06-02)"
     assert NE == 13, f"NE = {NE}, forventet 13"
 
 

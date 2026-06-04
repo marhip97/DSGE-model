@@ -95,8 +95,10 @@ from nemo.model.parameters import Parameters
  
 # ── Dimensjoner ───────────────────────────────────────────────────────────────
 # Alt. A (2026-05-15): NZ 48→49 — variabel kapitalutnyttelse u_t lagt til
-# (K&M 2019 Tabell 8 φ_u=0.2192 var kalibrert men ikke implementert)
-NZ = 49
+# Alt. A2 (2026-06-02, PE-godkjent): NZ 49→50 — AR(2) Taylor-regel (psi_R2)
+#   I_R_LL = i_{t-2} er andre lagg av styringsrenten.
+#   Exitstrategi: psi_R2=0.0 gir eksakt AR(1)-atferd (NZ=50 beholdes, tom ledd).
+NZ = 50
 NE = 13
 
 # ── Variabelindekser ─────────────────────────────────────────────────────────
@@ -110,6 +112,13 @@ A=37; EPS_C=38; EPS_H=39; EPS_G=40
 YS=41; EPS_RP=42; PI_STAR=43; I_STAR=44
 EPS_PHI_H=45; EPS_PREM=46; EPS_I_ADJ=47  # siste plass: investeringssjokk
 U_K=48  # Alt. A: kapitalutnyttelse (utilization rate)
+I_R_LL=49  # Alt. A2: 2-periodes lagg av styringsrenten (i_{t-2}) for AR(2) Taylor
+
+# PLT (Fase 2, 2026-06-02): akkumulert prisnivå-gap for prisnivåmål-kanal (NZ 50→51)
+# p_gap_t = p_gap_{t-1} + π_t  →  mean-reversion i styringsrenten via psi_PL > 0
+# Exitstrategi: psi_PL=0 → eksakt v3_forward-atferd (NZ_PLT beholdes, gap er dead state)
+P_STAR_GAP = 50
+NZ_PLT     = 51
 
 # Alt B (PE-godkjent 2026-05-29): boliginvesteringskanal — separat INV_H + lagg (NZ 49→51)
 INV_H   = 49   # boliginvestering (Euler-ligning med phi_H1)
@@ -468,7 +477,8 @@ def build_matrices(p=None):
     G0[30, INV_L]=1.0; G1[30, INV]=1.0     # inv_{t} = inv_{t-1}
     G0[31, H_W_L]=1.0; G1[31, H_W]=1.0    # h_W_{t} = h_W_{t-1}
     G0[32, H_NW_L]=1.0;G1[32, H_NW]=1.0  # h_NW_{t} = h_NW_{t-1}
-    G0[33, I_R_L]=1.0; G1[33, I_R]=1.0    # i_{t} = i_{t-1}
+    G0[33, I_R_L]=1.0;  G1[33, I_R]=1.0    # i_{t} = i_{t-1}
+    G0[49, I_R_LL]=1.0; G1[49, I_R_L]=1.0  # i_{t-1} = i_{t-2}  (AR(2)-lagg)
     G0[34, RER_L]=1.0; G1[34, RER]=1.0    # rer_{t} = rer_{t-1}
     G0[35, W_L]=1.0;   G1[35, W]=1.0      # w_{t} = w_{t-1}
     G0[36, PI_L]=1.0;  G1[36, PI]=1.0     # pi_{t} = pi_{t-1}
@@ -672,25 +682,27 @@ def build_matrices_v3(
     G0[8, Q_H]     = -delta_H
  
     # ── 4. Oppdater mimicking rule med estimerte parametere ───────────────────
-    # Ligning 20: i_R = ψ_R·i_{t-1} + (1-ψ_R)·[ψ_P1·π_t + ψ_Y·y + ψ_S·rer] + ε_i
-    # Spor A4b (2026-05-15):
-    #   1) samtid π (G0[20, PI]) i stedet for π_{t-1}
-    #   2) G0[20, I_R_L] = -psi_R i stedet for G1[20, I_R_L] = psi_R
-    #      (G1-bruken ga 2-periodes oscillasjon)
+    # AR(2) Taylor-regel (Alt. A2, PE-godkjent 2026-06-02):
+    #   i_t = psi_R·i_{t-1} + psi_R2·i_{t-2}
+    #         + (1 - psi_R - psi_R2)·[psi_P1·π_t + psi_Y·y + psi_S·rer + psi_W·πW] + ε_i
+    # psi_R2 < 0 gir mean-reversion; psi_R2=0.0 → eksakt AR(1) (exitstrategi).
     psi_R  = p.psi_R
+    psi_R2 = p.psi_R2
     psi_P1 = p.psi_P1
     psi_Y  = p.psi_Y
     psi_S  = p.psi_S
     psi_W  = p.psi_W
+    _scale = 1.0 - psi_R - psi_R2   # langsiktig nøytralitetsbetingelse
 
     G0[20, :] = 0.0; G1[20, :] = 0.0; Psi[20, :] = 0.0
-    G0[20, I_R]   =  1.0
-    G0[20, Y]     = -(1.0 - psi_R) * psi_Y
-    G0[20, RER]   = -(1.0 - psi_R) * psi_S
-    G0[20, PI]    = -(1.0 - psi_R) * psi_P1   # samtid inflasjon
-    G0[20, PIW]   = -(1.0 - psi_R) * psi_W    # A7 (PE-godkjent 2026-05-21): lønnsinflasjon, K&M §2.13
-    G0[20, I_R_L] = -psi_R                     # 1-periodes lagg via lagg-tilstand
-    Psi[20, E_i]  =  1.0
+    G0[20, I_R]    =  1.0
+    G0[20, Y]      = -_scale * psi_Y
+    G0[20, RER]    = -_scale * psi_S
+    G0[20, PI]     = -_scale * psi_P1   # samtid inflasjon
+    G0[20, PIW]    = -_scale * psi_W    # A7 (PE-godkjent 2026-05-21)
+    G0[20, I_R_L]  = -psi_R             # 1-periodes lagg
+    G0[20, I_R_LL] = -psi_R2            # 2-periodes lagg (AR(2)); 0 → AR(1)
+    Psi[20, E_i]   =  1.0
 
     # ── 5. Rettelse systemic lag-state bug (Spor A4a/A4c, 2026-05-15) ────────
     # G1 på lagg-tilstander (K_L, INV_L, H_W_L, H_NW_L, W_L) gir 2-periodes
@@ -992,7 +1004,7 @@ def build_matrices_v3_forward(p=None, theta_H: float = 0.05,
     der E_t[π_{t+4}] = e_PI @ T^4 @ z_t beregnes iterativt (fixed-point).
 
     Fordel over build_matrices_pi4chain:
-      - NZ=49 (uendret, ingen nye tilstandsvariabler)
+      - NZ=50 (Alt. A2 2026-06-02: +I_R_LL for AR(2) Taylor)
       - Pi-matrise fra v3 uendret (ingen nye jump-variabler)
       - BK kansellerer IKKE E_i-sjokket (R[I_R, E_i] ≈ 0.98)
       - Stabilitet fra v3 bevares
@@ -1025,9 +1037,11 @@ def build_matrices_v3_forward(p=None, theta_H: float = 0.05,
 
     # Koeffisienter for rad 20 (Taylor-regel) fra v3
     psi_R  = p.psi_R
+    psi_R2 = p.psi_R2
     psi_P1 = p.psi_P1
+    _scale = 1.0 - psi_R - psi_R2   # langsiktig nøytralitetsbetingelse
 
-    # Basisrad 20 fra v3 (med samtid PI-term = -(1-psi_R)*psi_P1)
+    # Basisrad 20 fra v3 (inneholder samtid PI-term = -_scale*psi_P1)
     G0_row20_base = G0[20, :].copy()
 
     # Løs v3 for startverdi av T
@@ -1037,21 +1051,20 @@ def build_matrices_v3_forward(p=None, theta_H: float = 0.05,
     if not d.get("stable", False):
         return G0, G1, Psi, Pi   # fallback til v3 hvis ustabilt
 
-    # Seleksjonsvektor for PI (rad 0)
+    # Seleksjonsvektor for PI (rad 0); NZ=50 etter Alt. A2
     e_PI = np.zeros(NZ)
     e_PI[PI] = 1.0
 
     for _ in range(n_iter):
-        # E_t[π_{t+4}] = e_PI @ T^4 @ z_t  →  fwd_row[j] = e_PI @ T^4[:, j]... nei:
-        # T^4 @ z_t: rad-PI av T^4 gir forventning for PI 4 perioder frem
+        # E_t[π_{t+4}] = e_PI @ T^4 @ z_t
         T4_PI = e_PI @ np.linalg.matrix_power(T_prev, 4)   # (NZ,)
 
         # Oppdater rad 20: ta utgangspunkt i basisraden (unngå akkumulering)
         G0[20, :] = G0_row20_base.copy()
         # Fjern v3-bidrag fra samtid PI og erstatt med hybrid
-        G0[20, PI] = -(1.0 - psi_R) * psi_P1 * lam
+        G0[20, PI] = -_scale * psi_P1 * lam
         # Legg til fremoverskuende komponent som lineærkombinasjon av alle tilstander
-        G0[20, :] -= (1.0 - psi_R) * psi_P1 * (1.0 - lam) * T4_PI
+        G0[20, :] -= _scale * psi_P1 * (1.0 - lam) * T4_PI
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -1063,6 +1076,67 @@ def build_matrices_v3_forward(p=None, theta_H: float = 0.05,
         if np.max(np.abs(T_new - T_prev)) < tol:
             break
         T_prev = T_new
+
+    return G0, G1, Psi, Pi
+
+
+def build_matrices_v3_plt(p=None, theta_H: float = 0.05,
+                           lambda_pi4: float | None = None,
+                           n_iter: int = 30, tol: float = 1e-8):
+    """
+    NEMO v3 med PLT-kanal (prisnivåmål, Fase 2 2026-06-02).
+
+    Utvider build_matrices_v3_forward (NZ=50) med:
+      - P_STAR_GAP (index 50): akkumulert prisnivå-gap  p_gap_t = p_gap_{t-1} + π_t
+      - Taylor-regel: reagerer på psi_PL·p_gap (gir mean-reversion etter sjokk)
+
+    NZ_PLT = 51. Exitstrategi: psi_PL=0.0 → eksakt v3_forward-atferd.
+    Ref: Woodford (2003) — prisnivåmål i NK-modeller. PE-godkjent 2026-06-02.
+
+    Parametere
+    ----------
+    p          : Parameters-instans; psi_PL leses via getattr(p, 'psi_PL', 0.0)
+    theta_H    : Boligpris-forventningsparameter (videresendt til v3_forward)
+    lambda_pi4 : Hybrid-vekt for fremoverskuende Taylor (videresendt til v3_forward)
+    n_iter     : Maks iterasjoner for fixed-point (v3_forward)
+    tol        : Konvergenstoleranse (v3_forward)
+
+    Returnerer
+    ----------
+    G0, G1, Psi, Pi : (NZ_PLT×NZ_PLT), (NZ_PLT×NZ_PLT), (NZ_PLT×NE), (NZ_PLT×NZ_PLT)
+    """
+    if p is None:
+        from nemo.model.parameters import Parameters as _DefaultP
+        p = _DefaultP
+
+    # Hent (NZ=50)×(NZ=50) matriser fra v3_forward
+    G0_50, G1_50, Psi_50, Pi_50 = build_matrices_v3_forward(
+        p, theta_H=theta_H, lambda_pi4=lambda_pi4, n_iter=n_iter, tol=tol
+    )
+
+    # Utvid til (NZ_PLT=51)×(NZ_PLT=51)
+    G0  = np.zeros((NZ_PLT, NZ_PLT))
+    G1  = np.zeros((NZ_PLT, NZ_PLT))
+    Psi = np.zeros((NZ_PLT, NE))
+    Pi  = np.zeros((NZ_PLT, NZ_PLT))
+
+    G0[:NZ, :NZ] = G0_50
+    G1[:NZ, :NZ] = G1_50
+    Psi[:NZ, :]  = Psi_50
+    Pi[:NZ, :NZ] = Pi_50
+
+    # P_STAR_GAP-likning (rad 50): p_gap_t = p_gap_{t-1} + π_t
+    # G0: p_gap_t − π_t = p_gap_{t-1}
+    G0[P_STAR_GAP, P_STAR_GAP] =  1.0
+    G0[P_STAR_GAP, PI]         = -1.0
+    G1[P_STAR_GAP, P_STAR_GAP] =  1.0
+
+    # Legg PLT-ledd til Taylor-regel (rad 20)
+    psi_R  = p.psi_R
+    psi_R2 = p.psi_R2
+    psi_PL = float(getattr(p, 'psi_PL', 0.0))
+    _scale = 1.0 - psi_R - psi_R2   # langsiktig nøytralitetsbetingelse
+    G0[I_R, P_STAR_GAP] = -_scale * psi_PL
 
     return G0, G1, Psi, Pi
 

@@ -115,7 +115,7 @@ class Parameters:
     # Oppr. est. under bugget INV-ligning (G1-lag, 2-periodes). Etter A4a-fix
     # (G0-lag, korrekt 1-periode) er disse verdiene inkonsistente.
     # Rekalibrert 2026-05-15: phi_I1=4, phi_I2=8 → INV std≈3.8 % (data: 4.1 %).
-    phi_I1   = 4.0        # (CAL) φ_I1 — SS-justeringskost., rekalibrert etter A4a
+    phi_I1   = 0.50       # (CAL) φ_I1 — fast=0.50 kj49 (PE-godkjent 2026-06-03); B5-passing [0.30,0.75]
     phi_I2   = 8.0        # (CAL) φ_I2 — periode-justeringskost., rekalibrert etter A4a
     phi_H1   = 60.7278    # (EST) φ_H1 — Tabell 8: boligi nvestering (SS-avvik)
     phi_H2   = 199.6549   # (EST) φ_H2 — Tabell 8: boliginvestering (periode-avvik)
@@ -150,8 +150,8 @@ class Parameters:
     # Olje-valuta-kanal i UIP (PE-godkjent 2026-05-20)
     # Kalibrert fra historisk NOK/olje-korrelasjon ~0.7:
     # +10% oljepris → ~1.5% NOK-appresiering → phi_O ≈ 0.15
-    phi_O    = 0.15       # (CAL) direkte olje→RER-kanal i UIP
-    rho_s    = 0.0        # (EST) AR(1)-glatting av RER i UIP; 0=ren UIP (Fase 1B)
+    phi_O    = 0.15       # (EST) direkte olje→RER-kanal i UIP — frigjort kj47 (PE-godkjent 2026-06-03)
+    rho_s    = 0.0        # (CAL) AR(1)-glatting av RER i UIP; kj47: fast=0.00 (kj46 posterior=0.003)
 
     # Nasjonalregnskapsandeler (Norske data 2001–2019)
     # CY+IY+IHY+GY+XY-MY = 1.00 (Spor A5 rettelse, 2026-05-15)
@@ -236,7 +236,11 @@ class Parameters:
     lambda_y  = 0.30      # (CAL) λ_y  — vekt outputgap
 
     # Mimicking rule-koeffisienter (NEMO Tabell 8)
-    psi_R    = 0.6663     # (EST) ψ_R  — renteglatting mimicking rule
+    psi_R    = 0.6663     # (EST) ψ_R  — renteglatting 1-periodes lagg
+    psi_R2   = 0.0        # (EST) ψ_R2 — AR(2) 2-periodes lagg (< 0 → mean-reversion)
+                           #             psi_R2=0 → eksakt AR(1) (exitstrategi, Alt. A2)
+    psi_PL   = 0.0        # (EST) ψ_PL — PLT prisnivåmål-koeffisient (Fase 2, 2026-06-02)
+                           #             psi_PL=0 → ren inflasjonsmål (exitstrategi)
     psi_P1   = 0.2921     # (EST) ψ_P1 — fremtidig inflasjon (4-kv. fremoverskuende)
     psi_Y    = 0.2417     # (EST) ψ_Y  — output mimicking rule
     psi_S    = 0.0159     # (EST) ψ_S  — reell valutakurs

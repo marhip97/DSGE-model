@@ -30,8 +30,8 @@ from scipy.special import betaln, gammaln
 
 from nemo.model.equations import (
     build_matrices_v3, build_matrices_pi4chain, build_matrices_altB,
-    build_matrices_v3_forward,
-    NZ, NZ_PI4, NZ_ALTB, NE,
+    build_matrices_v3_forward, build_matrices_v3_plt,
+    NZ, NZ_PI4, NZ_ALTB, NZ_PLT, NE,
     Y, C, INV, INV_H, X, M, PI, W, I_R, RER, S, PO, YS,
     Q_H, B_NW, C_NW, I_D, I_L_NW, L, MC,
     E_A, E_C, E_P, E_O, E_Ys, E_rp, E_i, E_H, E_phi_h
@@ -79,7 +79,7 @@ PSI_R_KJ25_FIXED = 0.90
 # og φ_PQ=300 er 2× for lav vs K&M=669. Disse korrigeres i kj26 for å eliminere systematisk feil.
 # Dessuten: rho_s=0 hardkoding i log_posterior (linje 334) gjorde at kj25 aldri estimerte rho_s
 # fra data (posterior var prior-dominert). kj26 fjerner dette og estimerer rho_s genuint.
-PHI_I1_KJ26_FIXED = 12.54   # K&M Tabell 8 (complete doc. s.59): kj25 brukte 0.50 (25× for lav)
+PHI_I1_KJ26_FIXED = 0.50    # kj49: B5-passing verdi (kj31/kj41 posterior ≈ 0.50); K&M=12.54 kollapser estimation
 PHI_PQ_KJ26_FIXED = 669.0   # K&M Tabell 8 (complete doc. s.59): kj25 brukte 300 (2× for lav)
 PHI_PQ_KJ38_FIXED = 200.0   # Sandkasse kj38+: kappa_P=0.15, forbedrer PI.q4≈NB
 # lambda_pi4: vekt på samtid π i hybrid Taylor-regel (0=ren E_t[π_{t+4}], 1=samtid)
@@ -217,6 +217,16 @@ def build_H_altB() -> np.ndarray:
     return H
 
 
+def build_H_plt() -> np.ndarray:
+    """Observasjonsmatrise for PLT-modellen (NZ_PLT=51 kolonner).
+    P_STAR_GAP (index 50) er ikke direkte observert — ekstra null-kolonne.
+    """
+    H_50 = build_H()
+    H = np.zeros((N_OBS, NZ_PLT))
+    H[:, :NZ] = H_50
+    return H
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # PARAMETERE OG PRIOR
 # sigma_A er fjernet fra estimering — kalibreres fast
@@ -226,6 +236,10 @@ PARAM_PRIORS = {
     # PE-godkjent 2026-05-16: Beta(2,2) — symmetrisk; data støtter ikke K&M rho_A=0.804
     'rho_A':   ('beta',     2.0,  2.0,  0.01, 0.9995),
     'rho_C':   ('beta',     2.0,  0.5,  0.01, 0.9995),
+    # rho_O: kj47: prior tilbake til original Beta(2,0.5,[0.01,0.9995]) etter at
+    # strammet Beta(6,1.5,[0.50,0.9995]) ga PSRF=11.8 (likelihood-klippe ved 0.50).
+    # Data vil ha rho_O≈0.24 — dette er en genuin modell-egenskap, ikke misidentifikasjon.
+    # Alt C (stram rho_O-prior) forlatt; phi_O-estimering (Alt A) beholdes.
     'rho_O':   ('beta',     2.0,  0.5,  0.01, 0.9995),
     'rho_Ys':  ('beta',     2.0,  0.5,  0.01, 0.9995),
     'rho_rp':  ('beta',     2.0,  0.5,  0.01, 0.9995),
@@ -248,6 +262,13 @@ PARAM_PRIORS = {
     # psi_R kj27: tak hevet fra 0.95→0.99. kj26 traff 0.9486 (std=0.001) — klart prior-tak.
     # Med K&M φ_I1=12.54 trenger modellen høy renteglattning for tilstrekkelig BNP-transmisjon.
     'psi_R':   ('beta',   2.0, 2.0, 0.50, 0.99),   # kj27: utvidet fra [0.50,0.95] (PE-godkjent 2026-05-29)
+    # psi_R2: AR(2) 2-periodes lagg (Alt. A2, PE-godkjent 2026-06-02).
+    # DEAKTIVERT etter kj45 (2026-06-02): estimert til -0.0003 (sd=0.0003) — presset mot
+    # øvre grense 0.0. Data forkaster mean-reversion entydig; AR(2)-leddet er en død tilstand
+    # (modellen oppfører seg eksakt som AR(1)). I_R.q12 forble 0.848 (NB: -0.15).
+    # Kalibreres fast = 0.0 (Parameters.psi_R2). NZ=50-infrastrukturen beholdt som exit-mulighet.
+    # Exit: gjenaktiver linjen under for å estimere psi_R2 på nytt.
+    # 'psi_R2':  ('normal', -0.10, 0.05, -0.40, 0.00),  # DEAKTIVERT etter kj45
     'psi_P1':  ('normal', 0.29, 0.10, 0.05, 1.50),
     'psi_Y':   ('normal', 0.24, 0.05, 0.01, 0.80),
     # gamma_p: Calvo-prisindeksasjon i hybrid NK Phillips-kurve (PE-godkjent 2026-05-24).
@@ -255,11 +276,13 @@ PARAM_PRIORS = {
     'gamma_p': ('beta',   3.0, 3.0,  0.0,  0.95),
     # h_c er fjernet fra estimering — kalibreres fast til H_C_FIXED=0.938 (PE-godkjent 2026-05-18, C2 Alt A).
     # Posterior traff alltid 0.9995-grensen og drepte konsumkanalen. K&M-verdi gjenoppretter a3_W=0.032.
-    # phi_I1 kj28: reaktivert (PE fullmakt 2026-05-29). kj19 estimerte 0.103 (BNP-eksplosjon) med v3.
-    # Med Alt B (NZ=51) er lavere phi_I1 stabilt. LL-sweep viser: phi_I1=0.3→LL=-3235 (best);
-    # phi_I1=12.54→LL=-3262. B5-passing region: phi_I1∈[0.30,0.75] med psi_R≈0.99.
-    # Prior Normal(2.0,5.0,[0.1,25]) — dekker K&M=12.54 og B5-passing 0.3-0.75.
-    'phi_I1':  ('normal', 2.0,  5.0,  0.1, 25.0),   # kj28: reaktivert (var DEAKTIVERT etter kj19)
+    # phi_I1 kj49: DEAKTIVERT — kalibreres fast=0.50 (PE-godkjent 2026-06-03).
+    # kj47/kj48: phi_I1 kollapset til nedre grense 0.10 (std=0.0001) — likelihood-drag
+    # overveldende (~800+ log-enheter). LogNormal(log(12.54),0.5)-prior (kj48) holdt ikke.
+    # Beste baseline kj41 (RMSE=0.277) brukte phi_I1≈0.50 effektivt fast.
+    # B5-passing region: phi_I1∈[0.30,0.75]. 0.50 er sentrum, strukturelt validert.
+    # Exit: gjenaktiver med LogNormal(log(0.50),0.15,[0.30,0.75]) dersom identifikasjonsproblem løses.
+    # 'phi_I1':  ('lognormal', np.log(12.54), 0.5, 0.1, 40.0),  # DEAKTIVERT kj49
     # phi_I2: kj25 prior Normal(8,4,[0.5,40]) truncerte K&M=165.66. kj26 åpner prioren:
     # Normal(50,50,[1,400]) lar data velge mellom kj25-estimat (~12) og K&M (166).
     'phi_I2':  ('normal', 50.0, 50.0, 1.0, 400.0),
@@ -272,15 +295,23 @@ PARAM_PRIORS = {
     # 'phi_PQ':  ('normal', 669.0, 300.0, 50.0, 2000.0),  # DEAKTIVERT etter kj13
     # kappa_M kj14: data vil ha LAVERE kappa_M (0.0175 < K&M=0.030) → KPI 0.13× NB. Ikke estimer på nytt.
     # 'kappa_M': ('normal', 0.03, 0.03, 0.005, 0.20),   # DEAKTIVERT etter kj13
-    # rho_s kj19: posterior=0.009 med gammel spec. kj25 reaktiverer: ny model (κ_P-fix, phi_u-fix)
-    # gir annet identifikasjonsmiljø. RMSE-diagnose: rho_s≈0.50 halverer RER-avvik fra 2×→0.7×NB.
-    # PE-godkjent 2026-05-28. Beta(2,2,[0.05,0.90]) sentrert ~0.50.
-    'rho_s':  ('beta', 2.0, 2.0, 0.05, 0.90),   # Reaktivert kj25
+    # rho_s: DEAKTIVERT kj47 (2026-06-03, PE-godkjent). kj46 estimerte 0.003±0.003 — degenerert
+    # posterior nær null. Kalibreres fast = 0.00 i parameters.py. ESS-bottleneck eliminert.
+    # Exit: gjenaktiver Beta(2,2,[0.05,0.90]) ved ny diagnose.
+    # 'rho_s': ('beta', 2.0, 2.0, 0.05, 0.90),  # DEAKTIVERT kj47
+    # phi_O: frigjort for estimering kj47 (PE-godkjent 2026-06-03, Alt. A).
+    # Kalibrert fast=0.15 (K&M Tabell 8) i alle kjøringer t.o.m. kj46. Frigjøres for å la
+    # data velge olje→RER-styrke. Normal(0.15,0.10,[0.01,0.80]) — sentrert på K&M med brede haler.
+    'phi_O':  ('normal', 0.15, 0.10, 0.01, 0.80),  # Aktivert kj47
     # phi_H1 kj27 (Alt B, PE-godkjent 2026-05-29): boliginvesteringsjusteringskost.
     # K&M Tabell 8: 60.73. phi_H1-sweep viser at K&M-verdi gir BNP q4=0.33× (mål 0.8×).
     # Med φ_I1=12.54 mangler vår forenklede modell NB-kanalene — phi_H1 estimeres for å
     # la data avgjøre kompensasjonsgraden. Prior Normal(60.73, 40, [0.5, 200]) — bredt.
     'phi_H1': ('normal', 60.73,  5.0, 30.0, 100.0),  # kj28: strammet fra (40,[0.5,200]) → eliminerer bimodal
+    # psi_PL: PLT prisnivåmål-koeffisient (Fase 2, 2026-06-02, kj46).
+    # Normal(0.10, 0.05, [0.00, 0.50]): sentrert over typisk PLT-respons.
+    # psi_PL=0 → exitstrategi (ren inflasjonsmål). Gjenaktiver for kj46.
+    # 'psi_PL': ('normal', 0.10, 0.05, 0.00, 0.50),  # DEAKTIVERT — aktiver for kj46
 }
 PARAM_NAMES = list(PARAM_PRIORS.keys())
 N_PARAMS    = len(PARAM_NAMES)
@@ -294,8 +325,11 @@ KM = {'rho_A':0.804,'rho_C':0.725,'rho_O':0.874,'rho_Ys':0.783,
       'sigma_O':0.079,'sigma_Ys':0.011,'sigma_rp':0.006,'sigma_i':0.0003,
       'sigma_P':0.003,'sigma_H':0.050,'psi_R':0.666,'psi_P1':0.292,
       'psi_Y':0.242,'h_c':0.938,'gamma_p':0.35,
+      'psi_R2':0.0,  # AR(2)-lagg; 0.0 = AR(1)-exit (Alt. A2, PE-godkjent 2026-06-02)
+      'psi_PL':0.0,  # PLT-koeffisient; 0.0 = ren inflasjonsmål (exitstrategi, Fase 2 2026-06-02)
       'phi_I1':12.54,'phi_I2':165.66,'phi_u':0.2192,  # K&M complete doc. s.59: phi_I1=12.54, phi_I2=165.66
-      'phi_PQ':669.0,'kappa_M':0.03,'rho_s':0.50,
+      'phi_PQ':669.0,'kappa_M':0.03,'rho_s':0.00,  # rho_s: kj47 fast=0.00
+      'phi_O':0.15,   # K&M Tabell 8: olje→RER-kanal; frigjort kj47
       'phi_H1':60.73}  # K&M Tabell 8: boliginvesteringsjusteringskost.
 
 def log_prior(theta, overrides=None):
@@ -320,6 +354,11 @@ def log_prior(theta, overrides=None):
             sh,sc = spec[1],spec[2]
             if x<=0: return -np.inf
             lp += sh*np.log(sc)-(sh+1)*np.log(x)-sc/x-gammaln(sh)
+        elif pt == 'lognormal':
+            # spec: ('lognormal', mu_log, sig_log, lb, ub). mu_log/sig_log i log-rom.
+            mu,sig = spec[1],spec[2]
+            if x<=0: return -np.inf
+            lp += -0.5*((np.log(x)-mu)/sig)**2-np.log(x*sig)-0.5*np.log(2*np.pi)
     return lp
 
 
