@@ -2904,3 +2904,20 @@ monetære RER-q12-fikset. **Konklusjon: den endogene premien og psi_R/rho_rp er
 ikke separat identifiserbare med dagens 14 observabler.** Strukturell
 identifikasjonsgrense, ikke løsbar ved parametervalg. Filer:
 chain_kj51_prod_posterior.json, kj51_vs_nb.png.
+
+## kj52 — i_3m anker pengemarkedspremie + sigma_prem aktivert — FORHÅNDSREGISTRERT 2026-06-04
+
+**PE-godkjent** 2026-06-04 (oppfølging kj51). Adresserer observasjonsekvivalensen
+ved å utnytte en eksisterende serie: i_3m_obs (NIBOR 3M) re-mappes fra redundant
+I_R-observasjon til `i_3m = i_R + pengemarkedspremie (EPS_PREM)` (build_H_rpendo_i3m).
+
+**Kritisk funn underveis:** Premie-sjokket E_prem var INAKTIVT (Q=0) i alle
+tidligere kjøringer → EPS_PREM død tilstand. Aktiveres nå ved å estimere
+`sigma_prem` (PE-godkjent). N_PARAMS 21→22.
+
+**Frie parametere (N=22):** kj50-21 + `sigma_prem` (Inv-Gamma(2, 0.0010, [1e-5, 0.05])).
+psi_R FRI (test om ny info hindrer 0.99-driften). rho_prem fast=0.8168.
+Modell: build_matrices_rpendo. Warm start: kj50 posterior; sigma_prem på prior-skala.
+**Hypotese:** Ankeret pinner EPS_PREM (som inngår i UIP) → fjerner en fri
+RER-persistens-absorber → skarpere identifikasjon av premiekanalene + mindre psi_R-drift.
+**Forhåndsforpliktelse:** Rapporteres uansett utfall.

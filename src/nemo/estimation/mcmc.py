@@ -33,8 +33,8 @@ from nemo.model.equations import (
     build_matrices_v3_forward, build_matrices_v3_plt,
     NZ, NZ_PI4, NZ_ALTB, NZ_PLT, NZ_GEORG, NZ_RPENDO, NE,
     Y, C, INV, INV_H, X, M, PI, W, I_R, RER, S, PO, YS,
-    Q_H, B_NW, C_NW, I_D, I_L_NW, L, MC,
-    E_A, E_C, E_P, E_O, E_Ys, E_rp, E_i, E_H, E_phi_h
+    Q_H, B_NW, C_NW, I_D, I_L_NW, L, MC, EPS_PREM,
+    E_A, E_C, E_P, E_O, E_Ys, E_rp, E_i, E_H, E_phi_h, E_prem
 )
 from nemo.solver.blanchard_kahn import solve as bk_solve
 from nemo.model.parameters import Parameters
@@ -249,6 +249,22 @@ def build_H_rpendo() -> np.ndarray:
     return H
 
 
+def build_H_rpendo_i3m() -> np.ndarray:
+    """kj52: som build_H_rpendo, men i_3m_obs anker pengemarkedspremien.
+
+    3m NIBOR ≈ forventet styringsrente + pengemarkedspremie. I et kvartalsmodell:
+        i_3m = i_R + μ,  μ = EPS_PREM (pengemarkedspremie-tilstand).
+    Gir EPS_PREM et eget observasjonsanker (i_3m_obs − i_R_obs), i stedet for
+    redundant dobbel-observasjon av I_R (build_H: H[8,I_R]=4). EPS_PREM inngår både
+    i innskuddsrenten (E2) og UIP (rad 15) — å anke den fjerner en fri
+    RER-persistens-absorber (adresserer kj51-observasjonsekvivalensen).
+    """
+    H = build_H_rpendo()
+    H[8, I_R]      = 4.0   # forventet styringsrente (annualisert)
+    H[8, EPS_PREM] = 4.0   # + pengemarkedspremie (annualisert)
+    return H
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # PARAMETERE OG PRIOR
 # sigma_A er fjernet fra estimering — kalibreres fast
@@ -337,6 +353,10 @@ PARAM_PRIORS = {
     # nedre grense 0 lar data forkaste premien hvis den ikke trengs.
     'kappa_rp_endo': ('normal', 0.20, 0.15, 0.0, 1.0),
     'rho_rp_endo':   ('beta',   2.0,  2.0,  0.05, 0.95),
+    # sigma_prem: pengemarkedspremie-sjokk aktivert (kj52, PE-godkjent 2026-06-04).
+    # E_prem var inaktiv (Q=0) i alle tidligere kjøringer → EPS_PREM død tilstand.
+    # Aktiveres slik at i_3m_obs kan identifisere premien (build_H_rpendo_i3m).
+    'sigma_prem':    ('inv_gamma', 2.0, 0.0010, 1e-5, 0.05),
     # psi_PL: PLT prisnivåmål-koeffisient (Fase 2, 2026-06-02, kj46).
     # Normal(0.10, 0.05, [0.00, 0.50]): sentrert over typisk PLT-respons.
     # psi_PL=0 → exitstrategi (ren inflasjonsmål). Gjenaktiver for kj46.
@@ -361,7 +381,8 @@ KM = {'rho_A':0.804,'rho_C':0.725,'rho_O':0.874,'rho_Ys':0.783,
       'phi_O':0.15,   # K&M Tabell 8: olje→RER-kanal; frigjort kj47
       'phi_H1':60.73,  # K&M Tabell 8: boliginvesteringsjusteringskost.
       # Endogen risikopremie (kj50, ikke i K&M) — referansepunkt = håndkalibrert NB-treff
-      'kappa_rp_endo':0.20, 'rho_rp_endo':0.50}
+      'kappa_rp_endo':0.20, 'rho_rp_endo':0.50,
+      'sigma_prem':0.0010}  # kj52: pengemarkedspremie-sjokk aktivert
 
 def log_prior(theta, overrides=None):
     """
@@ -400,7 +421,8 @@ def log_prior(theta, overrides=None):
 def build_Q(theta):
     # sigma_rp og sigma_A faste — ikke i theta, bruker _fixed-oppslag.
     smap = {E_A:'sigma_A',E_C:'sigma_C',E_P:'sigma_P',E_O:'sigma_O',
-            E_Ys:'sigma_Ys',E_rp:'sigma_rp',E_i:'sigma_i',E_H:'sigma_H'}
+            E_Ys:'sigma_Ys',E_rp:'sigma_rp',E_i:'sigma_i',E_H:'sigma_H',
+            E_prem:'sigma_prem'}   # kj52: aktiver pengemarkedspremie-sjokket
     _fixed = {'sigma_rp': SIGMA_RP_FIXED, 'sigma_A': SIGMA_A_FIXED}
     Q = np.zeros((NE,NE))
     for idx,pn in smap.items():
