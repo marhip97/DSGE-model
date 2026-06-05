@@ -2859,3 +2859,18 @@ diagnostiserte RER/PI-patologiene (q12-fortegn + inflasjonspersistens). Men
 frigjøring av UIP-kanalen presser psi_R til taket → renten overpersisterer →
 aggregert NB-RMSE forverres. Klassisk kanal↔psi_R-avveiing (begrensning 7), ikke
 en ren forbedring. Filer: chain_kj50_prod_posterior.json, kj50_vs_nb.png.
+
+## kj51 — Endogen risikopremie med psi_R pinnet — FORHÅNDSREGISTRERT 2026-06-04
+
+**PE-godkjent** 2026-06-04 (oppfølging av kj50). Bryter psi_R↔premie-korrelasjon
+(begrensning 7) ved å pinne psi_R = 0.949 (kj41-verdi).
+
+**Hypotese:** Med psi_R fast på kj41-nivå isolerer vi den endogene premiens
+bidrag. Hvis NB-RMSE da forbedres mot kj41 (0.295) samtidig som RER-q12-fortegnet
+og PI-persistensen beholdes (fra kj50), er premien en ren forbedring og
+psi_R-driften i kj50 var årsaken til forverringen.
+
+**Mekanisme:** psi_R pinnet via dogmatisk prior `Normal(0.949, 0.0005)` gjennom
+`prior_overrides` — infrastruktur (reparam, PARAM_NAMES, N=21) uendret, reversibel.
+Øvrig: build_matrices_rpendo, kj41/kj50-kalibrering, warm start kj50 posterior.
+**Forhåndsforpliktelse:** Rapporteres uansett utfall.
