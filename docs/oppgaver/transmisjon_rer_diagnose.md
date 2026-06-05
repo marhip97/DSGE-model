@@ -201,3 +201,42 @@ psi_R↔premie-korrelasjonen — f.eks. (i) reestimere med psi_R kalibrert fast 
 0.949 (kj41) og kun κ_pe/ρ_pe frie, for å isolere premiens bidrag uten
 renteglatting-drift, eller (ii) informativ/strammere psi_R-prior. Krever
 PE-godkjenning.
+
+---
+
+## 7. Oppfølging kj51 — psi_R pinnet (PE-godkjent, 200k trekk)
+
+psi_R pinnet = 0.949 via dogmatisk prior `Normal(0.949, 0.0005)` (prior_overrides),
+øvrig = kj50. Konvergens: PSRF_max=1.120 (rho_rp, marginalt over), ESS_min=204.
+
+**Estimat:**
+- `psi_R` = 0.9494 (pinnet ✓)
+- `kappa_rp_endo` = **0.094 ± 0.094** — std = mean → **svakt identifisert** (mot kj50s
+  tette 0.043 ± 0.016). Premien er ikke lenger pinnet ned når psi_R holdes fast.
+- `rho_rp_endo` = 0.389 ± 0.218 (kollapset fra kj50s 0.92).
+- `rho_rp` (eksogen risikopremie-AR1) = **0.910** (opp fra kj41/kj50 ~0.15).
+
+**NB-fit:** 16pt-RMSE = **0.281** (BESTE; kj41 0.295, kj50 0.374). Men:
+- I_R bedre (psi_R holdt nede): +1.00/+0.81/+0.62/+0.47.
+- RER **q12 = +0.14** — fortegnsskiftet TAPT igjen (kj50 hadde −0.25). PI tilbake til lav persistens.
+
+**Hovedfunn — observasjonsekvivalens (Spor C6 / begrensning 7):**
+Persistensen *migrerer* mellom tre substituerbare kanaler avhengig av hva som er
+fritt: (a) renteglatting psi_R→0.99 (kj50), (b) endogen premie ρ_pe=0.92 (kj50),
+(c) eksogen risikopremie ρ_rp=0.91 (kj51). Avgjørende: (c) inngår **ikke** i
+pengepolitikk-IRF-en (risikopremiesjokk=0 under et rentesjokk), så kj51 vinner på
+likelihood/aggregat-RMSE men **mister** den monetære RER-q12-fikset som kj50 ga.
+
+**Konklusjon:** Den endogene risikopremien, renteglattingen og den eksogene
+risikopremie-persistensen er **ikke separat identifiserbare** med dagens 14
+observabler. Dette er en strukturell identifikasjonsgrense (observasjonsekvivalens),
+ikke løsbar ved parameterpinning. Den NB-treffende RER-banen krever et
+**høy-persistens endogent premieledd** (kj50), men data foretrekker å legge
+persistensen i den eksogene premien når den får lov — og de to er empirisk
+uskillelige uten flere observabler.
+
+**Anbefaling (eskaleringspunkt):** Løs identifikasjonen med **flere
+observasjonsserier** som skiller kanalene — f.eks. NIBOR-OIS/pengemarkedspremie
+som egen observabel, valuta-terminpremie, eller en kreditspread (jf. Spor C6).
+Alternativt: aksepter RER-q12 som dokumentert begrensning og gå til Fase 3/4 med
+kj41 som referanse. Begge krever PE-beslutning.

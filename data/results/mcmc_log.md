@@ -2874,3 +2874,33 @@ psi_R-driften i kj50 var årsaken til forverringen.
 `prior_overrides` — infrastruktur (reparam, PARAM_NAMES, N=21) uendret, reversibel.
 Øvrig: build_matrices_rpendo, kj41/kj50-kalibrering, warm start kj50 posterior.
 **Forhåndsforpliktelse:** Rapporteres uansett utfall.
+
+### kj51 — RESULTAT (psi_R pinnet=0.949, 200k trekk, 109.8 min)
+
+**Konvergens:** PSRF_max=1.120 (rho_rp, marginalt over 1.10), ESS_min=204.
+20/21 OK. Borderline-konvergert på rho-klusteret.
+
+**Estimat:**
+- `psi_R` = 0.9494 ± 0.0005 (pinnet — ESS=1596 ✓)
+- `kappa_rp_endo` = 0.094 ± 0.094 (ESS=228) — **std = mean → svakt identifisert** (mot
+  kj50s 0.043 ± 0.016 tett). Premien er ikke lenger pinnet ned når psi_R holdes fast.
+- `rho_rp_endo` = 0.389 ± 0.218 — kollapset fra kj50s 0.92, stor usikkerhet.
+- `rho_rp` (EKSOGEN risikopremie-AR1) = 0.910 ± 0.190 — **hoppet opp** fra kj41/kj50
+  (0.17/0.12). PSRF=1.12 (den ukonvergerte).
+
+**NB-fit:** 16pt-RMSE = **0.2812** (kj41: 0.295, kj50: 0.374) — BESTE aggregat.
+- I_R: +1.00/+0.81/+0.62/+0.47 (NB .../−0.15) — bedre enn kj50 (psi_R holdt nede).
+- RER: −1.14/−0.83/−0.28/**+0.14** (NB .../−0.20) — **q12-fortegnsskiftet GIKK TAPT**
+  igjen (kj50 hadde −0.25). PI tilbake til lav persistens.
+
+**TOLKNING — observasjonsekvivalens (Spor C6 / begrensning 7):**
+Persistensen «migrerte» mellom kanaler: kj50 la den i renteglatting (psi_R→0.99) +
+endogen premie (rho_rp_endo=0.92); kj51 (psi_R pinnet) la den i den EKSOGENE
+risikopremien (rho_rp=0.91), mens endogen premie ble svakt identifisert. Disse tre
+kanalene er substitutter for å forklare RER/inflasjonspersistens. Avgjørende:
+eksogen rho_rp inngår IKKE i pengepolitikk-IRF-en (risikopremiesjokk=0 under
+pengepolitikksjokk), så kj51 får bedre likelihood + aggregat-RMSE, men MISTER den
+monetære RER-q12-fikset. **Konklusjon: den endogene premien og psi_R/rho_rp er
+ikke separat identifiserbare med dagens 14 observabler.** Strukturell
+identifikasjonsgrense, ikke løsbar ved parametervalg. Filer:
+chain_kj51_prod_posterior.json, kj51_vs_nb.png.
