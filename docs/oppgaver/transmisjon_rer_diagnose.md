@@ -163,3 +163,41 @@ parameterrom. Ikke startet uten eksplisitt godkjenning.
 
 *Status: Alt A implementert og kalibreringsverifisert. Reestimering avventer
 PE-godkjenning.*
+
+---
+
+## 6. Reestimeringsresultat — kj50 (192k trekk, stoppet av PE 2026-06-04)
+
+PE godkjente reestimering og stoppet kjøringen ved 192k/200k.
+
+**Konvergens:** PSRF_max=1.0022 (✓), ESS_min=877, ESS/n=0.0046 (> kj41s 0.003,
+< krav 0.02 — rho-klusteret er fortsatt ESS-flaskehals).
+
+**Estimat (godt identifisert):**
+- `kappa_rp_endo` = **0.043 ± 0.016** (ESS=1718) — positiv, ~2.6 sd fra 0. Data
+  støtter en endogen premie, men ~5× mindre enn håndkalibrert κ≈0.20.
+- `rho_rp_endo` = **0.919 ± 0.018** (ESS=1191) — høy, godt identifisert.
+- `psi_R` = **0.9895** (kj41: 0.949) → presset mot prior-tak 0.99.
+
+**NB-fit (16pt RMSE = 0.374; kj41: 0.295):**
+
+| Var | q1 | q4 | q8 | q12 | NB q1/q4/q8/q12 |
+|-----|----|----|----|-----|------------------|
+| I_R | +1.00 | +0.96 | +0.91 | +0.86 | 1.00/0.55/0.10/−0.15 |
+| RER | −1.19 | −1.18 | −0.78 | **−0.25** | −1.50/−1.00/−0.50/−0.20 |
+| PI  | −0.15 | −0.27 | −0.28 | −0.20 | −0.03/−0.14/−0.22/−0.22 |
+| Y   | −0.48 | −0.63 | −0.51 | −0.33 | −0.12/−0.47/−0.40/−0.25 |
+
+**Konklusjon:** Den endogene premien er **datastøttet** (liten κ, høy ρ) og
+**løser de to diagnostiserte patologiene**: RER-q12-fortegnsskiftet (kj41 +0.12 →
+kj50 −0.25 ≈ NB −0.20) og inflasjonspersistensen (PI nå nær NB ved q8/q12). Men
+frigjøring av UIP-kanalen presser `psi_R` til taket 0.99 → renten overpersisterer
+(I_R.q12 +0.86 vs NB −0.15) → aggregert NB-RMSE forverres (0.374 vs 0.295). Dette
+er **begrensning 7** (UIP-kanal ↔ psi_R-korrelasjon) som reaktiveres, samme
+avveiing som ved phi_O. Figur: `data/results/kj50_vs_nb.png`.
+
+**Anbefalt oppfølging (eskaleringspunkt, ikke startet):** Bryte
+psi_R↔premie-korrelasjonen — f.eks. (i) reestimere med psi_R kalibrert fast =
+0.949 (kj41) og kun κ_pe/ρ_pe frie, for å isolere premiens bidrag uten
+renteglatting-drift, eller (ii) informativ/strammere psi_R-prior. Krever
+PE-godkjenning.

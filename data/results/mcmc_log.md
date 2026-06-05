@@ -2830,3 +2830,32 @@ burnin=30k. Warm start: kj41 posterior; nye param på prior-mean.
 **Forhåndsforpliktelse:** Resultatet rapporteres uansett utfall (også hvis
 κ_pe→0, dvs. data forkaster premien). Ingen prior-justering etter å ha sett
 posterior uten ny PE-godkjenning.
+
+### kj50 — RESULTAT (192 000 trekk, stoppet av PE 2026-06-04)
+
+PE stoppet kjøringen ved 192k (av 200k) — fornøyd med antall trekninger.
+
+**Konvergens:** PSRF_max=1.0022 (< 1.10 ✓), ESS_min=877, ESS/n=0.0046
+(over kj41s 0.003, fortsatt under krav 0.02 — rho-klusteret er ESS-flaskehals).
+
+**Nye parametere (godt identifisert):**
+- `kappa_rp_endo` = 0.0431 ± 0.0164 (ESS=1718, PSRF=1.001) — positiv, ~2.6 sd fra 0.
+  Data støtter en endogen premie, men ~5× mindre enn håndkalibrert κ≈0.20.
+- `rho_rp_endo`   = 0.9191 ± 0.0177 (ESS=1191) — høy, godt identifisert persistens.
+
+**Sideeffekt:** `psi_R` = 0.9895 (kj41: 0.949) → presset mot prior-tak 0.99.
+Begrensning 7 (UIP-kanal ↔ psi_R-korrelasjon) reaktivert, som ved phi_O.
+
+**NB-fit (16pt, posterior-mean IRF):** RMSE = 0.3743 (kj41: 0.295 — verre).
+- RER: −1.19/−1.18/−0.78/−0.25 (NB −1.50/−1.00/−0.50/−0.20) — impact nærmere,
+  **q12-fortegnsskiftet løst** (kj41 var +0.12).
+- PI:  −0.15/−0.27/−0.28/−0.20 (NB −0.03/−0.14/−0.22/−0.22) — persistens klart bedre.
+- I_R: +1.00/+0.96/+0.91/+0.86 (NB +1.00/+0.55/+0.10/−0.15) — for persistent (psi_R→0.99),
+  dominerer RMSE-forverringen.
+- BK-stabil, max|eig|=0.9879.
+
+**Konklusjon:** Endogen risikopremie er datastøttet (liten κ, høy ρ) og løser de to
+diagnostiserte RER/PI-patologiene (q12-fortegn + inflasjonspersistens). Men
+frigjøring av UIP-kanalen presser psi_R til taket → renten overpersisterer →
+aggregert NB-RMSE forverres. Klassisk kanal↔psi_R-avveiing (begrensning 7), ikke
+en ren forbedring. Filer: chain_kj50_prod_posterior.json, kj50_vs_nb.png.
