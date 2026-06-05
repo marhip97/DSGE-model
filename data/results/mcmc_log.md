@@ -2921,3 +2921,27 @@ Modell: build_matrices_rpendo. Warm start: kj50 posterior; sigma_prem på prior-
 **Hypotese:** Ankeret pinner EPS_PREM (som inngår i UIP) → fjerner en fri
 RER-persistens-absorber → skarpere identifikasjon av premiekanalene + mindre psi_R-drift.
 **Forhåndsforpliktelse:** Rapporteres uansett utfall.
+
+### kj52 — RESULTAT (i_3m anker premie + sigma_prem aktivert, 200k, 152.8 min)
+
+**Konvergens (beste av rpendo-kjøringene):** PSRF_final=1.0041, ESS_min=750.
+
+**Funn:**
+- `sigma_prem` = 0.0002 (ESS=1931) — pengemarkedspremien er nå AKTIV og identifisert
+  (var død i kj41/kj50/kj51). log-posterior −3114 (mot kj50 −3306, kj51 −3537):
+  den nye observablen tilfører ~190–420 log-enheter — reell informasjon.
+- `kappa_rp_endo` = 0.0415 ± 0.0153 (ESS=2169) — robust identifisert, ~ identisk med kj50.
+- `rho_rp_endo` = 0.920 ± 0.017; `rho_rp` (eksogen) = 0.116 (lav, som kj50).
+- **`psi_R` = 0.9895 — driver fortsatt til taket.** Ankeret hindret IKKE psi_R-driften.
+
+**NB-fit:** 16pt-RMSE = 0.376 (≈ kj50). RER best av alle: −1.08/−1.01/−0.68/−0.29
+(NB −1.50/−1.00/−0.50/−0.20) — q4 nær eksakt, q12 negativ. Men I_R overpersisterer
+(psi_R=0.99): +1.00/+0.96/+0.91/+0.86 → dominerer RMSE.
+
+**Tolkning:** i_3m løste pengemarkedspremie-identifikasjonen (egen, tidligere død
+kanal) og bekreftet at endogen FX-premie er robust datastøttet (κ≈0.042 når psi_R
+fri). MEN pengemarkedspremien er et ANNET objekt enn psi_R↔FX-premie-floken:
+ankeret brøt ikke psi_R-driften. RER-banen er nå utmerket, men I_R-overpersistensen
+(psi_R→0.99) består → aggregat-RMSE uendret. For å bryte psi_R↔FX-premie kreves en
+FX-spesifikk observabel (valuta-terminpremie / cross-currency basis), ikke
+pengemarkedsrenten. Filer: chain_kj52_prod_posterior.json, kj52_vs_nb.png.

@@ -240,3 +240,34 @@ observasjonsserier** som skiller kanalene — f.eks. NIBOR-OIS/pengemarkedspremi
 som egen observabel, valuta-terminpremie, eller en kreditspread (jf. Spor C6).
 Alternativt: aksepter RER-q12 som dokumentert begrensning og gå til Fase 3/4 med
 kj41 som referanse. Begge krever PE-beslutning.
+
+---
+
+## 8. kj52 — i_3m anker pengemarkedspremien (PE-godkjent, 200k trekk)
+
+Utnytter en EKSISTERENDE serie: `i_3m_obs` (NIBOR 3M) re-mappet fra redundant
+I_R-observasjon til `i_3m = i_R + EPS_PREM`. **Kritisk funn underveis:**
+premie-sjokket `E_prem` var inaktivt (Q=0) i alle tidligere kjøringer → `EPS_PREM`
+var en død tilstand. Aktivert ved å estimere `sigma_prem` (N=22). psi_R holdt fri.
+
+**Konvergens (beste av rpendo):** PSRF=1.0041, ESS_min=750.
+
+**Resultat:**
+- `sigma_prem` = 0.0002 (ESS=1931) — pengemarkedspremien nå aktiv og identifisert.
+  log-posterior −3114 (kj50 −3306, kj51 −3537): observablen tilfører reell info.
+- `kappa_rp_endo` = 0.042 ± 0.015 (ESS=2169) — robust, ~ kj50.
+- `psi_R` = 0.9895 — **driver fortsatt til taket.** Ankeret brøt IKKE driften.
+- 16pt-RMSE = 0.376. RER best av alle (−1.08/−1.01/−0.68/−0.29 vs NB; q4 nær
+  eksakt, q12 negativ), men I_R overpersisterer (psi_R=0.99) → dominerer RMSE.
+
+**Tolkning:** Pengemarkedspremien (`EPS_PREM`/`i_3m`) er et **annet objekt** enn
+FX-risikopremien / renteglatting-floken. i_3m løste premie-identifikasjonen (en
+egen, tidligere død kanal — verdifullt i seg selv) og bekreftet at den endogene
+FX-premien er robust datastøttet, men brøt **ikke** psi_R↔FX-premie-ekvivalensen.
+
+**Samlet konklusjon (kj50–52):** Den endogene FX-risikopremien er reell og
+datastøttet, og fikser RER-patologiene (kj52 RER er utmerket). Men den er
+observasjonsekvivalent med renteglatting (psi_R→0.99) gitt dagens observabler;
+verken psi_R-pinning (kj51) eller pengemarkedsrente-anker (kj52) bryter floken.
+**Å bryte den krever en FX-spesifikk observabel** (valuta-terminpremie /
+cross-currency basis), ikke pengemarkedsrenten. Figur: `data/results/kj52_vs_nb.png`.
