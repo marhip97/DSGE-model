@@ -31,10 +31,10 @@ from scipy.special import betaln, gammaln
 from nemo.model.equations import (
     build_matrices_v3, build_matrices_pi4chain, build_matrices_altB,
     build_matrices_v3_forward, build_matrices_v3_plt,
-    NZ, NZ_PI4, NZ_ALTB, NZ_PLT, NE,
+    NZ, NZ_PI4, NZ_ALTB, NZ_PLT, NZ_GEORG, NZ_RPENDO, NE,
     Y, C, INV, INV_H, X, M, PI, W, I_R, RER, S, PO, YS,
-    Q_H, B_NW, C_NW, I_D, I_L_NW, L, MC,
-    E_A, E_C, E_P, E_O, E_Ys, E_rp, E_i, E_H, E_phi_h
+    Q_H, B_NW, C_NW, I_D, I_L_NW, L, MC, EPS_PREM,
+    E_A, E_C, E_P, E_O, E_Ys, E_rp, E_i, E_H, E_phi_h, E_prem
 )
 from nemo.solver.blanchard_kahn import solve as bk_solve
 from nemo.model.parameters import Parameters
@@ -227,6 +227,44 @@ def build_H_plt() -> np.ndarray:
     return H
 
 
+def build_H_georg() -> np.ndarray:
+    """Observasjonsmatrise for GEORG-modellen (NZ_GEORG=64 kolonner).
+    De 14 GEORG-tilstandene (lagg + AR(1)-Z) er ikke direkte observert —
+    ekstra null-kolonner. Første NZ kolonner matcher build_H().
+    """
+    H_50 = build_H()
+    H = np.zeros((N_OBS, NZ_GEORG))
+    H[:, :NZ] = H_50
+    return H
+
+
+def build_H_rpendo() -> np.ndarray:
+    """Observasjonsmatrise for endogen-risikopremie-modellen (NZ_RPENDO=51 kol.).
+    RP_ENDO (index 50) er ikke observert — ekstra null-kolonne. Første NZ
+    kolonner matcher build_H().
+    """
+    H_50 = build_H()
+    H = np.zeros((N_OBS, NZ_RPENDO))
+    H[:, :NZ] = H_50
+    return H
+
+
+def build_H_rpendo_i3m() -> np.ndarray:
+    """kj52: som build_H_rpendo, men i_3m_obs anker pengemarkedspremien.
+
+    3m NIBOR ≈ forventet styringsrente + pengemarkedspremie. I et kvartalsmodell:
+        i_3m = i_R + μ,  μ = EPS_PREM (pengemarkedspremie-tilstand).
+    Gir EPS_PREM et eget observasjonsanker (i_3m_obs − i_R_obs), i stedet for
+    redundant dobbel-observasjon av I_R (build_H: H[8,I_R]=4). EPS_PREM inngår både
+    i innskuddsrenten (E2) og UIP (rad 15) — å anke den fjerner en fri
+    RER-persistens-absorber (adresserer kj51-observasjonsekvivalensen).
+    """
+    H = build_H_rpendo()
+    H[8, I_R]      = 4.0   # forventet styringsrente (annualisert)
+    H[8, EPS_PREM] = 4.0   # + pengemarkedspremie (annualisert)
+    return H
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # PARAMETERE OG PRIOR
 # sigma_A er fjernet fra estimering — kalibreres fast
@@ -308,6 +346,18 @@ PARAM_PRIORS = {
     # Med φ_I1=12.54 mangler vår forenklede modell NB-kanalene — phi_H1 estimeres for å
     # la data avgjøre kompensasjonsgraden. Prior Normal(60.73, 40, [0.5, 200]) — bredt.
     'phi_H1': ('normal', 60.73,  5.0, 30.0, 100.0),  # kj28: strammet fra (40,[0.5,200]) → eliminerer bimodal
+    # Endogen risikopremie i UIP (kj50, Alt A, PE-godkjent 2026-06-04).
+    # Adresserer monetær RER-IRF-gap (transmisjonsdiagnose). Brukes med
+    # build_matrices_rpendo. Exit: kappa_rp_endo=0 → eksakt v3_forward.
+    # Prior sentrert på håndkalibrert NB-treffende verdi (κ≈0.2, ρ≈0.5-0.7);
+    # nedre grense 0 lar data forkaste premien hvis den ikke trengs.
+    # DEAKTIVERT 2026-06-04 (PE: avslutt FX-sporet). kj50–52: endogen FX-premie er
+    # datastøttet og fikser RER-patologiene, MEN observasjonsekvivalent med
+    # renteglatting gitt 14 observabler (begrensning 8). Default = kj41 (N=19).
+    # Reaktiver disse + E_prem i build_Q for å gjenoppta sporet med FX-serie.
+    # 'kappa_rp_endo': ('normal', 0.20, 0.15, 0.0, 1.0),       # DEAKTIVERT kj52
+    # 'rho_rp_endo':   ('beta',   2.0,  2.0,  0.05, 0.95),     # DEAKTIVERT kj52
+    # 'sigma_prem':    ('inv_gamma', 2.0, 0.0010, 1e-5, 0.05), # DEAKTIVERT kj52
     # psi_PL: PLT prisnivåmål-koeffisient (Fase 2, 2026-06-02, kj46).
     # Normal(0.10, 0.05, [0.00, 0.50]): sentrert over typisk PLT-respons.
     # psi_PL=0 → exitstrategi (ren inflasjonsmål). Gjenaktiver for kj46.
@@ -330,7 +380,10 @@ KM = {'rho_A':0.804,'rho_C':0.725,'rho_O':0.874,'rho_Ys':0.783,
       'phi_I1':12.54,'phi_I2':165.66,'phi_u':0.2192,  # K&M complete doc. s.59: phi_I1=12.54, phi_I2=165.66
       'phi_PQ':669.0,'kappa_M':0.03,'rho_s':0.00,  # rho_s: kj47 fast=0.00
       'phi_O':0.15,   # K&M Tabell 8: olje→RER-kanal; frigjort kj47
-      'phi_H1':60.73}  # K&M Tabell 8: boliginvesteringsjusteringskost.
+      'phi_H1':60.73,  # K&M Tabell 8: boliginvesteringsjusteringskost.
+      # Endogen risikopremie (kj50, ikke i K&M) — referansepunkt = håndkalibrert NB-treff
+      'kappa_rp_endo':0.20, 'rho_rp_endo':0.50,
+      'sigma_prem':0.0010}  # kj52: pengemarkedspremie-sjokk aktivert
 
 def log_prior(theta, overrides=None):
     """
@@ -370,6 +423,7 @@ def build_Q(theta):
     # sigma_rp og sigma_A faste — ikke i theta, bruker _fixed-oppslag.
     smap = {E_A:'sigma_A',E_C:'sigma_C',E_P:'sigma_P',E_O:'sigma_O',
             E_Ys:'sigma_Ys',E_rp:'sigma_rp',E_i:'sigma_i',E_H:'sigma_H'}
+            # kj52: E_prem:'sigma_prem' DEAKTIVERT 2026-06-04 (FX-sporet avsluttet)
     _fixed = {'sigma_rp': SIGMA_RP_FIXED, 'sigma_A': SIGMA_A_FIXED}
     Q = np.zeros((NE,NE))
     for idx,pn in smap.items():

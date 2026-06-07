@@ -2800,3 +2800,157 @@ eller HMC (krever PE-godkjenning).
 
 Fase 2 er avsluttet. Fase 3 (Analyseverktøy) kan starte med kj41 som referanseestimat.
 Se `PROSJEKTPLAN.md` for Fase 3-leveranser og akseptansekriterier.
+
+## kj50 — Endogen risikopremie i UIP (Alt A) — FORHÅNDSREGISTRERT 2026-06-04
+
+**PE-godkjent** 2026-06-04 (transmisjonsdiagnose, valg A).
+
+**Hypotese:** Data støtter en persistent risikopremie som reagerer på
+rentedifferansen og lukker (helt/delvis) det monetære RER-IRF-gapet mot NB
+Figur 1. Håndkalibrert test (kj41-transmisjon, ikke estimert): 16pt-RMSE
+0.295→0.263 ved κ≈0.2, ρ≈0.5–0.7.
+
+**Modell:** `build_matrices_rpendo` (NZ_RPENDO=51). Ny tilstand RP_ENDO:
+`RP_ENDO_t = ρ_pe·RP_ENDO_{t-1} + κ_pe·(i_D−i*)`; UIP rad 15:
+`rer_t = … − (1−ρ_s)·RP_ENDO`. v3/v3_forward urørt. Exit: κ_pe=0 → v3_forward.
+
+**Frie parametere (N=21):** kj41-19 + nye:
+- `kappa_rp_endo`: prior Normal(0.20, 0.15, [0.0, 1.0]) — nedre grense 0 = exit.
+- `rho_rp_endo`:   prior Beta(2, 2, [0.05, 0.95]).
+
+**Faste kalibreringer (= kj41):** phi_I1=0.50, rho_s=0.00, sigma_rp=0.006,
+sigma_A=0.006, h_c=0.938, phi_u=0.2192, kappa_M=0.030, phi_PQ=150,
+lambda_pi4=0.0. phi_O fri (Normal(0.15,0.10,[0.01,0.80])).
+
+**Data:** `nemo_data_kpi_jae.csv`, pre ≤2019Q4, post ≥2022Q1 (COVID-hull).
+**Sampler:** adaptive RWMH + logit-reparam(psi_R), seed=50, n_prod=200k,
+burnin=30k. Warm start: kj41 posterior; nye param på prior-mean.
+**Suksesskriterium:** PSRF<1.10; rapporter ESS/n; 16pt-RMSE vs kj41 (0.295);
+κ_pe-posterior (om data vil ha premien > 0).
+**Forhåndsforpliktelse:** Resultatet rapporteres uansett utfall (også hvis
+κ_pe→0, dvs. data forkaster premien). Ingen prior-justering etter å ha sett
+posterior uten ny PE-godkjenning.
+
+### kj50 — RESULTAT (192 000 trekk, stoppet av PE 2026-06-04)
+
+PE stoppet kjøringen ved 192k (av 200k) — fornøyd med antall trekninger.
+
+**Konvergens:** PSRF_max=1.0022 (< 1.10 ✓), ESS_min=877, ESS/n=0.0046
+(over kj41s 0.003, fortsatt under krav 0.02 — rho-klusteret er ESS-flaskehals).
+
+**Nye parametere (godt identifisert):**
+- `kappa_rp_endo` = 0.0431 ± 0.0164 (ESS=1718, PSRF=1.001) — positiv, ~2.6 sd fra 0.
+  Data støtter en endogen premie, men ~5× mindre enn håndkalibrert κ≈0.20.
+- `rho_rp_endo`   = 0.9191 ± 0.0177 (ESS=1191) — høy, godt identifisert persistens.
+
+**Sideeffekt:** `psi_R` = 0.9895 (kj41: 0.949) → presset mot prior-tak 0.99.
+Begrensning 7 (UIP-kanal ↔ psi_R-korrelasjon) reaktivert, som ved phi_O.
+
+**NB-fit (16pt, posterior-mean IRF):** RMSE = 0.3743 (kj41: 0.295 — verre).
+- RER: −1.19/−1.18/−0.78/−0.25 (NB −1.50/−1.00/−0.50/−0.20) — impact nærmere,
+  **q12-fortegnsskiftet løst** (kj41 var +0.12).
+- PI:  −0.15/−0.27/−0.28/−0.20 (NB −0.03/−0.14/−0.22/−0.22) — persistens klart bedre.
+- I_R: +1.00/+0.96/+0.91/+0.86 (NB +1.00/+0.55/+0.10/−0.15) — for persistent (psi_R→0.99),
+  dominerer RMSE-forverringen.
+- BK-stabil, max|eig|=0.9879.
+
+**Konklusjon:** Endogen risikopremie er datastøttet (liten κ, høy ρ) og løser de to
+diagnostiserte RER/PI-patologiene (q12-fortegn + inflasjonspersistens). Men
+frigjøring av UIP-kanalen presser psi_R til taket → renten overpersisterer →
+aggregert NB-RMSE forverres. Klassisk kanal↔psi_R-avveiing (begrensning 7), ikke
+en ren forbedring. Filer: chain_kj50_prod_posterior.json, kj50_vs_nb.png.
+
+## kj51 — Endogen risikopremie med psi_R pinnet — FORHÅNDSREGISTRERT 2026-06-04
+
+**PE-godkjent** 2026-06-04 (oppfølging av kj50). Bryter psi_R↔premie-korrelasjon
+(begrensning 7) ved å pinne psi_R = 0.949 (kj41-verdi).
+
+**Hypotese:** Med psi_R fast på kj41-nivå isolerer vi den endogene premiens
+bidrag. Hvis NB-RMSE da forbedres mot kj41 (0.295) samtidig som RER-q12-fortegnet
+og PI-persistensen beholdes (fra kj50), er premien en ren forbedring og
+psi_R-driften i kj50 var årsaken til forverringen.
+
+**Mekanisme:** psi_R pinnet via dogmatisk prior `Normal(0.949, 0.0005)` gjennom
+`prior_overrides` — infrastruktur (reparam, PARAM_NAMES, N=21) uendret, reversibel.
+Øvrig: build_matrices_rpendo, kj41/kj50-kalibrering, warm start kj50 posterior.
+**Forhåndsforpliktelse:** Rapporteres uansett utfall.
+
+### kj51 — RESULTAT (psi_R pinnet=0.949, 200k trekk, 109.8 min)
+
+**Konvergens:** PSRF_max=1.120 (rho_rp, marginalt over 1.10), ESS_min=204.
+20/21 OK. Borderline-konvergert på rho-klusteret.
+
+**Estimat:**
+- `psi_R` = 0.9494 ± 0.0005 (pinnet — ESS=1596 ✓)
+- `kappa_rp_endo` = 0.094 ± 0.094 (ESS=228) — **std = mean → svakt identifisert** (mot
+  kj50s 0.043 ± 0.016 tett). Premien er ikke lenger pinnet ned når psi_R holdes fast.
+- `rho_rp_endo` = 0.389 ± 0.218 — kollapset fra kj50s 0.92, stor usikkerhet.
+- `rho_rp` (EKSOGEN risikopremie-AR1) = 0.910 ± 0.190 — **hoppet opp** fra kj41/kj50
+  (0.17/0.12). PSRF=1.12 (den ukonvergerte).
+
+**NB-fit:** 16pt-RMSE = **0.2812** (kj41: 0.295, kj50: 0.374) — BESTE aggregat.
+- I_R: +1.00/+0.81/+0.62/+0.47 (NB .../−0.15) — bedre enn kj50 (psi_R holdt nede).
+- RER: −1.14/−0.83/−0.28/**+0.14** (NB .../−0.20) — **q12-fortegnsskiftet GIKK TAPT**
+  igjen (kj50 hadde −0.25). PI tilbake til lav persistens.
+
+**TOLKNING — observasjonsekvivalens (Spor C6 / begrensning 7):**
+Persistensen «migrerte» mellom kanaler: kj50 la den i renteglatting (psi_R→0.99) +
+endogen premie (rho_rp_endo=0.92); kj51 (psi_R pinnet) la den i den EKSOGENE
+risikopremien (rho_rp=0.91), mens endogen premie ble svakt identifisert. Disse tre
+kanalene er substitutter for å forklare RER/inflasjonspersistens. Avgjørende:
+eksogen rho_rp inngår IKKE i pengepolitikk-IRF-en (risikopremiesjokk=0 under
+pengepolitikksjokk), så kj51 får bedre likelihood + aggregat-RMSE, men MISTER den
+monetære RER-q12-fikset. **Konklusjon: den endogene premien og psi_R/rho_rp er
+ikke separat identifiserbare med dagens 14 observabler.** Strukturell
+identifikasjonsgrense, ikke løsbar ved parametervalg. Filer:
+chain_kj51_prod_posterior.json, kj51_vs_nb.png.
+
+## kj52 — i_3m anker pengemarkedspremie + sigma_prem aktivert — FORHÅNDSREGISTRERT 2026-06-04
+
+**PE-godkjent** 2026-06-04 (oppfølging kj51). Adresserer observasjonsekvivalensen
+ved å utnytte en eksisterende serie: i_3m_obs (NIBOR 3M) re-mappes fra redundant
+I_R-observasjon til `i_3m = i_R + pengemarkedspremie (EPS_PREM)` (build_H_rpendo_i3m).
+
+**Kritisk funn underveis:** Premie-sjokket E_prem var INAKTIVT (Q=0) i alle
+tidligere kjøringer → EPS_PREM død tilstand. Aktiveres nå ved å estimere
+`sigma_prem` (PE-godkjent). N_PARAMS 21→22.
+
+**Frie parametere (N=22):** kj50-21 + `sigma_prem` (Inv-Gamma(2, 0.0010, [1e-5, 0.05])).
+psi_R FRI (test om ny info hindrer 0.99-driften). rho_prem fast=0.8168.
+Modell: build_matrices_rpendo. Warm start: kj50 posterior; sigma_prem på prior-skala.
+**Hypotese:** Ankeret pinner EPS_PREM (som inngår i UIP) → fjerner en fri
+RER-persistens-absorber → skarpere identifikasjon av premiekanalene + mindre psi_R-drift.
+**Forhåndsforpliktelse:** Rapporteres uansett utfall.
+
+### kj52 — RESULTAT (i_3m anker premie + sigma_prem aktivert, 200k, 152.8 min)
+
+**Konvergens (beste av rpendo-kjøringene):** PSRF_final=1.0041, ESS_min=750.
+
+**Funn:**
+- `sigma_prem` = 0.0002 (ESS=1931) — pengemarkedspremien er nå AKTIV og identifisert
+  (var død i kj41/kj50/kj51). log-posterior −3114 (mot kj50 −3306, kj51 −3537):
+  den nye observablen tilfører ~190–420 log-enheter — reell informasjon.
+- `kappa_rp_endo` = 0.0415 ± 0.0153 (ESS=2169) — robust identifisert, ~ identisk med kj50.
+- `rho_rp_endo` = 0.920 ± 0.017; `rho_rp` (eksogen) = 0.116 (lav, som kj50).
+- **`psi_R` = 0.9895 — driver fortsatt til taket.** Ankeret hindret IKKE psi_R-driften.
+
+**NB-fit:** 16pt-RMSE = 0.376 (≈ kj50). RER best av alle: −1.08/−1.01/−0.68/−0.29
+(NB −1.50/−1.00/−0.50/−0.20) — q4 nær eksakt, q12 negativ. Men I_R overpersisterer
+(psi_R=0.99): +1.00/+0.96/+0.91/+0.86 → dominerer RMSE.
+
+**Tolkning:** i_3m løste pengemarkedspremie-identifikasjonen (egen, tidligere død
+kanal) og bekreftet at endogen FX-premie er robust datastøttet (κ≈0.042 når psi_R
+fri). MEN pengemarkedspremien er et ANNET objekt enn psi_R↔FX-premie-floken:
+ankeret brøt ikke psi_R-driften. RER-banen er nå utmerket, men I_R-overpersistensen
+(psi_R→0.99) består → aggregat-RMSE uendret. For å bryte psi_R↔FX-premie kreves en
+FX-spesifikk observabel (valuta-terminpremie / cross-currency basis), ikke
+pengemarkedsrenten. Filer: chain_kj52_prod_posterior.json, kj52_vs_nb.png.
+
+### FX-sporet AVSLUTTET (PE 2026-06-04)
+
+Konstruert UIP-proxy (i_R_obs − ds_obs_lead) vurdert: for svak (FX-støy-dominert,
+std 0.025 vs rente 0.005, AR1=0.14, mangler i*); ren FX-serie (basis/terminpremie)
+ikke tilgjengelig via API-ene. PE besluttet å akseptere identifikasjonsgrensen
+(begrensning 8) som dokumentert. **kj41 forblir referanseestimat.** PARAM_PRIORS
+tilbakestilt til kj41-default (N=19); E_prem deaktivert i build_Q. rpendo-byggere/
+parametere/tester/skripter beholdt for fremtidig reaktivering med FX-serie.

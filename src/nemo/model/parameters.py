@@ -153,6 +153,15 @@ class Parameters:
     phi_O    = 0.15       # (EST) direkte olje→RER-kanal i UIP — frigjort kj47 (PE-godkjent 2026-06-03)
     rho_s    = 0.0        # (CAL) AR(1)-glatting av RER i UIP; kj47: fast=0.00 (kj46 posterior=0.003)
 
+    # Endogen risikopremie i UIP (PE-godkjent 2026-06-04, transmisjonsdiagnose).
+    # Adresserer monetær RER-IRF-gap: NB Figur 1 har stort RER-utslag som henger
+    # appresiert, mens vår RER overshooter til positivt. En persistent premie som
+    # reagerer på rentedifferansen gir både større impact og treg hale (forward
+    # premium puzzle; Mæhlum 2025, Staff Memo 3/2025). Brukes av build_matrices_rpendo.
+    # Exitstrategi: kappa_rp_endo=0 → eksakt v3_forward-atferd.
+    kappa_rp_endo = 0.0   # (EST) premie-respons på rentedifferanse (i_D − i*); 0=av
+    rho_rp_endo   = 0.90  # (EST) persistens i endogen risikopremie
+
     # Nasjonalregnskapsandeler (Norske data 2001–2019)
     # CY+IY+IHY+GY+XY-MY = 1.00 (Spor A5 rettelse, 2026-05-15)
     # Opprinnelig MY=0.34 inkluderte olje-sektoren; fastland ~28 %.
@@ -249,6 +258,20 @@ class Parameters:
 
     # Diskontfaktor sentralbank
     beta_p   = 0.99       # (CAL) β_p
+
+    # ─── GEORG-politikkregel (Almlid, Haltia & Robstad 2025, Staff Memo 15/2025) ──
+    # "Ganske Enkel Optimal ReGel" — IRF-matchet mot tapsfunksjonsbasert optimal
+    # politikk i NEMO. Koeffisienter fra Tabell 4 (annualiserte). Brukes av
+    # build_matrices_georg() som læringssteg for å isolere politikkregel vs.
+    # transmisjon i NB Memo 3/2024 Figur 1-avviket. Estimeres IKKE mot data her.
+    georg_omega_r  = 0.74    # ω_r  — renteglatting (lign. 1)
+    georg_omega_pi = 1.17    # ω_π  — inflasjon (4-kv. KPI-JAE-vekst)
+    georg_omega_y  = 1.27    # ω_y  — outputgap
+    georg_omega_phi = 1.25   # ω_ϕ  — lønnskostnadsvekst-gap (4-kv. ULC)
+    georg_omega_S  = 0.13    # ω_S  — valutakursvekst-gap (8-kv. I-44)
+    georg_omega_rf = 0.25    # ω_rf — utenlandsk rente-gap
+    georg_omega_mu = -1.00   # ω_μ  — pengemarkedspremie-gap
+    georg_lambda_Z = 0.75    # λ_Z  — persistens pengepolitikksjokk Z_t (lign. 2)
 
     # ═══════════════════════════════════════════════════════════════════════
     # BLOKK G: UTENLANDSSEKTOR
