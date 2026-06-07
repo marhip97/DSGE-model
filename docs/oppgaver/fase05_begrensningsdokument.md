@@ -219,3 +219,28 @@ Se `data/results/mcmc_log.md` (kj47–kj49-seksjoner) for full dokumentasjon.
 | 3 | RER-respons OK | kj49 | −0.869 (q4) | −1.00 | Nær ✅ |
 | 6 | I_R.q12 = 0.86 (NB: −0.15) | alle | 0.84–0.86 | −0.15 | Strukturell ❌ |
 | 7 | phi_O–psi_R-korrelasjon | — | — | — | Ny 2026-06-03 ❌ |
+| 8 | FX-premie ↔ psi_R observasjonsekvivalens | kj50–52 | — | — | Ny 2026-06-04, strukturell ❌ |
+
+### 8. FX-risikopremie ↔ renteglatting ikke separat identifiserbare (ny, 2026-06-04)
+
+Transmisjonssporet (kj50–52, `transmisjon_rer_diagnose.md`) viste at NB-RER-avviket
+er strukturelt i UIP-blokken. En **endogen risikopremie** (`build_matrices_rpendo`:
+`RP_ENDO_t = ρ_pe·RP_ENDO_{t-1} + κ_pe·(i_D−i*)`) er **datastøttet** (κ≈0.042±0.015,
+robust når psi_R fri) og **fikser RER-patologiene** (kj52 RER −1.08/−1.01/−0.68/−0.29
+vs NB −1.50/−1.00/−0.50/−0.20; q12-fortegnet snur negativt som hos NB).
+
+**Men:** premien er **observasjonsekvivalent** med renteglatting (psi_R) og eksogen
+risikopremie (rho_rp) gitt dagens 14 observabler — persistensen migrerer mellom
+kanalene: psi_R fri (kj50/52) → psi_R→0.99 (begrensning 7) + premie identifisert →
+I_R overpersisterer; psi_R pinnet (kj51) → persistens migrerer til eksogen rho_rp
+(0.91), som ikke vises i pengepolitikk-IRF → RER-fikset tapt.
+
+Tilleggsfunn kj52: **pengemarkedspremie-sjokket `E_prem` var inaktivt (Q=0)** i alle
+kjøringer t.o.m. kj51 — `EPS_PREM` har vært en død tilstand. Aktivert i kj52
+(`sigma_prem`), men løste ikke floken (pengemarkedspremie ≠ FX-risikopremie).
+
+**Status:** Strukturell identifikasjonsgrense, ikke løsbar ved parametervalg.
+**Løsning krever en FX-spesifikk observabel** (cross-currency basis / terminpremie).
+Konstruert UIP-proxy fra eksisterende data er for svak (FX-støy-dominert, AR1=0.14,
+mangler i*). **PE-beslutning 2026-06-04: akseptert som begrensning; kj41 forblir
+referanse; Fase 3 kan starte.**

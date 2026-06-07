@@ -14,6 +14,10 @@ Tester om den ekstra observasjonsinformasjonen (a) hindrer psi_R-driften til 0.9
 og (b) skarpere identifiserer premiekanalene. Warm start: kj50 posterior.
 N_PARAMS=21.
 
+MERK (2026-06-04): FX-sporet ble avsluttet av PE. For å kjøre på nytt må
+sigma_prem reaktiveres i PARAM_PRIORS og E_prem legges tilbake i build_Q
+smap (begge deaktivert da default ble tilbakestilt til kj41).
+
 Bruk:
   python scripts/kj52_rpendo_i3m.py [n_production] [n_burnin]
 """

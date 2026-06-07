@@ -271,3 +271,28 @@ observasjonsekvivalent med renteglatting (psi_R→0.99) gitt dagens observabler;
 verken psi_R-pinning (kj51) eller pengemarkedsrente-anker (kj52) bryter floken.
 **Å bryte den krever en FX-spesifikk observabel** (valuta-terminpremie /
 cross-currency basis), ikke pengemarkedsrenten. Figur: `data/results/kj52_vs_nb.png`.
+
+## 9. Avslutning — FX-sporet lukket (PE-beslutning 2026-06-04)
+
+Vi vurderte en FX-spesifikk observabel for å bryte floken. Diagnose av en
+**konstruert UIP-proxy** fra eksisterende data (`i_R_obs − ds_obs_{t+1}`): for
+svak som anker — std 0.025 dominert av valutakurs-prognosefeil (mot rente-skala
+~0.005), AR(1)=0.14 (nær støy), ingen observert `i*` (utenlandsk rente er en død
+tilstand), og enhetsskalerings-tvetydighet (i_R_obs ×4 vs ds_obs ×1 i H). En ren
+FX-serie (cross-currency basis / terminpremie) er markedsdata, ikke tilgjengelig
+via SSB/NB/FRED-API-ene og blokkert fra sky-IP.
+
+**PE besluttet 2026-06-04: avslutt FX-sporet.** Identifikasjonsgrensen aksepteres
+som dokumentert begrensning (`fase05_begrensningsdokument.md` § 8). **kj41 forblir
+referanseestimat** (RMSE=0.277). PARAM_PRIORS tilbakestilt til kj41-default (N=19);
+premie-sjokket (`E_prem`) deaktivert igjen i `build_Q`. **Fase 3 (analyseverktøy)
+kan starte.**
+
+**Bevart for fremtidig reaktivering (med FX-serie):** `build_matrices_rpendo`,
+`build_H_rpendo`/`build_H_rpendo_i3m`, parametrene `kappa_rp_endo`/`rho_rp_endo`
+(parameters.py), `tests/test_rpendo.py`, og kj50–52-skriptene. Alle med exit
+κ=0 → v3_forward.
+
+*Merk: kj52-commit/datafiler ble midlertidig borte da sky-containeren ble
+gjenvunnet, men lå på remote og er gjenopprettet (chain_kj52_prod_posterior.json,
+kj52_vs_nb.png).*

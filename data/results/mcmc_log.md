@@ -2945,3 +2945,12 @@ ankeret brøt ikke psi_R-driften. RER-banen er nå utmerket, men I_R-overpersist
 (psi_R→0.99) består → aggregat-RMSE uendret. For å bryte psi_R↔FX-premie kreves en
 FX-spesifikk observabel (valuta-terminpremie / cross-currency basis), ikke
 pengemarkedsrenten. Filer: chain_kj52_prod_posterior.json, kj52_vs_nb.png.
+
+### FX-sporet AVSLUTTET (PE 2026-06-04)
+
+Konstruert UIP-proxy (i_R_obs − ds_obs_lead) vurdert: for svak (FX-støy-dominert,
+std 0.025 vs rente 0.005, AR1=0.14, mangler i*); ren FX-serie (basis/terminpremie)
+ikke tilgjengelig via API-ene. PE besluttet å akseptere identifikasjonsgrensen
+(begrensning 8) som dokumentert. **kj41 forblir referanseestimat.** PARAM_PRIORS
+tilbakestilt til kj41-default (N=19); E_prem deaktivert i build_Q. rpendo-byggere/
+parametere/tester/skripter beholdt for fremtidig reaktivering med FX-serie.

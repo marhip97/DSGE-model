@@ -351,12 +351,13 @@ PARAM_PRIORS = {
     # build_matrices_rpendo. Exit: kappa_rp_endo=0 → eksakt v3_forward.
     # Prior sentrert på håndkalibrert NB-treffende verdi (κ≈0.2, ρ≈0.5-0.7);
     # nedre grense 0 lar data forkaste premien hvis den ikke trengs.
-    'kappa_rp_endo': ('normal', 0.20, 0.15, 0.0, 1.0),
-    'rho_rp_endo':   ('beta',   2.0,  2.0,  0.05, 0.95),
-    # sigma_prem: pengemarkedspremie-sjokk aktivert (kj52, PE-godkjent 2026-06-04).
-    # E_prem var inaktiv (Q=0) i alle tidligere kjøringer → EPS_PREM død tilstand.
-    # Aktiveres slik at i_3m_obs kan identifisere premien (build_H_rpendo_i3m).
-    'sigma_prem':    ('inv_gamma', 2.0, 0.0010, 1e-5, 0.05),
+    # DEAKTIVERT 2026-06-04 (PE: avslutt FX-sporet). kj50–52: endogen FX-premie er
+    # datastøttet og fikser RER-patologiene, MEN observasjonsekvivalent med
+    # renteglatting gitt 14 observabler (begrensning 8). Default = kj41 (N=19).
+    # Reaktiver disse + E_prem i build_Q for å gjenoppta sporet med FX-serie.
+    # 'kappa_rp_endo': ('normal', 0.20, 0.15, 0.0, 1.0),       # DEAKTIVERT kj52
+    # 'rho_rp_endo':   ('beta',   2.0,  2.0,  0.05, 0.95),     # DEAKTIVERT kj52
+    # 'sigma_prem':    ('inv_gamma', 2.0, 0.0010, 1e-5, 0.05), # DEAKTIVERT kj52
     # psi_PL: PLT prisnivåmål-koeffisient (Fase 2, 2026-06-02, kj46).
     # Normal(0.10, 0.05, [0.00, 0.50]): sentrert over typisk PLT-respons.
     # psi_PL=0 → exitstrategi (ren inflasjonsmål). Gjenaktiver for kj46.
@@ -421,8 +422,8 @@ def log_prior(theta, overrides=None):
 def build_Q(theta):
     # sigma_rp og sigma_A faste — ikke i theta, bruker _fixed-oppslag.
     smap = {E_A:'sigma_A',E_C:'sigma_C',E_P:'sigma_P',E_O:'sigma_O',
-            E_Ys:'sigma_Ys',E_rp:'sigma_rp',E_i:'sigma_i',E_H:'sigma_H',
-            E_prem:'sigma_prem'}   # kj52: aktiver pengemarkedspremie-sjokket
+            E_Ys:'sigma_Ys',E_rp:'sigma_rp',E_i:'sigma_i',E_H:'sigma_H'}
+            # kj52: E_prem:'sigma_prem' DEAKTIVERT 2026-06-04 (FX-sporet avsluttet)
     _fixed = {'sigma_rp': SIGMA_RP_FIXED, 'sigma_A': SIGMA_A_FIXED}
     Q = np.zeros((NE,NE))
     for idx,pn in smap.items():
