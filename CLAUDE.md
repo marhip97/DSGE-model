@@ -33,13 +33,24 @@ prosjekteier.
 
 ## Aktiv fase
 
-Per 2026-06-04: **Fase 2 — Revidert estimering** (avsluttet). Fase 0.5, 0.75 og 1 avsluttet.
-Beste estimering: kj41 (psi_R=0.9490, RMSE=0.2771). Data: 2001Q1–2025Q4.
-Se `PROSJEKTPLAN.md` for full beskrivelse, og `docs/oppgaver/` for konkrete oppgaver.
+Per 2026-06-04: **Fase 3 — Analyseverktøy konsolidering** (klar til å starte).
+Fase 0.5, 0.75, 1 og 2 avsluttet. **Referanseestimat: kj41** (psi_R=0.9490,
+RMSE=0.2771). Data: 2001Q1–2025Q4.
 
-Anbefalt startsekvens for Claude Code:
-- `docs/oppgaver/B5_nb_benchmark.md` (rask diagnose mot NB-figur)
-- deretter parallelle spor A, C, D
+Siste arbeid (transmisjons-/regelspor, kj50–52 + GEORG):
+- **GEORG-læringssteg** (`docs/oppgaver/GEORG_laeringssteg_plan.md`): NB-IRF-avviket
+  er **transmisjonsdrevet** (ikke politikkregel).
+- **Transmisjonsdiagnose** (`docs/oppgaver/transmisjon_rer_diagnose.md`): RER-gapet
+  ligger i UIP-blokken. En endogen FX-risikopremie (`build_matrices_rpendo`) er
+  datastøttet og fikser RER, men er **observasjonsekvivalent** med renteglatting
+  gitt 14 observabler → **begrensning 8** (`fase05_begrensningsdokument.md`).
+- PE-beslutning: aksepter grensen; default tilbakestilt til kj41 (N=19). En FX-
+  spesifikk observabel (cross-currency basis/terminpremie) kreves for å gå videre.
+
+Se `PROSJEKTPLAN.md` for full beskrivelse og beslutningslogg.
+
+Anbefalt neste steg (Fase 3): konsolidér `src/nemo/analysis/` (IRF, FEVD,
+historisk dekomposisjon, betinget prognose) med kj41 som referanseestimat.
 
 ## Arbeidsregler
 
