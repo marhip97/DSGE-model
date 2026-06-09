@@ -3,609 +3,1254 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NEMO — Norsk makroøkonomisk modell</title>
+<title>NEMO — DSGE-modell for norsk økonomi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <style>
   :root {
-    --bg:       #f8fafc;
-    --surface:  #ffffff;
-    --border:   #e2e8f0;
-    --text:     #1e293b;
-    --muted:    #64748b;
-    --accent:   #2563eb;
-    --tab-h:    44px;
-    --radius:   8px;
+    /* FIN supplerende designprofil */
+    --fin-darkblue: #181c62;
+    --fin-blue:     #4156a6;
+    --fin-lightblue:#5b91cc;
+    --fin-red:      #f15d61;
+    --fin-gray:     #ededee;
+    --fin-purple:   #97499c;
+    --fin-teal-dark:#008286;
+    --fin-teal:     #60c3ad;
+    --fin-yellow:   #ffdf4f;
+
+    /* Semantiske tokens */
+    --bg:            #f5f6f8;
+    --surface:       #ffffff;
+    --plot-bg:       var(--fin-gray);
+    --text:          #000000;
+    --text-muted:    #3b414e;
+    --border:        #d8dbe1;
+    --border-strong: #b9bdc6;
+    --accent:        var(--fin-darkblue);
+    --focus:         var(--fin-blue);
+
+    --radius: 6px;
+    --maxw: 1180px;
+    --font: 'Open Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Hopp-til-innhold (tilgjengelighet) ── */
+  .skip {
+    position: absolute; left: -999px; top: 0; z-index: 100;
+    background: var(--fin-darkblue); color: #fff; padding: 10px 16px;
+    border-radius: 0 0 var(--radius) 0; font-weight: 600;
+  }
+  .skip:focus { left: 0; }
+
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
   /* ── Header ── */
-  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; align-items: baseline; gap: 12px; }
-  header h1 { font-size: 18px; font-weight: 700; }
-  header .sub { color: var(--muted); font-size: 13px; }
-  #meta-badge { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
-
-  /* ── Tabs ── */
-  nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; gap: 0; overflow-x: auto; }
-  nav button {
-    background: none; border: none; cursor: pointer; padding: 0 18px;
-    height: var(--tab-h); font-size: 13px; font-weight: 500; color: var(--muted);
-    border-bottom: 3px solid transparent; white-space: nowrap;
-    transition: color .15s, border-color .15s;
+  header.top {
+    background: var(--fin-darkblue);
+    color: #fff;
+    padding: 22px 24px 20px;
   }
-  nav button.active { color: var(--accent); border-bottom-color: var(--accent); }
-  nav button:hover:not(.active) { color: var(--text); }
+  .top-inner { max-width: var(--maxw); margin: 0 auto; }
+  .brandrow { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .brandrow h1 { font-size: 30px; font-weight: 800; letter-spacing: -0.5px; }
+  .brandrow .tagline { font-size: 15px; font-weight: 400; color: #c7cdf0; }
+  header.top p.purpose {
+    margin-top: 8px; max-width: 760px; font-size: 14.5px; color: #dde1f5;
+  }
+  .metastrip {
+    margin-top: 16px; display: flex; flex-wrap: wrap; gap: 10px 26px;
+    font-size: 12.5px; color: #c7cdf0;
+    border-top: 1px solid rgba(255,255,255,0.16); padding-top: 14px;
+  }
+  .metastrip b { color: #fff; font-weight: 600; }
+  .metastrip .ok-dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--fin-teal); margin-right: 6px; vertical-align: middle;
+  }
 
-  /* ── Main ── */
-  main { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
+  /* ── Faner ── */
+  nav.tabs {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 20;
+  }
+  .tabs-inner {
+    max-width: var(--maxw); margin: 0 auto; padding: 0 12px;
+    display: flex; gap: 2px; overflow-x: auto;
+  }
+  nav.tabs button {
+    background: none; border: none; cursor: pointer;
+    padding: 0 16px; height: 48px;
+    font-family: var(--font); font-size: 14px; font-weight: 600;
+    color: var(--text-muted); white-space: nowrap;
+    border-bottom: 3px solid transparent;
+    transition: color .12s, border-color .12s;
+  }
+  nav.tabs button[aria-selected="true"] {
+    color: var(--fin-darkblue); border-bottom-color: var(--fin-darkblue);
+  }
+  nav.tabs button:hover:not([aria-selected="true"]) { color: var(--text); }
 
-  /* ── Tab panes ── */
+  main { max-width: var(--maxw); margin: 0 auto; padding: 24px 16px 8px; }
+
   .pane { display: none; }
-  .pane.active { display: block; }
+  .pane.active { display: block; animation: fade .18s ease; }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 
-  /* ── Grid ── */
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
-  @media (max-width: 700px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+  /* ── Seksjonsoverskrift med FIN-hårlinje (signaturelement) ── */
+  .section-head { margin: 4px 0 14px; }
+  .section-head h2 {
+    font-size: 21px; font-weight: 800; color: var(--fin-darkblue);
+    letter-spacing: -0.3px;
+  }
+  .section-head h2::after {
+    content: ""; display: block; width: 46px; height: 3px;
+    background: var(--fin-darkblue); margin-top: 7px;
+  }
 
-  /* ── Card ── */
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
-  .card h3 { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 12px; }
+  /* ── Pedagogisk forklaringsboks ── */
+  .explain {
+    background: var(--surface); border: 1px solid var(--border);
+    border-left: 4px solid var(--fin-darkblue);
+    border-radius: var(--radius);
+    padding: 14px 18px; margin-bottom: 20px;
+    font-size: 14px; color: var(--text);
+  }
+  .explain .eyebrow {
+    font-size: 11.5px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--fin-blue); margin-bottom: 4px;
+  }
+  .explain p + p { margin-top: 8px; }
+  .explain .term { font-weight: 700; color: var(--fin-darkblue); }
 
-  /* ── Controls ── */
-  .controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; align-items: center; }
-  .controls label { font-size: 13px; color: var(--muted); }
-  select, input[type=range] { font-size: 13px; border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; background: var(--surface); color: var(--text); cursor: pointer; }
+  /* Sammenleggbar orientering */
+  details.orient {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); margin-bottom: 22px; overflow: hidden;
+  }
+  details.orient > summary {
+    cursor: pointer; padding: 13px 18px; font-weight: 700;
+    color: var(--fin-darkblue); font-size: 14.5px; list-style: none;
+    display: flex; align-items: center; gap: 8px;
+  }
+  details.orient > summary::-webkit-details-marker { display: none; }
+  details.orient > summary::before {
+    content: "+"; font-weight: 800; color: var(--fin-blue);
+    font-size: 18px; width: 16px; display: inline-block;
+  }
+  details.orient[open] > summary::before { content: "\2212"; }
+  .orient-body { padding: 4px 18px 16px; }
+  .orient-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px 26px;
+    font-size: 13.5px;
+  }
+  .orient-grid div { padding: 6px 0; border-top: 1px solid var(--border); }
+  .orient-grid b { color: var(--fin-darkblue); }
 
-  /* ── Stat tiles ── */
-  .stat-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
-  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; min-width: 140px; }
-  .stat .val { font-size: 22px; font-weight: 700; color: var(--accent); }
-  .stat .lbl { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  /* ── KPI-kort ── */
+  .kpi-row {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+    margin-bottom: 22px;
+  }
+  .kpi {
+    background: var(--surface); border: 1px solid var(--border);
+    border-top: 3px solid var(--fin-darkblue);
+    border-radius: var(--radius); padding: 14px 16px 13px;
+  }
+  .kpi .lbl {
+    font-size: 12px; font-weight: 600; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: .03em;
+  }
+  .kpi .val {
+    font-size: 30px; font-weight: 800; color: var(--fin-darkblue);
+    font-variant-numeric: tabular-nums; line-height: 1.1; margin-top: 6px;
+  }
+  .kpi .unit { font-size: 15px; font-weight: 600; color: var(--text-muted); }
+  .kpi .delta { font-size: 12.5px; color: var(--text-muted); margin-top: 5px;
+    font-variant-numeric: tabular-nums; }
 
-  /* ── Table ── */
+  /* ── Kort / figurcontainere ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px 12px;
+    display: flex; flex-direction: column;
+  }
+  .card .fignum {
+    font-size: 11px; font-weight: 700; letter-spacing: .06em;
+    color: var(--fin-blue); text-transform: uppercase;
+  }
+  .card h3 {
+    font-size: 14.5px; font-weight: 700; color: var(--fin-darkblue);
+    margin: 1px 0 2px;
+  }
+  .card .figsub { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+  .card .source { font-size: 11px; color: var(--text-muted); margin-top: 9px; }
+
+  /* Diagram ligger på lyst grått felt (FIN) */
+  .plot {
+    background: var(--plot-bg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 8px 8px 4px;
+  }
+  .chart-wrap { position: relative; height: 230px; }
+  .chart-wrap-tall { position: relative; height: 320px; }
+
+  .linekey {
+    display: flex; flex-wrap: wrap; gap: 14px; margin-top: 9px;
+    font-size: 11.5px; color: var(--text);
+  }
+  .linekey span { display: inline-flex; align-items: center; gap: 6px; }
+  .linekey i { width: 22px; height: 0; border-top-width: 3px; display: inline-block; }
+  .ls-solid { border-top-style: solid; border-color: var(--fin-darkblue); }
+  .ls-dash  { border-top-style: dashed; border-color: var(--fin-blue); }
+  .ls-dash-teal { border-top-style: dashed; border-color: var(--fin-teal-dark); }
+
+  /* ── Kontroller ── */
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 16px 22px; align-items: flex-end;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px; margin-bottom: 18px;
+  }
+  .ctl { display: flex; flex-direction: column; gap: 5px; }
+  .ctl label { font-size: 12px; font-weight: 700; color: var(--fin-darkblue); }
+  .ctl .hint { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+  select, input[type=range] {
+    font-family: var(--font); font-size: 13.5px;
+    border: 1px solid var(--border-strong); border-radius: 4px;
+    padding: 6px 9px; background: var(--surface); color: var(--text);
+    cursor: pointer; min-width: 190px;
+  }
+  input[type=range] { min-width: 170px; padding: 4px 0; accent-color: var(--fin-darkblue); }
+  .rangewrap { display: flex; align-items: center; gap: 10px; }
+  .rangeval {
+    font-size: 13px; font-weight: 700; color: var(--fin-darkblue);
+    min-width: 42px; font-variant-numeric: tabular-nums;
+  }
+  .pngbtn {
+    font-family: var(--font); font-size: 12px; font-weight: 600;
+    color: var(--fin-darkblue); background: var(--surface);
+    border: 1px solid var(--border-strong); border-radius: 4px;
+    padding: 6px 11px; cursor: pointer; align-self: flex-start;
+  }
+  .pngbtn:hover { background: var(--fin-gray); }
+  .card .cardtop { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+
+  /* ── Tabell (FIN) ── */
   .tbl-wrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { text-align: left; padding: 6px 10px; border-bottom: 2px solid var(--border); color: var(--muted); font-weight: 600; white-space: nowrap; }
-  td { padding: 5px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-  tr:last-child td { border-bottom: none; }
-  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.fin { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.fin thead th {
+    background: var(--fin-gray); text-align: left; padding: 8px 10px;
+    color: #000; font-weight: 700; white-space: nowrap;
+    border-bottom: 2px solid var(--border-strong);
+  }
+  table.fin td { padding: 7px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  table.fin tr:last-child td { border-bottom: none; }
+  table.fin td.num, table.fin th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .swatch { display: inline-block; width: 11px; height: 11px; border-radius: 2px; margin-right: 7px; vertical-align: -1px; }
 
-  /* ── Legend ── */
-  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
-  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); cursor: pointer; }
-  .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  /* ── Varsel / merknad ── */
+  .note {
+    font-size: 12.5px; color: var(--text); background: var(--surface);
+    border: 1px solid var(--border); border-left: 4px solid var(--fin-red);
+    border-radius: var(--radius); padding: 12px 16px; margin: 4px 0 18px;
+  }
+  .note b { color: var(--fin-darkblue); }
 
-  /* ── Canvas containers ── */
-  .chart-wrap { position: relative; height: 220px; }
-  .chart-wrap-tall { position: relative; height: 300px; }
+  .empty {
+    display: flex; align-items: center; justify-content: center;
+    height: 100%; color: var(--text-muted); font-size: 13px; text-align: center;
+  }
+
+  /* ── Diagnostikk-statkort ── */
+  .diag-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 20px; }
+  .diag {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 13px 15px;
+  }
+  .diag .val { font-size: 24px; font-weight: 800; color: var(--fin-darkblue);
+    font-variant-numeric: tabular-nums; }
+  .diag .lbl { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+
+  /* ── Footer ── */
+  footer {
+    max-width: var(--maxw); margin: 28px auto 0; padding: 22px 16px 40px;
+    border-top: 1px solid var(--border); font-size: 12.5px; color: var(--text-muted);
+  }
+  footer h4 { font-size: 13px; color: var(--fin-darkblue); margin-bottom: 6px; font-weight: 700; }
+  footer a { color: var(--fin-blue); }
+  footer p { max-width: 820px; margin-bottom: 8px; }
+
+  /* ── Responsivt ── */
+  @media (max-width: 880px) {
+    .kpi-row, .diag-row { grid-template-columns: 1fr 1fr; }
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .orient-grid { grid-template-columns: 1fr; }
+    .brandrow h1 { font-size: 25px; }
+  }
+  @media (max-width: 520px) {
+    .kpi-row, .diag-row { grid-template-columns: 1fr; }
+    select { min-width: 0; width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; scroll-behavior: auto; }
+  }
 </style>
 </head>
 <body>
 
-<header>
-  <h1>NEMO</h1>
-  <span class="sub">Norsk makroøkonomisk modell (kj41)</span>
-  <span id="meta-badge"></span>
+<a href="#hovedinnhold" class="skip">Hopp til hovedinnholdet</a>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brandrow">
+      <h1>NEMO</h1>
+      <span class="tagline">DSGE-modell for norsk økonomi</span>
+    </div>
+    <p class="purpose">
+      Bayesiansk estimert likevektsmodell for norsk økonomi. Dashbordet viser
+      hvordan sjokk forplanter seg gjennom økonomien, hva som har drevet
+      konjunkturene historisk, og modellens fremskrivning.
+    </p>
+    <div class="metastrip">
+      <span><span class="ok-dot" id="stab-dot"></span><b id="meta-stab">Modellen er stabil</b></span>
+      <span>Referanseestimat: <b>kj41</b></span>
+      <span>Estimeringsperiode: <b>2001K1–2025K4</b></span>
+      <span>Siste observasjon: <b id="meta-last">–</b></span>
+    </div>
+  </div>
 </header>
 
-<nav id="tabs">
-  <button class="active" data-tab="oversikt">Oversikt</button>
-  <button data-tab="irf">IRF</button>
-  <button data-tab="fevd">FEVD</button>
-  <button data-tab="historikk">Historikk</button>
-  <button data-tab="prognose">Prognose</button>
-  <button data-tab="diagnostikk">Diagnostikk</button>
+<nav class="tabs" id="tabs" role="tablist" aria-label="Analysefaner">
+  <div class="tabs-inner">
+    <button role="tab" aria-selected="true"  aria-controls="pane-oversikt"   id="tab-oversikt"   data-tab="oversikt">Oversikt</button>
+    <button role="tab" aria-selected="false" aria-controls="pane-irf"        id="tab-irf"        data-tab="irf">IRF</button>
+    <button role="tab" aria-selected="false" aria-controls="pane-fevd"       id="tab-fevd"       data-tab="fevd">FEVD</button>
+    <button role="tab" aria-selected="false" aria-controls="pane-historikk"  id="tab-historikk"  data-tab="historikk">Historikk</button>
+    <button role="tab" aria-selected="false" aria-controls="pane-prognose"   id="tab-prognose"   data-tab="prognose">Prognose</button>
+    <button role="tab" aria-selected="false" aria-controls="pane-diagnostikk" id="tab-diagnostikk" data-tab="diagnostikk">Diagnostikk</button>
+  </div>
 </nav>
 
-<main>
+<main id="hovedinnhold">
 
-<!-- ══════════════════════════════════════════════════════
-     OVERSIKT
-═══════════════════════════════════════════════════════ -->
-<div class="pane active" id="pane-oversikt">
-  <div id="stat-row" class="stat-row"></div>
-  <div class="grid-2">
-    <div class="card">
-      <h3>BNP-gap (historisk + prognose)</h3>
-      <div class="chart-wrap"><canvas id="ov-bnp"></canvas></div>
+  <details class="orient">
+    <summary>Slik leser du dashbordet</summary>
+    <div class="orient-body">
+      <div class="orient-grid">
+        <div><b>Oversikt</b> &mdash; sentrale størrelser med historikk og anslag.</div>
+        <div><b>IRF</b> &mdash; økonomiens respons på ett isolert sjokk over tid.</div>
+        <div><b>FEVD</b> &mdash; hvor mye hvert sjokk forklarer av prognoseusikkerheten.</div>
+        <div><b>Historikk</b> &mdash; hvilke sjokk som har drevet de observerte bevegelsene.</div>
+        <div><b>Prognose</b> &mdash; modellens fremskrivning, ubetinget og betinget.</div>
+        <div><b>Diagnostikk</b> &mdash; numerisk stabilitet og dokumenterte begrensninger.</div>
+      </div>
     </div>
-    <div class="card">
-      <h3>KPI-inflasjon (historisk + prognose)</h3>
-      <div class="chart-wrap"><canvas id="ov-pi"></canvas></div>
-    </div>
-    <div class="card">
-      <h3>Styringsrente (historisk + prognose)</h3>
-      <div class="chart-wrap"><canvas id="ov-rente"></canvas></div>
-    </div>
-    <div class="card">
-      <h3>Valutakurs NOK/EUR (historisk)</h3>
-      <div class="chart-wrap"><canvas id="ov-rer"></canvas></div>
-    </div>
-  </div>
-</div>
+  </details>
 
-<!-- ══════════════════════════════════════════════════════
-     IRF
-═══════════════════════════════════════════════════════ -->
-<div class="pane" id="pane-irf">
-  <div class="controls">
-    <label>Sjokk:</label>
-    <select id="irf-shock"></select>
-    <label style="margin-left:12px;">Horisonter:</label>
-    <input type="range" id="irf-horizon" min="4" max="20" value="20" step="1">
-    <span id="irf-horizon-label" style="font-size:13px;min-width:24px;"></span>
-  </div>
-  <div class="grid-2">
-    <div class="card"><h3>BNP-gap</h3><div class="chart-wrap"><canvas id="irf-bnp"></canvas></div></div>
-    <div class="card"><h3>KPI-inflasjon</h3><div class="chart-wrap"><canvas id="irf-pi"></canvas></div></div>
-    <div class="card"><h3>Styringsrente</h3><div class="chart-wrap"><canvas id="irf-rente"></canvas></div></div>
-    <div class="card"><h3>RER-gap</h3><div class="chart-wrap"><canvas id="irf-rer"></canvas></div></div>
-    <div class="card"><h3>Boligpris-gap</h3><div class="chart-wrap"><canvas id="irf-bolig"></canvas></div></div>
-  </div>
-</div>
+  <!-- ════════════ OVERSIKT ════════════ -->
+  <div class="pane active" id="pane-oversikt" role="tabpanel" aria-labelledby="tab-oversikt">
+    <div class="section-head"><h2>Oversikt</h2></div>
+    <div class="explain">
+      <div class="eyebrow">Hva viser fanen</div>
+      <p>Sentrale størrelser i norsk økonomi slik modellen ser dem.
+      <span class="term">Heltrukken</span> linje er historiske, modellfiltrerte verdier;
+      <span class="term">stiplet</span> linje er modellens fremskrivning fra siste observasjon.
+      Nivåtallene er avvik fra langsiktig likevekt (gap), målt i prosent, der ikke annet er angitt.</p>
+    </div>
 
-<!-- ══════════════════════════════════════════════════════
-     FEVD
-═══════════════════════════════════════════════════════ -->
-<div class="pane" id="pane-fevd">
-  <div class="controls">
-    <label>Variabel:</label>
-    <select id="fevd-var"></select>
-    <label style="margin-left:12px;">Horisont:</label>
-    <input type="range" id="fevd-horizon" min="1" max="20" value="8" step="1">
-    <span id="fevd-horizon-label" style="font-size:13px;min-width:24px;"></span>
-  </div>
-  <div class="grid-2">
-    <div class="card">
-      <h3>Sjokkandeler (stacked bar)</h3>
-      <div class="chart-wrap-tall"><canvas id="fevd-bar"></canvas></div>
-    </div>
-    <div class="card">
-      <h3>Tabell — h=<span id="fevd-tbl-h">8</span></h3>
-      <div class="tbl-wrap" id="fevd-table-wrap"></div>
-    </div>
-  </div>
-</div>
+    <div class="kpi-row" id="kpi-row"></div>
 
-<!-- ══════════════════════════════════════════════════════
-     HISTORIKK
-═══════════════════════════════════════════════════════ -->
-<div class="pane" id="pane-historikk">
-  <div class="controls">
-    <label>Variabel:</label>
-    <select id="hist-var"></select>
+    <div class="grid-2">
+      <div class="card">
+        <div class="fignum">Figur 1</div>
+        <h3>BNP-gap</h3>
+        <div class="figsub">Avvik fra trend-BNP, Fastlands-Norge. Prosent.</div>
+        <div class="plot"><div class="chart-wrap"><canvas id="ov-bnp"></canvas></div></div>
+        <div class="linekey">
+          <span><i class="ls-solid"></i>Historikk</span>
+          <span><i class="ls-dash"></i>Anslag</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="fignum">Figur 2</div>
+        <h3>KPI-inflasjon</h3>
+        <div class="figsub">Årsvekst i konsumprisene. Prosent.</div>
+        <div class="plot"><div class="chart-wrap"><canvas id="ov-pi"></canvas></div></div>
+        <div class="linekey">
+          <span><i class="ls-solid"></i>Historikk</span>
+          <span><i class="ls-dash"></i>Anslag</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="fignum">Figur 3</div>
+        <h3>Styringsrente</h3>
+        <div class="figsub">Norges Banks styringsrente. Prosent.</div>
+        <div class="plot"><div class="chart-wrap"><canvas id="ov-rente"></canvas></div></div>
+        <div class="linekey">
+          <span><i class="ls-solid"></i>Historikk</span>
+          <span><i class="ls-dash"></i>Anslag</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="fignum">Figur 4</div>
+        <h3>Valutakurs</h3>
+        <div class="figsub">Importveid kronekurs (I-44), historikk.</div>
+        <div class="plot"><div class="chart-wrap"><canvas id="ov-rer"></canvas></div></div>
+        <div class="linekey"><span><i class="ls-solid"></i>Historikk</span></div>
+      </div>
+    </div>
+    <p class="source" style="margin-top:14px">Kilde: NEMO (referanseestimat kj41). Modellfiltrerte og fremskrevne verdier.</p>
   </div>
-  <div class="card" style="margin-bottom:20px;">
-    <h3>Observert nivå</h3>
-    <div class="chart-wrap-tall"><canvas id="hist-level-chart"></canvas></div>
-  </div>
-  <div class="card">
-    <h3>Historisk dekomposisjon — sjokk-bidrag</h3>
-    <div class="chart-wrap-tall"><canvas id="hist-decomp-chart"></canvas></div>
-    <div class="legend" id="hist-decomp-legend"></div>
-  </div>
-</div>
 
-<!-- ══════════════════════════════════════════════════════
-     PROGNOSE
-═══════════════════════════════════════════════════════ -->
-<div class="pane" id="pane-prognose">
-  <div class="grid-2">
-    <div class="card"><h3>BNP-gap (prognose)</h3><div class="chart-wrap"><canvas id="fcst-bnp"></canvas></div></div>
-    <div class="card"><h3>KPI-inflasjon (prognose)</h3><div class="chart-wrap"><canvas id="fcst-pi"></canvas></div></div>
-    <div class="card"><h3>Styringsrente (prognose)</h3><div class="chart-wrap"><canvas id="fcst-rente"></canvas></div></div>
-    <div class="card"><h3>Valutakurs / RER (prognose)</h3><div class="chart-wrap"><canvas id="fcst-rer"></canvas></div></div>
-  </div>
-  <div class="card" style="margin-top:20px;">
-    <h3>Aktive sjokk ved siste kvartal (standardavvik)</h3>
-    <div class="chart-wrap"><canvas id="fcst-shocks"></canvas></div>
-  </div>
-</div>
+  <!-- ════════════ IRF ════════════ -->
+  <div class="pane" id="pane-irf" role="tabpanel" aria-labelledby="tab-irf">
+    <div class="section-head"><h2>Impulsrespons (IRF)</h2></div>
+    <div class="explain">
+      <div class="eyebrow">Hva viser fanen</div>
+      <p>Et <span class="term">impulsresponsdiagram</span> viser hvordan økonomien reagerer
+      over tid på étt isolert sjokk på étt kvartal &mdash; for eksempel en uventet renteheving.
+      Kurvene er modellberegnede avvik fra likevekt, kvartal for kvartal. Velg sjokk og hvor mange
+      kvartaler du vil se.</p>
+    </div>
 
-<!-- ══════════════════════════════════════════════════════
-     DIAGNOSTIKK
-═══════════════════════════════════════════════════════ -->
-<div class="pane" id="pane-diagnostikk">
-  <div class="stat-row" id="diag-stats"></div>
-  <div class="grid-2">
-    <div class="card">
-      <h3>FEVD — BNP h=8 (sjokkandeler)</h3>
-      <div class="chart-wrap-tall"><canvas id="diag-fevd-bnp"></canvas></div>
+    <div class="controls">
+      <div class="ctl">
+        <label for="irf-shock">Sjokk</label>
+        <span class="hint">Hvilket sjokk økonomien utsettes for</span>
+        <select id="irf-shock"></select>
+      </div>
+      <div class="ctl">
+        <label for="irf-horizon">Horisont</label>
+        <span class="hint">Antall kvartaler etter sjokket</span>
+        <div class="rangewrap">
+          <input type="range" id="irf-horizon" min="4" max="20" value="20" step="1">
+          <span class="rangeval" id="irf-horizon-label">20K</span>
+        </div>
+      </div>
     </div>
-    <div class="card">
-      <h3>FEVD — RER h=8 (sjokkandeler)</h3>
-      <div class="chart-wrap-tall"><canvas id="diag-fevd-rer"></canvas></div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="cardtop"><div><div class="fignum">Figur 5</div><h3>BNP-gap</h3></div>
+          <button class="pngbtn" data-png="irf-bnp" data-name="irf_bnp">Last ned PNG</button></div>
+        <div class="figsub" id="irf-bnp-sub">Respons i BNP-gap. Prosent.</div>
+        <div class="plot"><div class="chart-wrap"><canvas id="irf-bnp"></canvas></div></div>
+      </div>
+      <div class="card">
+        <div class="cardtop"><div><div class="fignum">Figur 6</div><h3>KPI-inflasjon</h3></div>
+          <button class="pngbtn" data-png="irf-pi" data-name="irf_inflasjon">Last ned PNG</button></div>
+        <div class="figsub">Respons i inflasjon. Prosentpoeng.</div>
+        <div class="plot"><div class="chart-wrap"><canvas id="irf-pi"></canvas></div></div>
+      </div>
+      <div class="card">
+        <div class="cardtop"><div><div class="fignum">Figur 7</div><h3>Styringsrente</h3></div>
+          <button class="pngbtn" data-png="irf-rente" data-name="irf_styringsrente">Last ned PNG</button></div>
+        <div class="figsub">Respons i styringsrenten. Prosentpoeng.</div>
+        <div class="plot"><div class="chart-wrap"><canvas id="irf-rente"></canvas></div></div>
+      </div>
+      <div class="card">
+        <div class="cardtop"><div><div class="fignum">Figur 8</div><h3>Valutakurs (RER-gap)</h3></div>
+          <button class="pngbtn" data-png="irf-rer" data-name="irf_rer">Last ned PNG</button></div>
+        <div class="figsub">Respons i reell valutakurs. Prosent.</div>
+        <div class="plot"><div class="chart-wrap"><canvas id="irf-rer"></canvas></div></div>
+      </div>
+      <div class="card">
+        <div class="cardtop"><div><div class="fignum">Figur 9</div><h3>Boligpris-gap</h3></div>
+          <button class="pngbtn" data-png="irf-bolig" data-name="irf_boligpris">Last ned PNG</button></div>
+        <div class="figsub">Respons i boligprisene. Prosent.</div>
+        <div class="plot"><div class="chart-wrap"><canvas id="irf-bolig"></canvas></div></div>
+      </div>
+    </div>
+
+    <div class="note" style="margin-top:18px">
+      <b>Merk:</b> Responsene er modellberegnede avvik fra likevekt, ikke observerte tall.
+      Nivåene er betinget på referanseestimatet kj41 og er beheftet med samplingsusikkerhet
+      &mdash; se Diagnostikk-fanen.
     </div>
   </div>
-  <div class="card" style="margin-top:20px;">
-    <h3>Strukturelle begrensninger (fra Fase 0.5/2)</h3>
-    <div class="tbl-wrap">
-      <table>
-        <thead><tr><th>#</th><th>Begrensning</th><th>Verdi (kj41)</th><th>NB-referanse</th></tr></thead>
-        <tbody>
-          <tr><td>1</td><td>sigma_rp dominerer FEVD</td><td>sigma_rp = 0.014</td><td>K&amp;M: 0.006</td></tr>
-          <tr><td>2</td><td>h_c habit persistens (fast)</td><td>0.938</td><td>K&amp;M: 0.65</td></tr>
-          <tr><td>3</td><td>sigma_A svakt identifisert (fast)</td><td>0.006</td><td>K&amp;M: 0.006</td></tr>
-          <tr><td>4</td><td>phi_I1 investeringsrigiditet (fast)</td><td>0.50</td><td>K&amp;M: 4.0</td></tr>
-          <tr><td>5</td><td>COVID-hull i estimering</td><td>2020Q1–2021Q4</td><td>—</td></tr>
-          <tr><td>6</td><td>I_R.q12 feil fortegn</td><td>+0.84 vs NB −0.15</td><td>psi_R=0.949 strukturell</td></tr>
-          <tr><td>7</td><td>phi_O–psi_R korrelasjon</td><td>phi_O=0.15 (fast)</td><td>phi_O∼0.21 fritt</td></tr>
-          <tr><td>8</td><td>FX-premie observasjonsekvivalens</td><td>kj50–52 avsluttet</td><td>14 obs utilstrekkelig</td></tr>
-        </tbody>
-      </table>
+
+  <!-- ════════════ FEVD ════════════ -->
+  <div class="pane" id="pane-fevd" role="tabpanel" aria-labelledby="tab-fevd">
+    <div class="section-head"><h2>Variansdekomponering (FEVD)</h2></div>
+    <div class="explain">
+      <div class="eyebrow">Hva viser fanen</div>
+      <p><span class="term">Variansdekomponering</span> svarer på: hvor mye av usikkerheten i
+      prognosen for en variabel skyldes hvert enkelt sjokk, ved ulike tidshorisonter?
+      Søylene er stablet og summerer til 100 prosent for hver horisont. På kort sikt dominerer
+      som regel få sjokk; over tid sprer bidragene seg.</p>
+    </div>
+
+    <div class="controls">
+      <div class="ctl">
+        <label for="fevd-var">Variabel</label>
+        <span class="hint">Størrelsen du dekomponerer</span>
+        <select id="fevd-var"></select>
+      </div>
+      <div class="ctl">
+        <label for="fevd-horizon">Horisont</label>
+        <span class="hint">Kvartal som tabellen leser av</span>
+        <div class="rangewrap">
+          <input type="range" id="fevd-horizon" min="1" max="20" value="12" step="1">
+          <span class="rangeval" id="fevd-horizon-label">12K</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="cardtop"><div><div class="fignum">Figur 10</div><h3>Sjokkandeler over horisont</h3></div>
+          <button class="pngbtn" data-png="fevd-bar" data-name="fevd_andeler">Last ned PNG</button></div>
+        <div class="figsub">Andel av prognosefeilvariansen. Prosent.</div>
+        <div class="plot"><div class="chart-wrap-tall"><canvas id="fevd-bar"></canvas></div></div>
+      </div>
+      <div class="card">
+        <div class="fignum">Tabell 1</div>
+        <h3>Andeler ved valgte horisonter</h3>
+        <div class="figsub">Eksakte verdier for h = 1, 4, 8 og valgt horisont.</div>
+        <div class="tbl-wrap" id="fevd-table-wrap" style="margin-top:6px"></div>
+      </div>
+    </div>
+
+    <div class="note" style="margin-top:18px">
+      <b>Kjent begrensning:</b> Risikopremiesjokket forklarer en uforholdsmessig stor del av
+      valutakursvariansen. Dette er en dokumentert strukturell begrensning (UIP-likningen mangler
+      dynamikk) &mdash; se Diagnostikk-fanen, begrensning 1 og 8.
     </div>
   </div>
-</div>
+
+  <!-- ════════════ HISTORIKK ════════════ -->
+  <div class="pane" id="pane-historikk" role="tabpanel" aria-labelledby="tab-historikk">
+    <div class="section-head"><h2>Historisk dekomponering</h2></div>
+    <div class="explain">
+      <div class="eyebrow">Hva viser fanen</div>
+      <p><span class="term">Historisk dekomponering</span> fordeler de observerte bevegelsene i en
+      variabel på de underliggende sjokkene modellen identifiserer. Søyler over null trekker
+      variabelen opp i det aktuelle kvartalet; søyler under null trekker ned. Øverst vises det
+      observerte nivået, nederst bidragene.</p>
+    </div>
+
+    <div class="controls">
+      <div class="ctl">
+        <label for="hist-var">Variabel</label>
+        <span class="hint">Størrelsen som dekomponeres</span>
+        <select id="hist-var"></select>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:18px">
+      <div class="cardtop"><div><div class="fignum">Figur 11</div><h3 id="hist-level-title">Observert nivå</h3></div>
+        <button class="pngbtn" data-png="hist-level-chart" data-name="historikk_niva">Last ned PNG</button></div>
+      <div class="figsub">Modellfiltrert nivå over tid.</div>
+      <div class="plot"><div class="chart-wrap-tall"><canvas id="hist-level-chart"></canvas></div></div>
+    </div>
+    <div class="card">
+      <div class="cardtop"><div><div class="fignum">Figur 12</div><h3>Sjokkbidrag</h3></div>
+        <button class="pngbtn" data-png="hist-decomp-chart" data-name="historikk_dekomponering">Last ned PNG</button></div>
+      <div class="figsub">Bidrag fra hvert sjokk per kvartal. Stablede søyler.</div>
+      <div class="plot"><div class="chart-wrap-tall"><canvas id="hist-decomp-chart"></canvas></div></div>
+      <div class="linekey" id="hist-decomp-legend"></div>
+    </div>
+
+    <div class="note" style="margin-top:18px">
+      <b>Tolkning:</b> Dekomponeringen er betinget på modellstrukturen. Den fordeler observerte
+      bevegelser på modellens sjokk og er ikke en uavhengig årsaksanalyse.
+    </div>
+  </div>
+
+  <!-- ════════════ PROGNOSE ════════════ -->
+  <div class="pane" id="pane-prognose" role="tabpanel" aria-labelledby="tab-prognose">
+    <div class="section-head"><h2>Prognose</h2></div>
+    <div class="explain">
+      <div class="eyebrow">Hva viser fanen</div>
+      <p>Fremskrivningen viser den <span class="term">ubetingede</span> banen (modellens beste anslag
+      gitt all informasjon, stiplet blå) og en <span class="term">betinget</span> bane (turkis stiplet)
+      som forutsetter de antatte sjokkene ved siste kvartal. Heltrukken linje er historikk.
+      Søylediagrammet nederst viser hvilke sjokk som er aktive ved fremskrivningens start.</p>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="cardtop"><div><div class="fignum">Figur 13</div><h3>BNP-gap</h3></div>
+          <button class="pngbtn" data-png="fcst-bnp" data-name="prognose_bnp">Last ned PNG</button></div>
+        <div class="figsub">Prosent.</div>
+        <div class="plot"><div class="chart-wrap"><canvas id="fcst-bnp"></canvas></div></div>
+        <div class="linekey">
+          <span><i class="ls-solid"></i>Historikk</span>
+          <span><i class="ls-dash"></i>Ubetinget</span>
+          <span><i class="ls-dash-teal"></i>Betinget</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cardtop"><div><div class="fignum">Figur 14</div><h3>KPI-inflasjon</h3></div>
+          <button class="pngbtn" data-png="fcst-pi" data-name="prognose_inflasjon">Last ned PNG</button></div>
+        <div class="figsub">Prosent.</div>
+        <div class="plot"><div class="chart-wrap"><canvas id="fcst-pi"></canvas></div></div>
+        <div class="linekey">
+          <span><i class="ls-solid"></i>Historikk</span>
+          <span><i class="ls-dash"></i>Ubetinget</span>
+          <span><i class="ls-dash-teal"></i>Betinget</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cardtop"><div><div class="fignum">Figur 15</div><h3>Styringsrente</h3></div>
+          <button class="pngbtn" data-png="fcst-rente" data-name="prognose_styringsrente">Last ned PNG</button></div>
+        <div class="figsub">Prosent.</div>
+        <div class="plot"><div class="chart-wrap"><canvas id="fcst-rente"></canvas></div></div>
+        <div class="linekey">
+          <span><i class="ls-solid"></i>Historikk</span>
+          <span><i class="ls-dash"></i>Ubetinget</span>
+          <span><i class="ls-dash-teal"></i>Betinget</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cardtop"><div><div class="fignum">Figur 16</div><h3>Aktive sjokk ved siste kvartal</h3></div>
+          <button class="pngbtn" data-png="fcst-shocks" data-name="prognose_aktive_sjokk">Last ned PNG</button></div>
+        <div class="figsub">Standardavvik. Blå trekker opp, rød trekker ned.</div>
+        <div class="plot"><div class="chart-wrap"><canvas id="fcst-shocks"></canvas></div></div>
+      </div>
+    </div>
+
+    <div class="note" style="margin-top:18px">
+      <b>Merk:</b> Usikkerhetsbånd er ikke vist i denne versjonen. Fremskrivningen er betinget på
+      referanseestimatet kj41.
+    </div>
+  </div>
+
+  <!-- ════════════ DIAGNOSTIKK ════════════ -->
+  <div class="pane" id="pane-diagnostikk" role="tabpanel" aria-labelledby="tab-diagnostikk">
+    <div class="section-head"><h2>Diagnostikk</h2></div>
+    <div class="explain">
+      <div class="eyebrow">Hva viser fanen</div>
+      <p>Numerisk stabilitet og de strukturelle begrensningene som er dokumentert i Fase 0.5 og 2.
+      Begrensningene er <span class="term">kjente og bevisste avveininger</span>, ikke feil &mdash; de
+      forteller hvor modellens svar skal tolkes med varsomhet.</p>
+    </div>
+
+    <div class="note">
+      <b>Usikkerhet i estimatene:</b> Effektivt antall uavhengige trekk (ESS) i estimeringen er lavere
+      enn målkravet. Punktestimatene for sterkt persistente parametere (blant annet renteglatting og
+      habitkonsum) har derfor høyere Monte&nbsp;Carlo-usikkerhet enn standardformelen tilsier.
+      Tolk kvantitative nivåer i IRF og prognose som indikative.
+    </div>
+
+    <div class="diag-row" id="diag-stats"></div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="fignum">Figur 17</div>
+        <h3>BNP-gap, sjokkandeler (h = 8)</h3>
+        <div class="figsub">Variansdekomponering ved åtte kvartaler.</div>
+        <div class="plot"><div class="chart-wrap-tall"><canvas id="diag-fevd-bnp"></canvas></div></div>
+      </div>
+      <div class="card">
+        <div class="fignum">Figur 18</div>
+        <h3>Valutakurs, sjokkandeler (h = 8)</h3>
+        <div class="figsub">Variansdekomponering ved åtte kvartaler.</div>
+        <div class="plot"><div class="chart-wrap-tall"><canvas id="diag-fevd-rer"></canvas></div></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+      <div class="fignum">Tabell 2</div>
+      <h3>Strukturelle begrensninger (Fase 0.5 og 2)</h3>
+      <div class="figsub">Dokumenterte avveininger i referanseestimatet kj41.</div>
+      <div class="tbl-wrap" style="margin-top:8px">
+        <table class="fin">
+          <thead><tr><th>#</th><th>Begrensning</th><th>Verdi (kj41)</th><th>NB-referanse</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>sigma_rp dominerer FEVD</td><td>sigma_rp = 0,014</td><td>K&amp;M: 0,006</td></tr>
+            <tr><td>2</td><td>h_c habitpersistens (fast)</td><td>0,938</td><td>K&amp;M: 0,65</td></tr>
+            <tr><td>3</td><td>sigma_A svakt identifisert (fast)</td><td>0,006</td><td>K&amp;M: 0,006</td></tr>
+            <tr><td>4</td><td>phi_I1 investeringsrigiditet (fast)</td><td>0,50</td><td>K&amp;M: 4,0</td></tr>
+            <tr><td>5</td><td>COVID-hull i estimeringen</td><td>2020K1–2021K4</td><td>–</td></tr>
+            <tr><td>6</td><td>I_R q12 feil fortegn</td><td>+0,84 mot NB −0,15</td><td>psi_R = 0,949 strukturell</td></tr>
+            <tr><td>7</td><td>phi_O–psi_R-korrelasjon</td><td>phi_O = 0,15 (fast)</td><td>phi_O ≈ 0,21 fritt</td></tr>
+            <tr><td>8</td><td>FX-premie observasjonsekvivalens</td><td>kj50–52 avsluttet</td><td>14 obs. utilstrekkelig</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
 </main>
 
+<footer>
+  <h4>Om modellen og kildene</h4>
+  <p>NEMO er en bayesiansk estimert DSGE-modell for norsk økonomi, basert på Norges Banks
+  NEMO-rammeverk (Kravik &amp; Mimir 2019). Modellen har 50 tilstandsvariabler og 13 strukturelle
+  sjokk, estimert på 14 observerte serier fra 2001K1 til 2025K4. Estimeringen splitter
+  sannsynligheten rundt et COVID-hull (2020K1–2021K4).</p>
+  <p>Kilde: Kravik, E. M. &amp; Mimir, Y. (2019), <em>Navigating with NEMO</em>, Norges Bank Staff
+  Memo 5/2019 (<a href="https://www.norges-bank.no/contentassets/685d5f91e22a442c81d2e9680483e137/staff_memo_5_2019_eng.pdf" target="_blank" rel="noopener">staff_memo_5_2019_eng.pdf</a>).
+  Validering mot NB Memo 3/2024, Figur 1. Referanseestimat: kj41.</p>
+  <p>Visualiseringen følger Finansdepartementets supplerende designprofil.</p>
+</footer>
+
 <script>
-// ── Innebygde data ────────────────────────────────────────────────────────────
-const IRF_DATA         = {"TFP": {"BNP-gap": [-0.0264, -0.0184, -0.0113, -0.0079, -0.0036, -0.0026, 0.0, 0.0, 0.0018, 0.0012, 0.0025, 0.0018, 0.0028, 0.002, 0.0029, 0.002, 0.0029, 0.002, 0.0028, 0.002], "KPI-inflasjon": [-0.0243, -0.0171, -0.012, -0.0085, -0.0059, -0.0042, -0.0029, -0.002, -0.0013, -0.0009, -0.0006, -0.0004, -0.0002, -0.0002, -0.0, -0.0, 0.0, 0.0, 0.0001, 0.0001], "Styringsrente": [-0.0003, -0.0002, -0.0007, -0.0005, -0.0008, -0.0006, -0.0008, -0.0006, -0.0008, -0.0006, -0.0008, -0.0005, -0.0007, -0.0005, -0.0006, -0.0005, -0.0006, -0.0004, -0.0005, -0.0004], "RER-gap": [-0.0241, -0.017, -0.0115, -0.0081, -0.0052, -0.0037, -0.0021, -0.0015, -0.0006, -0.0004, 0.0002, 0.0001, 0.0005, 0.0003, 0.0006, 0.0004, 0.0006, 0.0004, 0.0006, 0.0004], "Boligpris-gap": [-0.0241, -0.0317, -0.0307, -0.0267, -0.0214, -0.0167, -0.0122, -0.0089, -0.0059, -0.004, -0.0023, -0.0013, -0.0003, 0.0002, 0.0007, 0.0008, 0.0011, 0.0011, 0.0013, 0.0012]}, "Konsum": {"BNP-gap": [0.3269, 0.1056, 0.0356, 0.0207, -0.0061, -0.0001, -0.0157, -0.005, -0.0174, -0.006, -0.0172, -0.006, -0.0166, -0.0059, -0.0159, -0.0056, -0.0152, -0.0054, -0.0145, -0.0051], "KPI-inflasjon": [0.0126, 0.0041, 0.0013, 0.0008, -0.0003, -0.0, -0.0007, -0.0002, -0.0008, -0.0003, -0.0008, -0.0003, -0.0007, -0.0003, -0.0007, -0.0002, -0.0006, -0.0002, -0.0006, -0.0002], "Styringsrente": [0.0034, 0.0011, 0.0037, 0.0013, 0.0035, 0.0013, 0.0032, 0.0012, 0.0029, 0.001, 0.0026, 0.0009, 0.0023, 0.0008, 0.0021, 0.0007, 0.0018, 0.0007, 0.0016, 0.0006], "RER-gap": [0.0092, 0.003, -0.0025, -0.0005, -0.0039, -0.0013, -0.004, -0.0014, -0.0037, -0.0013, -0.0034, -0.0012, -0.0031, -0.0011, -0.0028, -0.001, -0.0025, -0.0009, -0.0022, -0.0008], "Boligpris-gap": [0.0092, 0.0086, 0.0028, 0.0011, -0.0032, -0.0033, -0.0059, -0.005, -0.0067, -0.0054, -0.0067, -0.0053, -0.0063, -0.0049, -0.0057, -0.0045, -0.0052, -0.004, -0.0047, -0.0036]}, "Prismarkup": {"BNP-gap": [0.0535, -0.0067, -0.0193, -0.0022, -0.0162, -0.0005, -0.0145, 0.0001, -0.0135, 0.0003, -0.0128, 0.0004, -0.0121, 0.0004, -0.0116, 0.0004, -0.011, 0.0004, -0.0105, 0.0004], "KPI-inflasjon": [0.618, -0.0002, -0.0009, -0.0001, -0.0008, -0.0, -0.0008, 0.0, -0.0007, 0.0, -0.0007, 0.0, -0.0006, 0.0, -0.0006, 0.0, -0.0006, 0.0, -0.0005, 0.0], "Styringsrente": [0.0009, -0.0001, 0.0071, -0.0001, 0.0067, -0.0001, 0.0063, -0.0001, 0.0059, -0.0001, 0.0055, -0.0001, 0.0051, -0.0001, 0.0048, -0.0001, 0.0045, -0.0001, 0.0042, -0.0], "RER-gap": [0.6191, 0.0011, -0.0073, 0.0005, -0.0072, 0.0003, -0.0069, 0.0002, -0.0065, 0.0001, -0.0061, 0.0001, -0.0057, 0.0001, -0.0053, 0.0001, -0.005, 0.0001, -0.0047, 0.0001], "Boligpris-gap": [0.6191, 0.3769, 0.2215, 0.135, 0.0748, 0.0456, 0.0208, 0.0128, 0.0013, 0.0009, -0.0055, -0.0032, -0.0077, -0.0046, -0.0081, -0.0048, -0.0079, -0.0047, -0.0076, -0.0045]}, "Oljepris": {"BNP-gap": [0.0, 0.7291, 0.2814, 0.105, 0.0406, 0.0117, 0.0046, -0.002, -0.0007, -0.0039, -0.0014, -0.004, -0.0014, -0.0039, -0.0014, -0.0037, -0.0013, -0.0035, -0.0013, -0.0034], "KPI-inflasjon": [0.0, 0.028, 0.0108, 0.0038, 0.0015, 0.0002, 0.0001, -0.0003, -0.0001, -0.0004, -0.0001, -0.0004, -0.0001, -0.0004, -0.0001, -0.0004, -0.0001, -0.0003, -0.0001, -0.0003], "Styringsrente": [0.0, 0.0075, 0.0029, 0.0086, 0.0033, 0.0084, 0.0032, 0.0081, 0.0031, 0.0077, 0.003, 0.0073, 0.0028, 0.007, 0.0027, 0.0067, 0.0026, 0.0064, 0.0025, 0.0061], "RER-gap": [0.0, 0.0206, 0.008, -0.0048, -0.0018, -0.0082, -0.0032, -0.0084, -0.0033, -0.0081, -0.0032, -0.0078, -0.003, -0.0074, -0.0029, -0.0071, -0.0028, -0.0067, -0.0026, -0.0064], "Boligpris-gap": [0.0, 0.0206, 0.0205, 0.0077, 0.0028, -0.0065, -0.0072, -0.0128, -0.011, -0.0148, -0.0121, -0.0151, -0.0122, -0.0148, -0.0119, -0.0143, -0.0114, -0.0137, -0.0109, -0.0131]}, "Ettersp.": {"BNP-gap": [0.1424, 0.1172, 0.0958, 0.0788, 0.0641, 0.0528, 0.0427, 0.0352, 0.0282, 0.0233, 0.0185, 0.0152, 0.0119, 0.0098, 0.0075, 0.0062, 0.0045, 0.0037, 0.0025, 0.0021], "KPI-inflasjon": [0.0055, 0.0045, 0.0036, 0.003, 0.0024, 0.002, 0.0015, 0.0013, 0.001, 0.0008, 0.0006, 0.0005, 0.0003, 0.0003, 0.0002, 0.0001, 0.0001, 0.0001, -0.0, -0.0], "Styringsrente": [0.0015, 0.0012, 0.0025, 0.002, 0.0031, 0.0025, 0.0034, 0.0028, 0.0036, 0.0029, 0.0036, 0.003, 0.0036, 0.003, 0.0035, 0.0029, 0.0034, 0.0028, 0.0033, 0.0027], "RER-gap": [0.004, 0.0033, 0.0012, 0.001, -0.0007, -0.0005, -0.0019, -0.0015, -0.0026, -0.0021, -0.003, -0.0025, -0.0033, -0.0027, -0.0034, -0.0028, -0.0034, -0.0028, -0.0034, -0.0028], "Boligpris-gap": [0.004, 0.0058, 0.0047, 0.0038, 0.0017, 0.0005, -0.0016, -0.0025, -0.0041, -0.0046, -0.0059, -0.0061, -0.007, -0.0069, -0.0076, -0.0074, -0.0079, -0.0076, -0.008, -0.0076]}, "Risikopremie": {"BNP-gap": [0.4821, -0.0007, -0.0042, -0.0002, -0.0042, 0.0, -0.0039, 0.0001, -0.0037, 0.0001, -0.0035, 0.0001, -0.0033, 0.0001, -0.0032, 0.0001, -0.0031, 0.0001, -0.0029, 0.0001], "KPI-inflasjon": [0.0682, -0.0, -0.0004, -0.0, -0.0004, 0.0, -0.0003, 0.0, -0.0003, 0.0, -0.0003, 0.0, -0.0003, 0.0, -0.0003, 0.0, -0.0003, 0.0, -0.0003, 0.0], "Styringsrente": [0.006, -0.0, 0.0064, -0.0, 0.0061, -0.0, 0.0058, -0.0, 0.0056, -0.0, 0.0053, -0.0, 0.0051, -0.0, 0.0048, -0.0, 0.0046, -0.0, 0.0044, 0.0], "RER-gap": [1.6702, 0.0001, -0.0067, 0.0, -0.0065, 0.0, -0.0062, 0.0, -0.0059, -0.0, -0.0056, -0.0, -0.0054, -0.0, -0.0051, -0.0, -0.0049, -0.0, -0.0046, -0.0], "Boligpris-gap": [0.0624, 0.038, 0.0163, 0.0099, -0.0004, -0.0003, -0.0064, -0.0039, -0.0082, -0.005, -0.0087, -0.0053, -0.0086, -0.0052, -0.0083, -0.005, -0.0079, -0.0048, -0.0076, -0.0046]}, "Pengepol.": {"BNP-gap": [-0.0075, 0.0003, -0.007, 0.0004, -0.0067, 0.0004, -0.0064, 0.0004, -0.0061, 0.0004, -0.0058, 0.0003, -0.0056, 0.0003, -0.0053, 0.0003, -0.0051, 0.0003, -0.0049, 0.0002], "KPI-inflasjon": [-0.0011, 0.0, -0.0011, 0.0, -0.001, 0.0, -0.001, 0.0, -0.001, 0.0, -0.0009, 0.0, -0.0009, 0.0, -0.0008, 0.0, -0.0008, 0.0, -0.0008, 0.0], "Styringsrente": [0.0276, 0.0, 0.0264, 0.0, 0.0252, 0.0, 0.0241, 0.0, 0.0231, 0.0, 0.0221, 0.0, 0.0211, 0.0, 0.0202, 0.0, 0.0193, 0.0, 0.0185, 0.0], "RER-gap": [-0.0288, -0.0001, -0.0276, -0.0001, -0.0264, -0.0001, -0.0252, -0.0001, -0.0242, -0.0001, -0.0231, -0.0001, -0.0221, -0.0001, -0.0211, -0.0001, -0.0202, -0.0001, -0.0194, -0.0001], "Boligpris-gap": [-0.0288, -0.0175, -0.0382, -0.0233, -0.0405, -0.0247, -0.0402, -0.0245, -0.039, -0.0238, -0.0375, -0.0229, -0.036, -0.0219, -0.0345, -0.021, -0.033, -0.0201, -0.0316, -0.0193]}, "Bolig": {"BNP-gap": [-0.0012, -0.0008, -0.0004, -0.0003, -0.0001, -0.0001, -0.0, -0.0, 0.0, 0.0, 0.0001, 0.0, 0.0001, 0.0, 0.0001, 0.0, 0.0001, 0.0, 0.0001, 0.0], "KPI-inflasjon": [-0.0, -0.0, -0.0, -0.0, -0.0, -0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "Styringsrente": [-0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0], "RER-gap": [0.0002, 0.0001, 0.0001, 0.0001, 0.0001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "Boligpris-gap": [0.0697, 0.0425, 0.0259, 0.0158, 0.0096, 0.0059, 0.0036, 0.0022, 0.0014, 0.0009, 0.0005, 0.0003, 0.0002, 0.0002, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0]}};
-const FEVD_DATA        = {"bnp": {"TFP": [0.19, 0.11, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.13], "Konsum": [29.43, 12.83, 11.81, 11.65, 11.58, 11.55, 11.55, 11.53, 11.55, 11.55, 11.56, 11.56, 11.58, 11.59, 11.6, 11.61, 11.62, 11.63, 11.64, 11.64], "Prismarkup": [0.79, 0.32, 0.32, 0.32, 0.34, 0.34, 0.36, 0.36, 0.38, 0.38, 0.39, 0.39, 0.41, 0.41, 0.42, 0.42, 0.43, 0.43, 0.44, 0.44], "Oljepris": [0.0, 57.77, 60.45, 60.48, 60.29, 60.13, 59.99, 59.92, 59.84, 59.81, 59.76, 59.75, 59.71, 59.71, 59.68, 59.67, 59.65, 59.65, 59.63, 59.63], "Ettersp.": [5.59, 3.7, 4.28, 4.81, 5.18, 5.43, 5.59, 5.7, 5.77, 5.82, 5.85, 5.87, 5.88, 5.89, 5.89, 5.89, 5.89, 5.9, 5.89, 5.89], "Risikopremie": [63.99, 25.26, 23.01, 22.61, 22.48, 22.42, 22.37, 22.34, 22.31, 22.3, 22.28, 22.28, 22.26, 22.26, 22.25, 22.25, 22.24, 22.24, 22.23, 22.23], "Pengepol.": [0.02, 0.01, 0.01, 0.01, 0.01, 0.01, 0.02, 0.02, 0.02, 0.02, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.04, 0.04], "Bolig": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, "pi": {"TFP": [0.15, 0.23, 0.26, 0.28, 0.29, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3], "Konsum": [0.04, 0.04, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05], "Prismarkup": [98.6, 98.31, 98.24, 98.22, 98.21, 98.2, 98.2, 98.2, 98.2, 98.2, 98.2, 98.2, 98.2, 98.19, 98.19, 98.19, 98.19, 98.19, 98.19, 98.19], "Oljepris": [0.0, 0.2, 0.23, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24], "Ettersp.": [0.01, 0.01, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02], "Risikopremie": [1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2], "Pengepol.": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "Bolig": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, "rente": {"TFP": [0.01, 0.01, 0.03, 0.04, 0.06, 0.07, 0.07, 0.08, 0.08, 0.09, 0.09, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1], "Konsum": [1.41, 1.45, 1.57, 1.6, 1.62, 1.63, 1.61, 1.61, 1.57, 1.57, 1.52, 1.52, 1.47, 1.47, 1.42, 1.41, 1.37, 1.36, 1.32, 1.32], "Prismarkup": [0.11, 0.1, 3.08, 2.94, 3.84, 3.72, 4.13, 4.04, 4.26, 4.19, 4.32, 4.26, 4.33, 4.28, 4.33, 4.29, 4.31, 4.27, 4.28, 4.25], "Oljepris": [0.0, 6.51, 3.86, 7.87, 5.96, 8.5, 7.04, 8.82, 7.67, 8.99, 8.07, 9.1, 8.34, 9.17, 8.54, 9.22, 8.69, 9.26, 8.8, 9.29], "Ettersp.": [0.27, 0.42, 0.57, 0.78, 0.92, 1.13, 1.25, 1.45, 1.54, 1.73, 1.8, 1.96, 2.02, 2.16, 2.2, 2.33, 2.35, 2.46, 2.48, 2.58], "Risikopremie": [4.48, 4.17, 4.62, 4.41, 4.59, 4.45, 4.56, 4.46, 4.53, 4.46, 4.51, 4.45, 4.49, 4.44, 4.48, 4.44, 4.46, 4.43, 4.45, 4.42], "Pengepol.": [93.73, 87.33, 86.26, 82.35, 83.02, 80.5, 81.34, 79.54, 80.34, 78.97, 79.69, 78.61, 79.25, 78.37, 78.94, 78.21, 78.72, 78.11, 78.57, 78.04], "Bolig": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, "rer": {"TFP": [0.02, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04], "Konsum": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01], "Prismarkup": [12.08, 12.07, 12.07, 12.07, 12.07, 12.07, 12.07, 12.07, 12.06, 12.06, 12.06, 12.06, 12.06, 12.06, 12.06, 12.06, 12.06, 12.06, 12.06, 12.06], "Oljepris": [0.0, 0.01, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03], "Ettersp.": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "Risikopremie": [87.88, 87.86, 87.83, 87.83, 87.8, 87.8, 87.78, 87.78, 87.76, 87.76, 87.74, 87.74, 87.73, 87.73, 87.71, 87.71, 87.7, 87.7, 87.68, 87.68], "Pengepol.": [0.03, 0.03, 0.05, 0.05, 0.07, 0.07, 0.09, 0.09, 0.11, 0.11, 0.13, 0.13, 0.14, 0.14, 0.16, 0.16, 0.17, 0.17, 0.18, 0.18], "Bolig": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, "bolig": {"TFP": [0.15, 0.29, 0.43, 0.53, 0.59, 0.64, 0.66, 0.67, 0.67, 0.67, 0.67, 0.67, 0.67, 0.67, 0.67, 0.67, 0.67, 0.67, 0.67, 0.66], "Konsum": [0.02, 0.03, 0.03, 0.03, 0.03, 0.03, 0.04, 0.04, 0.05, 0.05, 0.06, 0.06, 0.07, 0.07, 0.08, 0.08, 0.08, 0.09, 0.09, 0.09], "Prismarkup": [97.39, 97.16, 96.77, 96.61, 96.29, 96.15, 95.86, 95.73, 95.45, 95.32, 95.06, 94.94, 94.7, 94.58, 94.36, 94.25, 94.04, 93.94, 93.76, 93.67], "Oljepris": [0.0, 0.08, 0.14, 0.15, 0.15, 0.15, 0.16, 0.19, 0.2, 0.24, 0.26, 0.3, 0.32, 0.35, 0.38, 0.41, 0.43, 0.46, 0.47, 0.5], "Ettersp.": [0.0, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.02, 0.02, 0.02, 0.03, 0.03, 0.04, 0.05, 0.06, 0.07, 0.07, 0.08, 0.09, 0.1], "Risikopremie": [0.99, 0.99, 0.94, 0.93, 0.92, 0.91, 0.92, 0.92, 0.93, 0.93, 0.94, 0.94, 0.95, 0.95, 0.96, 0.96, 0.97, 0.97, 0.98, 0.98], "Pengepol.": [0.21, 0.21, 0.44, 0.51, 0.77, 0.86, 1.12, 1.21, 1.45, 1.54, 1.76, 1.84, 2.04, 2.11, 2.29, 2.36, 2.52, 2.58, 2.73, 2.79], "Bolig": [1.24, 1.23, 1.24, 1.24, 1.24, 1.24, 1.23, 1.23, 1.23, 1.23, 1.22, 1.22, 1.22, 1.22, 1.21, 1.21, 1.21, 1.21, 1.21, 1.2]}};
-const HIST_LEVEL       = {"dates": ["2001-01-01", "2001-04-01", "2001-07-01", "2001-10-01", "2002-01-01", "2002-04-01", "2002-07-01", "2002-10-01", "2003-01-01", "2003-04-01", "2003-07-01", "2003-10-01", "2004-01-01", "2004-04-01", "2004-07-01", "2004-10-01", "2005-01-01", "2005-04-01", "2005-07-01", "2005-10-01", "2006-01-01", "2006-04-01", "2006-07-01", "2006-10-01", "2007-01-01", "2007-04-01", "2007-07-01", "2007-10-01", "2008-01-01", "2008-04-01", "2008-07-01", "2008-10-01", "2009-01-01", "2009-04-01", "2009-07-01", "2009-10-01", "2010-01-01", "2010-04-01", "2010-07-01", "2010-10-01", "2011-01-01", "2011-04-01", "2011-07-01", "2011-10-01", "2012-01-01", "2012-04-01", "2012-07-01", "2012-10-01", "2013-01-01", "2013-04-01", "2013-07-01", "2013-10-01", "2014-01-01", "2014-04-01", "2014-07-01", "2014-10-01", "2015-01-01", "2015-04-01", "2015-07-01", "2015-10-01", "2016-01-01", "2016-04-01", "2016-07-01", "2016-10-01", "2017-01-01", "2017-04-01", "2017-07-01", "2017-10-01", "2018-01-01", "2018-04-01", "2018-07-01", "2018-10-01", "2019-01-01", "2019-04-01", "2019-07-01", "2019-10-01", "2022-01-01", "2022-04-01", "2022-07-01", "2022-10-01", "2023-01-01", "2023-04-01", "2023-07-01", "2023-10-01", "2024-01-01", "2024-04-01", "2024-07-01", "2024-10-01", "2025-01-01", "2025-04-01", "2025-07-01", "2025-10-01", "2026-01-01", "2026-04-01"], "y": [1.9149, -0.7594, -0.4126, 1.2948, 0.419, 0.8289, 0.3004, -0.7753, 0.813, 0.318, 1.3191, -0.3517, 3.4333, 0.6462, 1.2825, 0.8787, 1.2235, 2.3577, 0.0723, 1.6264, 1.8154, 1.081, 0.5341, 2.5043, 2.3341, 0.3075, 2.1335, 0.536, 0.0997, 1.2294, 0.3093, -1.987, -0.424, 0.1197, -0.2601, 0.5874, 1.9044, -0.2454, 0.3625, -0.1495, 1.2991, 0.6744, 0.4169, 0.5929, 2.3392, 0.2205, 0.5878, 0.6273, 1.1158, 0.02, 0.8379, 0.6501, 0.4677, 0.8091, 0.2171, 0.5533, 0.674, 0.2787, 0.1646, -0.1139, 0.4302, 0.1529, 0.4148, -0.1888, 1.3146, 1.0859, 0.6853, 0.6027, 0.4169, 0.6069, 0.397, 0.8046, 0.5384, 1.0769, 0.8778, -0.1286, 0.8403, 1.4657, 0.4359, 0.7328, 0.0035, 0.1952, 0.041, 0.0497, -0.0085, 0.2134, 0.9112, -0.1823, 0.8276, 0.5152, 0.111, 0.4207, null, null], "pi": [5.9029, 4.6263, -4.1096, 1.5461, 2.0522, 2.381, -0.3393, 4.7238, 11.2451, -6.7422, -1.6618, 1.9934, 0.6623, 2.3093, -0.1645, 2.1333, -0.3275, 4.3983, 0.8092, 2.4179, 1.2836, 4.9354, 0.1582, 3.3078, -4.4164, 2.2143, -0.4735, 8.1285, 4.0031, 1.071, 5.1614, 3.7531, -0.299, 3.721, 0.0, 2.2161, 5.705, 2.3172, -2.8986, 3.9081, 2.1548, 2.5705, -2.7138, 1.2878, 2.1371, 0.8517, -2.846, 4.6851, 2.2519, 3.6326, 1.2498, 1.9364, 1.5149, 2.7397, 2.3141, 1.4903, 1.2152, 3.7572, 1.4664, 3.4449, 3.8077, 4.9351, 3.4699, 1.7874, 0.0, 3.0457, 1.1362, 1.133, 2.6312, 4.5942, 4.542, 1.4621, 1.2143, 2.4177, 1.4436, 1.3187, 2.8133, 9.5295, 9.0938, 4.2588, 2.7441, 9.0476, 1.6419, 4.2781, 2.122, 4.1108, 0.4984, 2.6809, 3.939, 3.9976, 2.9963, 1.2499, null, null], "i": [7.0, null, 7.0, 6.9141, 6.5, 6.5, 6.9773, 6.9062, 5.9762, null, 3.4015, 2.4758, 2.0195, null, 1.75, 1.75, 1.75, 1.75, 2.0, 2.1602, 2.2923, null, 2.8731, 3.1984, 3.7266, null, 4.6308, 5.0397, 5.25, 5.4444, 5.75, 4.8095, 2.6587, null, 1.25, 1.457, 1.75, null, 2.0, 2.0, 2.0, null, 2.25, 2.1641, 1.7038, null, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, null, 1.5, 1.4563, 1.25, null, 0.9848, 0.75, 0.7213, 0.5, 0.5, 0.5, 0.5, null, 0.5, 0.5, 0.5, 0.5, 0.5231, 0.75, 0.7738, null, 1.2765, 1.5, 0.5195, null, 1.5303, 2.4453, 2.7731, null, 3.8923, 4.2857, 4.5, 4.5, 4.5, 4.5, 4.5, null, 4.2197, 4.0, 4.0, null], "rer": [8.2024, null, 8.0094, 7.9699, 7.8135, 7.5157, 7.3991, 7.3193, 7.5706, null, 8.2472, 8.2226, 8.631, null, 8.389, 8.1975, 8.2394, 8.0455, 7.8817, 7.8785, 8.0227, null, 8.0604, 8.2712, 8.169, null, 7.9175, 7.8761, 7.9555, 7.9417, 8.0604, 8.9191, 8.9472, null, 8.7397, 8.3943, 8.1019, null, 7.9561, 8.0536, 7.8236, null, 7.7652, 7.7602, 7.5868, null, 7.391, 7.3662, 7.4277, 7.6152, 7.9303, 8.2347, 8.3471, null, 8.2754, 8.5788, 8.7318, null, 9.1378, 9.3356, 9.5264, 9.3205, 9.2887, 9.0363, 8.9892, null, 9.3479, 9.6049, 9.633, 9.5525, 9.5773, 9.621, 9.7421, null, 9.8471, 10.0938, 9.9247, null, 10.0556, 10.391, 10.9901, null, 11.4044, 11.6581, 11.4113, 11.565, 11.7625, 11.7585, 11.6514, null, 11.7962, 11.7453, 11.382, null], "bolig": [3.415, 4.226, -0.0, -0.2301, 3.1749, 3.5091, -3.2862, -0.6704, 2.2174, 0.6557, -0.2181, 1.3015, 7.0716, 1.5937, 0.1974, 1.1765, 4.012, 2.7703, 0.9066, -0.0, 6.1261, 4.8062, 3.185, 1.2461, 6.0078, 3.72, -0.1405, -2.2761, 2.2761, 1.2579, -3.3902, -7.3003, 4.0884, 5.0625, 1.817, -0.0, 3.27, 3.6846, -0.5181, -0.13, 5.0708, 2.6831, 0.3604, -0.4808, 3.5507, 3.2039, 0.5615, -0.6742, 2.9986, 2.6985, -1.9355, -2.752, 2.3167, 3.7458, 0.105, -0.526, 3.6255, 3.2035, -0.3949, -1.9981, 3.6656, 4.0978, 1.8502, -0.0, 3.6891, 1.1419, -2.3863, -1.7141, 1.8928, 3.8534, -1.1231, -2.3737, 2.634, 2.8195, -0.7611, -2.1451, 4.5263, 3.9193, -1.8006, -4.0647, 1.8746, 3.8534, -2.9291, -3.5294, 3.812, 4.1471, -1.2262, -2.0077, 5.3773, 2.2929, -0.7802, -1.1159, 3.3748, null]};
-const HIST_DECOMP      = {"y": {"TFP": [-0.051958, 0.013634, -0.039175, -0.049017, -0.038107, 0.008364, -0.028218, -0.09014, 0.053283, -0.003601, -0.039512, -0.047152, -0.025149, -0.001199, -0.02881, -0.030519, -0.051116, -0.020181, -0.054434, -0.058415, -0.069152, -0.017203, -0.054108, 0.001171, -0.042731, 0.010099, -0.042884, -0.021479, 0.023015, 0.01939, 0.050605, 0.010175, 0.009082, 0.052011, 0.038552, -0.002963, 0.030421, 0.080552, 0.009577, 0.008399, 0.012975, 0.053119, 0.026189, 0.000893, 0.024613, 0.058586, 0.006741, 0.01038, 0.01048, 0.042622, 0.037308, 0.009456, 0.017724, 0.037857, 0.037272, 0.01515, 0.016691, 0.043926, 0.039538, 0.001417, 0.01141, 0.034445, 0.034446, 0.025022, 0.028622, 0.051595, 0.042747, 0.022653, 0.017031, 0.043081, 0.049608, 0.025588, 0.028729, 0.056227, 0.055486, 0.021092, 0.0158, 0.038521, 0.065763, 0.031208, 0.003457, 0.08173, 0.048668, 0.031543, 0.023923, 0.06856, 0.035242, -0.000298, 0.02404, 0.036259, 0.032169, -0.101263, 0.0], "Konsum": [0.072789, -0.1232, 0.075668, 0.081201, -0.119717, 0.157719, -0.054374, -0.045492, -0.125114, 0.133281, -0.146422, 0.201855, -0.152918, -0.10983, -0.061338, 0.062737, -0.103813, -0.418712, -0.163087, -0.06328, -0.05788, -0.380914, 0.001184, -0.213501, 0.06702, -0.06, -0.023499, -0.336258, 0.192686, 0.359119, -0.207593, 0.720069, 0.115739, 0.026679, 0.036769, 0.276761, -0.017622, 0.096977, 0.042749, 0.062628, 0.077476, 0.010352, 0.067494, 0.210783, 0.009447, 0.222693, 0.031227, 0.259467, -0.063782, 0.295543, 0.023586, 0.299925, 0.062083, 0.083553, 0.087234, 0.443648, 0.032746, 0.120865, 0.067766, 0.49156, -0.020015, -0.245517, 0.150456, 0.339036, -0.279683, 0.045209, 0.321804, -0.047037, -0.036325, -0.113342, 0.301787, -0.065201, 0.00264, 0.320244, -0.226251, 0.135177, 0.060033, -0.042489, 0.473215, -0.038973, -0.04373, 0.002348, 0.014399, 0.022675, 0.026494, 0.163881, -0.035532, 0.17785, -0.011072, -0.104901, -0.102307, 0.019573, 0.0], "Prismarkup": [0.002523, -0.000316, 0.002046, 0.002647, 0.00209, -0.000306, 0.00138, 0.004327, -0.001941, 0.000683, 0.002349, 0.002766, 0.001491, 0.000383, 0.001656, 0.001838, 0.002688, 0.001325, 0.002944, 0.003242, 0.003554, 0.001139, 0.002758, 0.000416, 0.002213, -0.000397, 0.001794, 0.001039, -0.001191, -0.001374, -0.002815, -0.000324, -0.000471, -0.002477, -0.001824, -0.000114, -0.00168, -0.003962, -0.000659, -0.000429, -0.000751, -0.002542, -0.001308, -6e-05, -0.001188, -0.002783, -0.000471, -0.000587, -0.000661, -0.00232, -0.001991, -0.00058, -0.001014, -0.002045, -0.001981, -0.000847, -0.00103, -0.002349, -0.002156, -0.00029, -0.000781, -0.0018, -0.001796, -0.001202, -0.001563, -0.002694, -0.002195, -0.001236, -0.001057, -0.002415, -0.002651, -0.001344, -0.001652, -0.003028, -0.002947, -0.001174, -0.001379, -0.002663, -0.003684, -0.001996, -0.000845, -0.004539, -0.002812, -0.001803, -0.001487, -0.003585, -0.001967, -0.000152, -0.001438, -0.001972, -0.001583, 0.004794, 0.0], "Oljepris": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "Ettersp.": [-0.330601, 0.207472, -0.271624, -0.320671, -0.050964, -0.104622, -0.073009, -0.414429, 0.412618, -0.186153, -0.038843, -0.464709, 0.030798, 0.117991, -0.067347, -0.210944, -0.142223, 0.335364, -0.107737, -0.236813, -0.294541, 0.299755, -0.288563, 0.215815, -0.28373, 0.120119, -0.188087, 0.23287, -0.078104, -0.263042, 0.434757, -0.67249, -0.069537, 0.256774, 0.176385, -0.278933, 0.173172, 0.30974, -0.00151, -0.012592, -0.002801, 0.259908, 0.063151, -0.204684, 0.122117, 0.076378, 0.00507, -0.21059, 0.107274, -0.103778, 0.148922, -0.257853, 0.025117, 0.110525, 0.083048, -0.382462, 0.036986, 0.083874, 0.117048, -0.498402, 0.083242, 0.428548, 0.036853, -0.213001, 0.425667, 0.194962, -0.118565, 0.164118, 0.125744, 0.328563, -0.060509, 0.184276, 0.130957, -0.045326, 0.495864, -0.025853, 0.02407, 0.229874, -0.161691, 0.170272, 0.055917, 0.39019, 0.223901, 0.144237, 0.086338, 0.168225, 0.212232, -0.177394, 0.13072, 0.279716, 0.263048, -0.509279, 0.0], "Risikopremie": [0.370601, -0.046407, 0.300458, 0.388716, 0.306895, -0.045013, 0.202729, 0.63556, -0.2851, 0.100282, 0.345012, 0.406238, 0.219021, 0.056242, 0.243193, 0.270015, 0.394798, 0.19454, 0.432425, 0.476124, 0.521912, 0.167262, 0.40512, 0.061159, 0.325078, -0.058245, 0.263419, 0.152541, -0.174907, -0.201839, -0.413502, -0.047624, -0.069201, -0.363789, -0.267949, -0.016772, -0.246794, -0.581973, -0.096839, -0.063032, -0.110314, -0.373419, -0.192139, -0.008744, -0.17451, -0.408694, -0.069151, -0.086189, -0.097078, -0.340787, -0.292432, -0.085234, -0.14893, -0.300353, -0.290881, -0.124339, -0.151234, -0.345046, -0.316652, -0.042659, -0.11464, -0.264361, -0.263847, -0.176531, -0.229531, -0.39567, -0.322389, -0.181592, -0.155287, -0.35476, -0.38943, -0.197382, -0.242698, -0.444728, -0.432794, -0.172451, -0.202588, -0.391193, -0.541027, -0.293107, -0.124096, -0.666677, -0.412999, -0.264872, -0.218414, -0.526497, -0.288876, -0.022284, -0.211246, -0.289598, -0.23245, 0.704061, 0.0], "Pengepol.": [-0.007676, 0.000961, -0.006223, -0.008051, -0.006357, 0.000932, -0.004199, -0.013164, 0.005905, -0.002077, -0.007146, -0.008414, -0.004537, -0.001165, -0.005037, -0.005593, -0.008177, -0.004029, -0.008957, -0.009862, -0.01081, -0.003464, -0.008391, -0.001267, -0.006733, 0.001206, -0.005456, -0.00316, 0.003623, 0.004181, 0.008565, 0.000986, 0.001433, 0.007535, 0.00555, 0.000347, 0.005112, 0.012054, 0.002006, 0.001306, 0.002285, 0.007735, 0.00398, 0.000181, 0.003615, 0.008465, 0.001432, 0.001785, 0.002011, 0.007059, 0.006057, 0.001765, 0.003085, 0.006221, 0.006025, 0.002575, 0.003132, 0.007147, 0.006559, 0.000884, 0.002375, 0.005476, 0.005465, 0.003656, 0.004754, 0.008195, 0.006678, 0.003761, 0.003216, 0.007348, 0.008066, 0.004088, 0.005027, 0.009212, 0.008964, 0.003572, 0.004196, 0.008103, 0.011206, 0.006071, 0.00257, 0.013809, 0.008554, 0.005486, 0.004524, 0.010905, 0.005983, 0.000462, 0.004375, 0.005998, 0.004815, -0.014583, 0.0], "Bolig": [3.1e-05, 0.000705, -9.7e-05, 1.1e-05, 0.001108, -0.000754, 0.00063, 0.00081, 0.000485, -0.000998, 0.001186, -0.00095, 0.001018, 0.000728, 0.000694, -4.2e-05, 0.001016, 0.002489, 0.001263, 0.000685, 0.000747, 0.00214, 0.000224, 0.00106, -5.6e-05, 0.000332, 0.000459, 0.001926, -0.001168, -0.002008, 0.000416, -0.003798, -0.000652, -0.000278, -0.00026, -0.001276, -0.000106, -0.001057, -0.000364, -0.000302, -0.000397, -0.000399, -0.000545, -0.001073, -0.000143, -0.001514, -0.000186, -0.001443, 0.000155, -0.00206, -0.000547, -0.001667, -0.000469, -0.000666, -0.000894, -0.002543, -0.000439, -0.001104, -0.000779, -0.002683, 7.6e-05, 0.001114, -0.000876, -0.001917, 0.001249, -0.000803, -0.00208, 0.000109, 9.9e-05, 0.000253, -0.001994, 5e-05, -0.000338, -0.002134, 0.000663, -0.000813, -0.00039, -0.000143, -0.003108, -0.000301, 0.000126, -0.000802, -0.000499, -0.000265, -0.000392, -0.001468, -8.1e-05, -0.000896, -0.000135, 0.000198, 0.000286, 0.00082, 0.0]}, "pi": {"TFP": [-0.190874, 0.050086, -0.143916, -0.180071, -0.139991, 0.030725, -0.103664, -0.331143, 0.195743, -0.013229, -0.145154, -0.173218, -0.092389, -0.004406, -0.105838, -0.112116, -0.187781, -0.074139, -0.199971, -0.214597, -0.254042, -0.063196, -0.198775, 0.004303, -0.156978, 0.037102, -0.15754, -0.078905, 0.084549, 0.07123, 0.185904, 0.03738, 0.033364, 0.19107, 0.141628, -0.010884, 0.111754, 0.295919, 0.035181, 0.030856, 0.047665, 0.19514, 0.096208, 0.003279, 0.09042, 0.215225, 0.024763, 0.038134, 0.038499, 0.156578, 0.137057, 0.034738, 0.065112, 0.139072, 0.136924, 0.055656, 0.061316, 0.161369, 0.145247, 0.005204, 0.041915, 0.126538, 0.126541, 0.091921, 0.105148, 0.189541, 0.157036, 0.08322, 0.062567, 0.158263, 0.182243, 0.094, 0.105539, 0.206559, 0.203836, 0.077486, 0.058042, 0.141513, 0.241588, 0.114645, 0.012699, 0.300246, 0.178788, 0.115877, 0.087883, 0.251864, 0.129467, -0.001093, 0.088314, 0.133202, 0.118178, -0.372006, 0.0], "Konsum": [0.011197, -0.018952, 0.01164, 0.012491, -0.018416, 0.024262, -0.008364, -0.006998, -0.019246, 0.020503, -0.022524, 0.031051, -0.023523, -0.016895, -0.009436, 0.009651, -0.01597, -0.06441, -0.025088, -0.009734, -0.008904, -0.058596, 0.000182, -0.032843, 0.01031, -0.00923, -0.003615, -0.051726, 0.029641, 0.055243, -0.031934, 0.110768, 0.017804, 0.004104, 0.005656, 0.042574, -0.002711, 0.014918, 0.006576, 0.009634, 0.011918, 0.001592, 0.010383, 0.032425, 0.001453, 0.034257, 0.004804, 0.039914, -0.009812, 0.045463, 0.003628, 0.046137, 0.00955, 0.012853, 0.013419, 0.068246, 0.005037, 0.018593, 0.010424, 0.075617, -0.003079, -0.037768, 0.023145, 0.052154, -0.043024, 0.006954, 0.049503, -0.007236, -0.005588, -0.017435, 0.046424, -0.01003, 0.000406, 0.049263, -0.034804, 0.020794, 0.009235, -0.006536, 0.072795, -0.005995, -0.006727, 0.000361, 0.002215, 0.003488, 0.004076, 0.02521, -0.005466, 0.027359, -0.001703, -0.016137, -0.015738, 0.003011, 0.0], "Prismarkup": [0.116597, -0.0146, 0.094528, 0.122296, 0.096554, -0.014162, 0.063781, 0.199956, -0.089697, 0.03155, 0.108546, 0.127809, 0.068907, 0.017694, 0.076512, 0.084951, 0.124209, 0.061205, 0.136047, 0.149796, 0.164201, 0.052623, 0.127457, 0.019242, 0.102274, -0.018325, 0.082876, 0.047992, -0.055028, -0.063501, -0.130094, -0.014983, -0.021772, -0.114453, -0.084301, -0.005277, -0.077645, -0.183097, -0.030467, -0.019831, -0.034706, -0.117483, -0.06045, -0.002751, -0.054903, -0.128581, -0.021756, -0.027116, -0.030542, -0.107217, -0.092003, -0.026816, -0.046856, -0.094495, -0.091515, -0.039119, -0.04758, -0.108557, -0.099623, -0.013421, -0.036067, -0.083172, -0.08301, -0.055539, -0.072214, -0.124484, -0.101428, -0.057132, -0.048856, -0.111613, -0.12252, -0.062099, -0.076356, -0.139918, -0.136163, -0.054256, -0.063737, -0.123075, -0.170215, -0.092216, -0.039042, -0.209746, -0.129935, -0.083333, -0.068716, -0.165644, -0.090884, -0.007011, -0.066461, -0.091112, -0.073132, 0.221508, 0.0], "Oljepris": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "Ettersp.": [-0.050856, 0.031915, -0.041784, -0.049329, -0.00784, -0.016094, -0.011231, -0.063751, 0.063473, -0.028636, -0.005975, -0.071486, 0.004738, 0.018151, -0.01036, -0.03245, -0.021878, 0.051589, -0.016573, -0.036429, -0.045309, 0.046111, -0.04439, 0.033199, -0.043646, 0.018478, -0.028933, 0.035822, -0.012015, -0.040464, 0.066879, -0.103449, -0.010697, 0.039499, 0.027133, -0.042908, 0.026639, 0.047647, -0.000232, -0.001937, -0.000431, 0.039982, 0.009714, -0.031486, 0.018785, 0.011749, 0.00078, -0.032395, 0.016502, -0.015964, 0.022909, -0.039665, 0.003864, 0.017002, 0.012775, -0.058834, 0.00569, 0.012902, 0.018005, -0.076669, 0.012805, 0.065923, 0.005669, -0.032766, 0.06548, 0.029991, -0.018239, 0.025246, 0.019343, 0.050543, -0.009308, 0.028347, 0.020145, -0.006973, 0.076279, -0.003977, 0.003703, 0.035361, -0.024873, 0.026193, 0.008602, 0.060023, 0.034443, 0.022188, 0.013281, 0.025878, 0.032648, -0.027289, 0.020109, 0.043029, 0.040465, -0.078342, 0.0], "Risikopremie": [0.209819, -0.026274, 0.170106, 0.220074, 0.173751, -0.025484, 0.114776, 0.359826, -0.161412, 0.056775, 0.195331, 0.229994, 0.124, 0.031842, 0.137685, 0.152871, 0.223517, 0.11014, 0.24482, 0.269561, 0.295484, 0.094697, 0.229362, 0.034626, 0.184045, -0.032976, 0.149137, 0.086362, -0.099025, -0.114272, -0.234107, -0.026963, -0.039179, -0.205962, -0.151701, -0.009496, -0.139724, -0.329488, -0.054826, -0.035686, -0.062455, -0.211413, -0.108781, -0.00495, -0.0988, -0.231385, -0.03915, -0.048796, -0.054962, -0.192939, -0.165562, -0.048256, -0.084318, -0.170047, -0.164684, -0.070395, -0.085622, -0.19535, -0.179275, -0.024152, -0.064904, -0.14967, -0.149378, -0.099944, -0.129951, -0.224011, -0.182523, -0.10281, -0.087917, -0.20085, -0.220479, -0.111749, -0.137405, -0.251786, -0.245029, -0.097634, -0.114697, -0.221476, -0.306306, -0.165945, -0.070258, -0.377443, -0.233822, -0.149959, -0.123657, -0.29808, -0.163549, -0.012616, -0.119598, -0.163958, -0.131603, 0.398609, 0.0], "Pengepol.": [-0.004674, 0.000585, -0.003789, -0.004902, -0.00387, 0.000568, -0.002557, -0.008015, 0.003596, -0.001265, -0.004351, -0.005123, -0.002762, -0.000709, -0.003067, -0.003405, -0.004979, -0.002453, -0.005454, -0.006005, -0.006582, -0.002109, -0.005109, -0.000771, -0.0041, 0.000735, -0.003322, -0.001924, 0.002206, 0.002545, 0.005215, 0.000601, 0.000873, 0.004588, 0.003379, 0.000212, 0.003112, 0.00734, 0.001221, 0.000795, 0.001391, 0.004709, 0.002423, 0.00011, 0.002201, 0.005154, 0.000872, 0.001087, 0.001224, 0.004298, 0.003688, 0.001075, 0.001878, 0.003788, 0.003668, 0.001568, 0.001907, 0.004352, 0.003993, 0.000538, 0.001446, 0.003334, 0.003328, 0.002226, 0.002895, 0.00499, 0.004066, 0.00229, 0.001958, 0.004474, 0.004911, 0.002489, 0.003061, 0.005609, 0.005458, 0.002175, 0.002555, 0.004934, 0.006823, 0.003697, 0.001565, 0.008408, 0.005209, 0.00334, 0.002755, 0.00664, 0.003643, 0.000281, 0.002664, 0.003652, 0.002932, -0.008879, 0.0], "Bolig": [4e-06, 9.2e-05, -1.3e-05, 1e-06, 0.000144, -9.8e-05, 8.2e-05, 0.000105, 6.3e-05, -0.00013, 0.000155, -0.000124, 0.000133, 9.5e-05, 9e-05, -5e-06, 0.000132, 0.000324, 0.000165, 8.9e-05, 9.7e-05, 0.000279, 2.9e-05, 0.000138, -7e-06, 4.3e-05, 6e-05, 0.000251, -0.000152, -0.000262, 5.4e-05, -0.000495, -8.5e-05, -3.6e-05, -3.4e-05, -0.000166, -1.4e-05, -0.000138, -4.7e-05, -3.9e-05, -5.2e-05, -5.2e-05, -7.1e-05, -0.00014, -1.9e-05, -0.000197, -2.4e-05, -0.000188, 2e-05, -0.000268, -7.1e-05, -0.000217, -6.1e-05, -8.7e-05, -0.000116, -0.000331, -5.7e-05, -0.000144, -0.000101, -0.00035, 1e-05, 0.000145, -0.000114, -0.00025, 0.000163, -0.000105, -0.000271, 1.4e-05, 1.3e-05, 3.3e-05, -0.00026, 7e-06, -4.4e-05, -0.000278, 8.6e-05, -0.000106, -5.1e-05, -1.9e-05, -0.000405, -3.9e-05, 1.6e-05, -0.000104, -6.5e-05, -3.5e-05, -5.1e-05, -0.000191, -1.1e-05, -0.000117, -1.8e-05, 2.6e-05, 3.7e-05, 0.000107, 0.0]}, "i": {"TFP": [-0.002262, 0.000594, -0.001705, -0.002134, -0.001659, 0.000364, -0.001228, -0.003924, 0.00232, -0.000157, -0.00172, -0.002053, -0.001095, -5.2e-05, -0.001254, -0.001329, -0.002225, -0.000879, -0.00237, -0.002543, -0.00301, -0.000749, -0.002355, 5.1e-05, -0.00186, 0.00044, -0.001867, -0.000935, 0.001002, 0.000844, 0.002203, 0.000443, 0.000395, 0.002264, 0.001678, -0.000129, 0.001324, 0.003507, 0.000417, 0.000366, 0.000565, 0.002312, 0.00114, 3.9e-05, 0.001071, 0.00255, 0.000293, 0.000452, 0.000456, 0.001855, 0.001624, 0.000412, 0.000772, 0.001648, 0.001623, 0.00066, 0.000727, 0.001912, 0.001721, 6.2e-05, 0.000497, 0.001499, 0.001499, 0.001089, 0.001246, 0.002246, 0.001861, 0.000986, 0.000741, 0.001875, 0.00216, 0.001114, 0.001251, 0.002448, 0.002415, 0.000918, 0.000688, 0.001677, 0.002863, 0.001359, 0.00015, 0.003558, 0.002119, 0.001373, 0.001041, 0.002985, 0.001534, -1.3e-05, 0.001046, 0.001578, 0.0014, -0.004408, 0.0], "Konsum": [0.003006, -0.005088, 0.003125, 0.003353, -0.004944, 0.006514, -0.002246, -0.001879, -0.005167, 0.005504, -0.006047, 0.008336, -0.006315, -0.004536, -0.002533, 0.002591, -0.004287, -0.017292, -0.006735, -0.002613, -0.00239, -0.015731, 4.9e-05, -0.008817, 0.002768, -0.002478, -0.00097, -0.013887, 0.007958, 0.014831, -0.008573, 0.029738, 0.00478, 0.001102, 0.001519, 0.01143, -0.000728, 0.004005, 0.001765, 0.002586, 0.0032, 0.000428, 0.002787, 0.008705, 0.00039, 0.009197, 0.00129, 0.010716, -0.002634, 0.012205, 0.000974, 0.012386, 0.002564, 0.003451, 0.003603, 0.018322, 0.001352, 0.004992, 0.002799, 0.020301, -0.000827, -0.010139, 0.006214, 0.014002, -0.01155, 0.001867, 0.01329, -0.001943, -0.0015, -0.004681, 0.012463, -0.002693, 0.000109, 0.013226, -0.009344, 0.005583, 0.002479, -0.001755, 0.019543, -0.00161, -0.001806, 9.7e-05, 0.000595, 0.000936, 0.001094, 0.006768, -0.001467, 0.007345, -0.000457, -0.004332, -0.004225, 0.000808, 0.0], "Prismarkup": [0.000178, -2.2e-05, 0.000144, 0.000187, 0.000147, -2.2e-05, 9.7e-05, 0.000305, -0.000137, 4.8e-05, 0.000166, 0.000195, 0.000105, 2.7e-05, 0.000117, 0.00013, 0.00019, 9.3e-05, 0.000208, 0.000229, 0.000251, 8e-05, 0.000195, 2.9e-05, 0.000156, -2.8e-05, 0.000126, 7.3e-05, -8.4e-05, -9.7e-05, -0.000199, -2.3e-05, -3.3e-05, -0.000175, -0.000129, -8e-06, -0.000118, -0.000279, -4.6e-05, -3e-05, -5.3e-05, -0.000179, -9.2e-05, -4e-06, -8.4e-05, -0.000196, -3.3e-05, -4.1e-05, -4.7e-05, -0.000164, -0.00014, -4.1e-05, -7.2e-05, -0.000144, -0.00014, -6e-05, -7.3e-05, -0.000166, -0.000152, -2e-05, -5.5e-05, -0.000127, -0.000127, -8.5e-05, -0.00011, -0.00019, -0.000155, -8.7e-05, -7.5e-05, -0.00017, -0.000187, -9.5e-05, -0.000117, -0.000214, -0.000208, -8.3e-05, -9.7e-05, -0.000188, -0.00026, -0.000141, -6e-05, -0.00032, -0.000198, -0.000127, -0.000105, -0.000253, -0.000139, -1.1e-05, -0.000101, -0.000139, -0.000112, 0.000338, 0.0], "Oljepris": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "Ettersp.": [-0.013653, 0.008568, -0.011218, -0.013243, -0.002105, -0.004321, -0.003015, -0.017115, 0.01704, -0.007688, -0.001604, -0.019192, 0.001272, 0.004873, -0.002781, -0.008712, -0.005874, 0.01385, -0.004449, -0.00978, -0.012164, 0.012379, -0.011917, 0.008913, -0.011718, 0.004961, -0.007768, 0.009617, -0.003226, -0.010863, 0.017955, -0.027773, -0.002872, 0.010604, 0.007284, -0.011519, 0.007152, 0.012792, -6.2e-05, -0.00052, -0.000116, 0.010734, 0.002608, -0.008453, 0.005043, 0.003154, 0.000209, -0.008697, 0.00443, -0.004286, 0.00615, -0.010649, 0.001037, 0.004565, 0.00343, -0.015795, 0.001527, 0.003464, 0.004834, -0.020583, 0.003438, 0.017698, 0.001522, -0.008797, 0.017579, 0.008052, -0.004897, 0.006778, 0.005193, 0.013569, -0.002499, 0.00761, 0.005408, -0.001872, 0.020478, -0.001068, 0.000994, 0.009493, -0.006678, 0.007032, 0.002309, 0.016114, 0.009247, 0.005957, 0.003566, 0.006947, 0.008765, -0.007326, 0.005399, 0.011552, 0.010863, -0.021032, 0.0], "Risikopremie": [0.018528, -0.00232, 0.015021, 0.019434, 0.015343, -0.00225, 0.010135, 0.031775, -0.014254, 0.005014, 0.017249, 0.02031, 0.01095, 0.002812, 0.012158, 0.013499, 0.019738, 0.009726, 0.021619, 0.023804, 0.026093, 0.008362, 0.020254, 0.003058, 0.016252, -0.002912, 0.01317, 0.007626, -0.008744, -0.010091, -0.020673, -0.002381, -0.00346, -0.018188, -0.013396, -0.000839, -0.012338, -0.029096, -0.004841, -0.003151, -0.005515, -0.018669, -0.009606, -0.000437, -0.008725, -0.020433, -0.003457, -0.004309, -0.004853, -0.017038, -0.01462, -0.004261, -0.007446, -0.015016, -0.014543, -0.006216, -0.007561, -0.01725, -0.015831, -0.002133, -0.005731, -0.013217, -0.013191, -0.008826, -0.011475, -0.019781, -0.016118, -0.009079, -0.007764, -0.017736, -0.019469, -0.009868, -0.012134, -0.022234, -0.021637, -0.008622, -0.010128, -0.019558, -0.027048, -0.014654, -0.006204, -0.03333, -0.020648, -0.013242, -0.01092, -0.026322, -0.014442, -0.001114, -0.010561, -0.014478, -0.011621, 0.035199, 0.0], "Pengepol.": [0.112322, -0.014065, 0.091063, 0.117812, 0.093014, -0.013642, 0.061443, 0.192625, -0.086408, 0.030393, 0.104566, 0.123123, 0.066381, 0.017046, 0.073707, 0.081836, 0.119655, 0.058961, 0.131059, 0.144304, 0.158181, 0.050694, 0.122784, 0.018536, 0.098525, -0.017653, 0.079837, 0.046232, -0.053011, -0.061173, -0.125324, -0.014434, -0.020974, -0.110257, -0.08121, -0.005083, -0.074798, -0.176384, -0.02935, -0.019104, -0.033434, -0.113176, -0.058234, -0.00265, -0.05289, -0.123867, -0.020958, -0.026122, -0.029422, -0.103286, -0.08863, -0.025833, -0.045138, -0.091031, -0.08816, -0.037685, -0.045836, -0.104576, -0.095971, -0.012929, -0.034745, -0.080122, -0.079967, -0.053503, -0.069566, -0.11992, -0.09771, -0.055037, -0.047064, -0.107521, -0.118029, -0.059822, -0.073557, -0.134788, -0.131171, -0.052267, -0.0614, -0.118563, -0.163974, -0.088835, -0.037611, -0.202056, -0.125172, -0.080278, -0.066197, -0.159571, -0.087552, -0.006754, -0.064024, -0.087771, -0.070451, 0.213387, 0.0], "Bolig": [1e-06, 2.9e-05, -4e-06, 0.0, 4.5e-05, -3.1e-05, 2.6e-05, 3.3e-05, 2e-05, -4.1e-05, 4.8e-05, -3.9e-05, 4.2e-05, 3e-05, 2.8e-05, -2e-06, 4.1e-05, 0.000102, 5.2e-05, 2.8e-05, 3e-05, 8.7e-05, 9e-06, 4.3e-05, -2e-06, 1.4e-05, 1.9e-05, 7.9e-05, -4.8e-05, -8.2e-05, 1.7e-05, -0.000155, -2.7e-05, -1.1e-05, -1.1e-05, -5.2e-05, -4e-06, -4.3e-05, -1.5e-05, -1.2e-05, -1.6e-05, -1.6e-05, -2.2e-05, -4.4e-05, -6e-06, -6.2e-05, -8e-06, -5.9e-05, 6e-06, -8.4e-05, -2.2e-05, -6.8e-05, -1.9e-05, -2.7e-05, -3.6e-05, -0.000104, -1.8e-05, -4.5e-05, -3.2e-05, -0.000109, 3e-06, 4.5e-05, -3.6e-05, -7.8e-05, 5.1e-05, -3.3e-05, -8.5e-05, 4e-06, 4e-06, 1e-05, -8.1e-05, 2e-06, -1.4e-05, -8.7e-05, 2.7e-05, -3.3e-05, -1.6e-05, -6e-06, -0.000127, -1.2e-05, 5e-06, -3.3e-05, -2e-05, -1.1e-05, -1.6e-05, -6e-05, -3e-06, -3.7e-05, -5e-06, 8e-06, 1.2e-05, 3.3e-05, 0.0]}, "rer": {"TFP": [-0.047315, 0.012415, -0.035674, -0.044637, -0.034702, 0.007616, -0.025697, -0.082085, 0.048522, -0.003279, -0.035981, -0.042938, -0.022902, -0.001092, -0.026236, -0.027792, -0.046548, -0.018378, -0.04957, -0.053195, -0.062973, -0.015665, -0.049273, 0.001067, -0.038912, 0.009197, -0.039052, -0.019559, 0.020958, 0.017657, 0.046083, 0.009266, 0.008271, 0.047363, 0.035107, -0.002698, 0.027702, 0.073354, 0.008721, 0.007649, 0.011815, 0.048372, 0.023848, 0.000813, 0.022414, 0.053351, 0.006138, 0.009453, 0.009543, 0.038813, 0.033974, 0.008611, 0.01614, 0.034474, 0.033941, 0.013796, 0.015199, 0.040001, 0.036004, 0.00129, 0.01039, 0.031367, 0.031368, 0.022786, 0.026064, 0.046984, 0.038927, 0.020629, 0.015509, 0.039231, 0.045175, 0.023301, 0.026161, 0.051203, 0.050528, 0.019208, 0.014388, 0.035079, 0.059886, 0.028419, 0.003148, 0.074426, 0.044319, 0.028724, 0.021785, 0.062433, 0.032093, -0.000271, 0.021892, 0.033019, 0.029294, -0.092214, 0.0], "Konsum": [0.002055, -0.003479, 0.002137, 0.002293, -0.003381, 0.004454, -0.001535, -0.001285, -0.003533, 0.003764, -0.004135, 0.0057, -0.004318, -0.003101, -0.001732, 0.001772, -0.002931, -0.011823, -0.004605, -0.001787, -0.001634, -0.010756, 3.3e-05, -0.006029, 0.001892, -0.001694, -0.000664, -0.009495, 0.005441, 0.010141, -0.005862, 0.020333, 0.003268, 0.000753, 0.001038, 0.007815, -0.000498, 0.002738, 0.001207, 0.001768, 0.002188, 0.000292, 0.001906, 0.005952, 0.000267, 0.006288, 0.000882, 0.007327, -0.001801, 0.008345, 0.000666, 0.008469, 0.001753, 0.002359, 0.002463, 0.012528, 0.000925, 0.003413, 0.001914, 0.01388, -0.000565, -0.006933, 0.004249, 0.009574, -0.007898, 0.001277, 0.009087, -0.001328, -0.001026, -0.0032, 0.008522, -0.001841, 7.5e-05, 0.009043, -0.006389, 0.003817, 0.001695, -0.0012, 0.013362, -0.0011, -0.001235, 6.6e-05, 0.000407, 0.00064, 0.000748, 0.004628, -0.001003, 0.005022, -0.000313, -0.002962, -0.002889, 0.000553, 0.0], "Prismarkup": [0.029204, -0.003657, 0.023677, 0.030632, 0.024184, -0.003547, 0.015975, 0.050083, -0.022466, 0.007902, 0.027188, 0.032012, 0.017259, 0.004432, 0.019164, 0.021278, 0.031111, 0.01533, 0.034076, 0.03752, 0.041128, 0.013181, 0.031924, 0.004819, 0.025617, -0.00459, 0.020758, 0.012021, -0.013783, -0.015905, -0.032585, -0.003753, -0.005453, -0.028667, -0.021115, -0.001322, -0.019448, -0.045861, -0.007631, -0.004967, -0.008693, -0.029426, -0.015141, -0.000689, -0.013752, -0.032206, -0.005449, -0.006792, -0.00765, -0.026855, -0.023044, -0.006717, -0.011736, -0.023668, -0.022922, -0.009798, -0.011918, -0.02719, -0.024953, -0.003362, -0.009034, -0.020832, -0.020792, -0.013911, -0.018088, -0.03118, -0.025405, -0.01431, -0.012237, -0.027956, -0.030688, -0.015554, -0.019125, -0.035045, -0.034105, -0.01359, -0.015964, -0.030827, -0.042634, -0.023097, -0.009779, -0.052535, -0.032545, -0.020872, -0.017211, -0.041489, -0.022764, -0.001756, -0.016647, -0.022821, -0.018318, 0.055481, 0.0], "Oljepris": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "Ettersp.": [-0.009335, 0.005859, -0.00767, -0.009055, -0.001439, -0.002954, -0.002062, -0.011702, 0.011651, -0.005256, -0.001097, -0.013122, 0.00087, 0.003332, -0.001902, -0.005957, -0.004016, 0.00947, -0.003042, -0.006687, -0.008317, 0.008464, -0.008148, 0.006094, -0.008012, 0.003392, -0.005311, 0.006576, -0.002205, -0.007428, 0.012276, -0.018989, -0.001964, 0.007251, 0.004981, -0.007876, 0.00489, 0.008746, -4.3e-05, -0.000356, -7.9e-05, 0.007339, 0.001783, -0.00578, 0.003448, 0.002157, 0.000143, -0.005947, 0.003029, -0.00293, 0.004205, -0.007281, 0.000709, 0.003121, 0.002345, -0.0108, 0.001044, 0.002368, 0.003305, -0.014074, 0.002351, 0.012101, 0.001041, -0.006015, 0.01202, 0.005505, -0.003348, 0.004634, 0.003551, 0.009278, -0.001709, 0.005204, 0.003698, -0.00128, 0.014002, -0.00073, 0.00068, 0.006491, -0.004566, 0.004808, 0.001579, 0.011018, 0.006322, 0.004073, 0.002438, 0.00475, 0.005993, -0.005009, 0.003691, 0.007898, 0.007428, -0.014381, 0.0], "Risikopremie": [1.283873, -0.160767, 1.040874, 1.346626, 1.063176, -0.155937, 0.702313, 2.201766, -0.987672, 0.347405, 1.195225, 1.407329, 0.758753, 0.194837, 0.842493, 0.935412, 1.367696, 0.673943, 1.498047, 1.649433, 1.808057, 0.579446, 1.403457, 0.211874, 1.126166, -0.201778, 0.912562, 0.528446, -0.605928, -0.699229, -1.432494, -0.164983, -0.239734, -1.260274, -0.928256, -0.058104, -0.854968, -2.016125, -0.335477, -0.218361, -0.382161, -1.293632, -0.665627, -0.030291, -0.604554, -1.415838, -0.23956, -0.298584, -0.336308, -1.180587, -1.013071, -0.295276, -0.515938, -1.04051, -1.007698, -0.430747, -0.523918, -1.195341, -1.096976, -0.147784, -0.397147, -0.915823, -0.914042, -0.611557, -0.795163, -1.370718, -1.116853, -0.629088, -0.53796, -1.228994, -1.349102, -0.683788, -0.840778, -1.540668, -1.499327, -0.597423, -0.701826, -1.355208, -1.874278, -1.01541, -0.429904, -2.309565, -1.43075, -0.917596, -0.756652, -1.82394, -1.00075, -0.077197, -0.731818, -1.003253, -0.805276, 2.439075, 0.0], "Pengepol.": [-0.029325, 0.003672, -0.023775, -0.030759, -0.024284, 0.003562, -0.016042, -0.050291, 0.02256, -0.007935, -0.027301, -0.032145, -0.017331, -0.00445, -0.019244, -0.021366, -0.03124, -0.015394, -0.034217, -0.037675, -0.041298, -0.013235, -0.032057, -0.004839, -0.025723, 0.004609, -0.020844, -0.01207, 0.01384, 0.015971, 0.03272, 0.003768, 0.005476, 0.028786, 0.021203, 0.001327, 0.019529, 0.046051, 0.007663, 0.004988, 0.008729, 0.029548, 0.015204, 0.000692, 0.013809, 0.03234, 0.005472, 0.00682, 0.007682, 0.026966, 0.02314, 0.006745, 0.011785, 0.023767, 0.023017, 0.009839, 0.011967, 0.027303, 0.025056, 0.003376, 0.009071, 0.020919, 0.020878, 0.013969, 0.018163, 0.031309, 0.02551, 0.014369, 0.012288, 0.028072, 0.030815, 0.015619, 0.019205, 0.035191, 0.034247, 0.013646, 0.016031, 0.030955, 0.042811, 0.023193, 0.00982, 0.052754, 0.03268, 0.020959, 0.017283, 0.041661, 0.022858, 0.001763, 0.016716, 0.022916, 0.018394, -0.055712, 0.0], "Bolig": [-5e-06, -0.000118, 1.6e-05, -2e-06, -0.000186, 0.000127, -0.000106, -0.000136, -8.1e-05, 0.000168, -0.000199, 0.00016, -0.000171, -0.000122, -0.000117, 7e-06, -0.000171, -0.000418, -0.000212, -0.000115, -0.000126, -0.000359, -3.8e-05, -0.000178, 9e-06, -5.6e-05, -7.7e-05, -0.000323, 0.000196, 0.000337, -7e-05, 0.000638, 0.00011, 4.7e-05, 4.4e-05, 0.000214, 1.8e-05, 0.000178, 6.1e-05, 5.1e-05, 6.7e-05, 6.7e-05, 9.2e-05, 0.00018, 2.4e-05, 0.000254, 3.1e-05, 0.000242, -2.6e-05, 0.000346, 9.2e-05, 0.00028, 7.9e-05, 0.000112, 0.00015, 0.000427, 7.4e-05, 0.000185, 0.000131, 0.000451, -1.3e-05, -0.000187, 0.000147, 0.000322, -0.00021, 0.000135, 0.000349, -1.8e-05, -1.7e-05, -4.2e-05, 0.000335, -8e-06, 5.7e-05, 0.000358, -0.000111, 0.000137, 6.6e-05, 2.4e-05, 0.000522, 5.1e-05, -2.1e-05, 0.000135, 8.4e-05, 4.5e-05, 6.6e-05, 0.000246, 1.4e-05, 0.00015, 2.3e-05, -3.3e-05, -4.8e-05, -0.000138, 0.0]}, "bolig": {"TFP": [-0.047315, 0.012415, -0.035674, -0.044637, -0.034702, 0.007616, -0.025697, -0.082085, 0.048522, -0.003279, -0.035981, -0.042938, -0.022902, -0.001092, -0.026236, -0.027792, -0.046548, -0.018378, -0.04957, -0.053195, -0.062973, -0.015665, -0.049273, 0.001067, -0.038912, 0.009197, -0.039052, -0.019559, 0.020958, 0.017657, 0.046083, 0.009266, 0.008271, 0.047363, 0.035107, -0.002698, 0.027702, 0.073354, 0.008721, 0.007649, 0.011815, 0.048372, 0.023848, 0.000813, 0.022414, 0.053351, 0.006138, 0.009453, 0.009543, 0.038813, 0.033974, 0.008611, 0.01614, 0.034474, 0.033941, 0.013796, 0.015199, 0.040001, 0.036004, 0.00129, 0.01039, 0.031367, 0.031368, 0.022786, 0.026064, 0.046984, 0.038927, 0.020629, 0.015509, 0.039231, 0.045175, 0.023301, 0.026161, 0.051203, 0.050528, 0.019208, 0.014388, 0.035079, 0.059886, 0.028419, 0.003148, 0.074426, 0.044319, 0.028724, 0.021785, 0.062433, 0.032093, -0.000271, 0.021892, 0.033019, 0.029294, -0.092214, 0.0], "Konsum": [0.002055, -0.003479, 0.002137, 0.002293, -0.003381, 0.004454, -0.001535, -0.001285, -0.003533, 0.003764, -0.004135, 0.0057, -0.004318, -0.003101, -0.001732, 0.001772, -0.002931, -0.011823, -0.004605, -0.001787, -0.001634, -0.010756, 3.3e-05, -0.006029, 0.001892, -0.001694, -0.000664, -0.009495, 0.005441, 0.010141, -0.005862, 0.020333, 0.003268, 0.000753, 0.001038, 0.007815, -0.000498, 0.002738, 0.001207, 0.001768, 0.002188, 0.000292, 0.001906, 0.005952, 0.000267, 0.006288, 0.000882, 0.007327, -0.001801, 0.008345, 0.000666, 0.008469, 0.001753, 0.002359, 0.002463, 0.012528, 0.000925, 0.003413, 0.001914, 0.01388, -0.000565, -0.006933, 0.004249, 0.009574, -0.007898, 0.001277, 0.009087, -0.001328, -0.001026, -0.0032, 0.008522, -0.001841, 7.5e-05, 0.009043, -0.006389, 0.003817, 0.001695, -0.0012, 0.013362, -0.0011, -0.001235, 6.6e-05, 0.000407, 0.00064, 0.000748, 0.004628, -0.001003, 0.005022, -0.000313, -0.002962, -0.002889, 0.000553, 0.0], "Prismarkup": [0.029204, -0.003657, 0.023677, 0.030632, 0.024184, -0.003547, 0.015975, 0.050083, -0.022466, 0.007902, 0.027188, 0.032012, 0.017259, 0.004432, 0.019164, 0.021278, 0.031111, 0.01533, 0.034076, 0.03752, 0.041128, 0.013181, 0.031924, 0.004819, 0.025617, -0.00459, 0.020758, 0.012021, -0.013783, -0.015905, -0.032585, -0.003753, -0.005453, -0.028667, -0.021115, -0.001322, -0.019448, -0.045861, -0.007631, -0.004967, -0.008693, -0.029426, -0.015141, -0.000689, -0.013752, -0.032206, -0.005449, -0.006792, -0.00765, -0.026855, -0.023044, -0.006717, -0.011736, -0.023668, -0.022922, -0.009798, -0.011918, -0.02719, -0.024953, -0.003362, -0.009034, -0.020832, -0.020792, -0.013911, -0.018088, -0.03118, -0.025405, -0.01431, -0.012237, -0.027956, -0.030688, -0.015554, -0.019125, -0.035045, -0.034105, -0.01359, -0.015964, -0.030827, -0.042634, -0.023097, -0.009779, -0.052535, -0.032545, -0.020872, -0.017211, -0.041489, -0.022764, -0.001756, -0.016647, -0.022821, -0.018318, 0.055481, 0.0], "Oljepris": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "Ettersp.": [-0.009335, 0.005859, -0.00767, -0.009055, -0.001439, -0.002954, -0.002062, -0.011702, 0.011651, -0.005256, -0.001097, -0.013122, 0.00087, 0.003332, -0.001902, -0.005957, -0.004016, 0.00947, -0.003042, -0.006687, -0.008317, 0.008464, -0.008148, 0.006094, -0.008012, 0.003392, -0.005311, 0.006576, -0.002205, -0.007428, 0.012276, -0.018989, -0.001964, 0.007251, 0.004981, -0.007876, 0.00489, 0.008746, -4.3e-05, -0.000356, -7.9e-05, 0.007339, 0.001783, -0.00578, 0.003448, 0.002157, 0.000143, -0.005947, 0.003029, -0.00293, 0.004205, -0.007281, 0.000709, 0.003121, 0.002345, -0.0108, 0.001044, 0.002368, 0.003305, -0.014074, 0.002351, 0.012101, 0.001041, -0.006015, 0.01202, 0.005505, -0.003348, 0.004634, 0.003551, 0.009278, -0.001709, 0.005204, 0.003698, -0.00128, 0.014002, -0.00073, 0.00068, 0.006491, -0.004566, 0.004808, 0.001579, 0.011018, 0.006322, 0.004073, 0.002438, 0.00475, 0.005993, -0.005009, 0.003691, 0.007898, 0.007428, -0.014381, 0.0], "Risikopremie": [0.04799, -0.006009, 0.038907, 0.050335, 0.03974, -0.005829, 0.026252, 0.0823, -0.036918, 0.012986, 0.044676, 0.052605, 0.028361, 0.007283, 0.031492, 0.034965, 0.051123, 0.025191, 0.055995, 0.061654, 0.067583, 0.021659, 0.05246, 0.00792, 0.042095, -0.007542, 0.034111, 0.019753, -0.022649, -0.026136, -0.053545, -0.006167, -0.008961, -0.047108, -0.034697, -0.002172, -0.031958, -0.075361, -0.01254, -0.008162, -0.014285, -0.048355, -0.02488, -0.001132, -0.022598, -0.052923, -0.008955, -0.011161, -0.012571, -0.044129, -0.037868, -0.011037, -0.019285, -0.038893, -0.037667, -0.016101, -0.019583, -0.044681, -0.041004, -0.005524, -0.014845, -0.034233, -0.034166, -0.022859, -0.029722, -0.051236, -0.041747, -0.023515, -0.020108, -0.045939, -0.050428, -0.025559, -0.031427, -0.057589, -0.056043, -0.022331, -0.026234, -0.050656, -0.070059, -0.037955, -0.016069, -0.086329, -0.05348, -0.034299, -0.028283, -0.068177, -0.037407, -0.002886, -0.027355, -0.037501, -0.0301, 0.09117, 0.0], "Pengepol.": [-0.029325, 0.003672, -0.023775, -0.030759, -0.024284, 0.003562, -0.016042, -0.050291, 0.02256, -0.007935, -0.027301, -0.032145, -0.017331, -0.00445, -0.019244, -0.021366, -0.03124, -0.015394, -0.034217, -0.037675, -0.041298, -0.013235, -0.032057, -0.004839, -0.025723, 0.004609, -0.020844, -0.01207, 0.01384, 0.015971, 0.03272, 0.003768, 0.005476, 0.028786, 0.021203, 0.001327, 0.019529, 0.046051, 0.007663, 0.004988, 0.008729, 0.029548, 0.015204, 0.000692, 0.013809, 0.03234, 0.005472, 0.00682, 0.007682, 0.026966, 0.02314, 0.006745, 0.011785, 0.023767, 0.023017, 0.009839, 0.011967, 0.027303, 0.025056, 0.003376, 0.009071, 0.020919, 0.020878, 0.013969, 0.018163, 0.031309, 0.02551, 0.014369, 0.012288, 0.028072, 0.030815, 0.015619, 0.019205, 0.035191, 0.034247, 0.013646, 0.016031, 0.030955, 0.042811, 0.023193, 0.00982, 0.052754, 0.03268, 0.020959, 0.017283, 0.041661, 0.022858, 0.001763, 0.016716, 0.022916, 0.018394, -0.055712, 0.0], "Bolig": [-0.001728, -0.039416, 0.00544, -0.000622, -0.061956, 0.042163, -0.035218, -0.045264, -0.027092, 0.055789, -0.066325, 0.053097, -0.05692, -0.040702, -0.038808, 0.002333, -0.056828, -0.139134, -0.070605, -0.038303, -0.041781, -0.119633, -0.012525, -0.059266, 0.003139, -0.018564, -0.025648, -0.107665, 0.0653, 0.112244, -0.02328, 0.212346, 0.03645, 0.015534, 0.014527, 0.07134, 0.005938, 0.059117, 0.020322, 0.016896, 0.022203, 0.022319, 0.030475, 0.059966, 0.008015, 0.08463, 0.010396, 0.080676, -0.008649, 0.115164, 0.030564, 0.093207, 0.026237, 0.037224, 0.049977, 0.142191, 0.024535, 0.061742, 0.043528, 0.15, -0.004276, -0.062301, 0.04899, 0.107166, -0.069828, 0.044901, 0.116308, -0.006116, -0.005509, -0.014127, 0.11149, -0.002816, 0.01892, 0.119317, -0.037053, 0.045468, 0.021811, 0.007969, 0.173772, 0.016835, -0.007059, 0.044832, 0.027903, 0.014832, 0.02194, 0.082048, 0.004525, 0.05009, 0.007526, -0.011068, -0.015994, -0.045826, 0.0]}};
-const FCST_LEVEL       = {"dates": ["2026-07-01", "2026-10-01", "2027-01-01", "2027-04-01", "2027-07-01", "2027-10-01", "2028-01-01", "2028-04-01", "2028-07-01", "2028-10-01", "2029-01-01", "2029-04-01", "2029-07-01", "2029-10-01", "2030-01-01", "2030-04-01"], "y": [1.0603, 0.857, 0.6568, 0.6985, 0.5985, 0.6731, 0.5909, 0.6672, 0.5906, 0.6643, 0.5915, 0.662, 0.5925, 0.6598, 0.5935, 0.6579], "pi": [2.4211, 2.3879, 2.3523, 2.3589, 2.3405, 2.353, 2.3382, 2.3514, 2.338, 2.3508, 2.3383, 2.3505, 2.3388, 2.3505, 2.3394, 2.3505], "i": [4.783, 4.4933, 4.7089, 4.4364, 4.6252, 4.3764, 4.5432, 4.3175, 4.4644, 4.2605, 4.3888, 4.2054, 4.3165, 4.1522, 4.2473, 4.1007], "rer": [0.3353, 0.3445, 0.3218, 0.3403, 0.3237, 0.3424, 0.3282, 0.3456, 0.333, 0.349, 0.3378, 0.3524, 0.3425, 0.3557, 0.347, 0.359], "bolig": [1.4313, 1.2773, 1.1611, 1.1091, 1.0609, 1.0503, 1.0297, 1.0346, 1.025, 1.0352, 1.0302, 1.0417, 1.0388, 1.0503, 1.0485, 1.0594], "y_bl": [1.0603, 0.857, 0.6568, 0.6985, 0.5985, 0.6731, 0.5909, 0.6672, 0.5906, 0.6643, 0.5915, 0.662, 0.5925, 0.6598, 0.5935, 0.6579], "pi_bl": [2.4211, 2.3879, 2.3523, 2.3589, 2.3405, 2.353, 2.3382, 2.3514, 2.338, 2.3508, 2.3383, 2.3505, 2.3388, 2.3505, 2.3394, 2.3505], "i_bl": [4.783, 4.4933, 4.7089, 4.4364, 4.6252, 4.3764, 4.5432, 4.3175, 4.4644, 4.2605, 4.3888, 4.2054, 4.3165, 4.1522, 4.2473, 4.1007]};
-const ACTIVE_SHOCKS    = {"TFP": 0.0, "Konsum": 0.0, "Prismarkup": 0.0, "Oljepris": 0.0, "Ettersp.": 0.0, "Risikopremie": 0.0, "Pengepol.": 0.0, "Bolig": 0.0};
-const META             = {"eig_max": 0.994429, "n_states": 48, "n_shocks": 13, "last_obs_date": "2026-04-01"};
+// ════════════ Innebygde data (fylles av build.py) ════════════
+const IRF_DATA      = {"TFP": {"BNP-gap": [-0.0264, -0.0184, -0.0113, -0.0079, -0.0036, -0.0026, 0.0, 0.0, 0.0018, 0.0012, 0.0025, 0.0018, 0.0028, 0.002, 0.0029, 0.002, 0.0029, 0.002, 0.0028, 0.002], "KPI-inflasjon": [-0.0243, -0.0171, -0.012, -0.0085, -0.0059, -0.0042, -0.0029, -0.002, -0.0013, -0.0009, -0.0006, -0.0004, -0.0002, -0.0002, -0.0, -0.0, 0.0, 0.0, 0.0001, 0.0001], "Styringsrente": [-0.0003, -0.0002, -0.0007, -0.0005, -0.0008, -0.0006, -0.0008, -0.0006, -0.0008, -0.0006, -0.0008, -0.0005, -0.0007, -0.0005, -0.0006, -0.0005, -0.0006, -0.0004, -0.0005, -0.0004], "RER-gap": [-0.0241, -0.017, -0.0115, -0.0081, -0.0052, -0.0037, -0.0021, -0.0015, -0.0006, -0.0004, 0.0002, 0.0001, 0.0005, 0.0003, 0.0006, 0.0004, 0.0006, 0.0004, 0.0006, 0.0004], "Boligpris-gap": [-0.0241, -0.0317, -0.0307, -0.0267, -0.0214, -0.0167, -0.0122, -0.0089, -0.0059, -0.004, -0.0023, -0.0013, -0.0003, 0.0002, 0.0007, 0.0008, 0.0011, 0.0011, 0.0013, 0.0012]}, "Konsum": {"BNP-gap": [0.3269, 0.1056, 0.0356, 0.0207, -0.0061, -0.0001, -0.0157, -0.005, -0.0174, -0.006, -0.0172, -0.006, -0.0166, -0.0059, -0.0159, -0.0056, -0.0152, -0.0054, -0.0145, -0.0051], "KPI-inflasjon": [0.0126, 0.0041, 0.0013, 0.0008, -0.0003, -0.0, -0.0007, -0.0002, -0.0008, -0.0003, -0.0008, -0.0003, -0.0007, -0.0003, -0.0007, -0.0002, -0.0006, -0.0002, -0.0006, -0.0002], "Styringsrente": [0.0034, 0.0011, 0.0037, 0.0013, 0.0035, 0.0013, 0.0032, 0.0012, 0.0029, 0.001, 0.0026, 0.0009, 0.0023, 0.0008, 0.0021, 0.0007, 0.0018, 0.0007, 0.0016, 0.0006], "RER-gap": [0.0092, 0.003, -0.0025, -0.0005, -0.0039, -0.0013, -0.004, -0.0014, -0.0037, -0.0013, -0.0034, -0.0012, -0.0031, -0.0011, -0.0028, -0.001, -0.0025, -0.0009, -0.0022, -0.0008], "Boligpris-gap": [0.0092, 0.0086, 0.0028, 0.0011, -0.0032, -0.0033, -0.0059, -0.005, -0.0067, -0.0054, -0.0067, -0.0053, -0.0063, -0.0049, -0.0057, -0.0045, -0.0052, -0.004, -0.0047, -0.0036]}, "Prismarkup": {"BNP-gap": [0.0535, -0.0067, -0.0193, -0.0022, -0.0162, -0.0005, -0.0145, 0.0001, -0.0135, 0.0003, -0.0128, 0.0004, -0.0121, 0.0004, -0.0116, 0.0004, -0.011, 0.0004, -0.0105, 0.0004], "KPI-inflasjon": [0.618, -0.0002, -0.0009, -0.0001, -0.0008, -0.0, -0.0008, 0.0, -0.0007, 0.0, -0.0007, 0.0, -0.0006, 0.0, -0.0006, 0.0, -0.0006, 0.0, -0.0005, 0.0], "Styringsrente": [0.0009, -0.0001, 0.0071, -0.0001, 0.0067, -0.0001, 0.0063, -0.0001, 0.0059, -0.0001, 0.0055, -0.0001, 0.0051, -0.0001, 0.0048, -0.0001, 0.0045, -0.0001, 0.0042, -0.0], "RER-gap": [0.6191, 0.0011, -0.0073, 0.0005, -0.0072, 0.0003, -0.0069, 0.0002, -0.0065, 0.0001, -0.0061, 0.0001, -0.0057, 0.0001, -0.0053, 0.0001, -0.005, 0.0001, -0.0047, 0.0001], "Boligpris-gap": [0.6191, 0.3769, 0.2215, 0.135, 0.0748, 0.0456, 0.0208, 0.0128, 0.0013, 0.0009, -0.0055, -0.0032, -0.0077, -0.0046, -0.0081, -0.0048, -0.0079, -0.0047, -0.0076, -0.0045]}, "Oljepris": {"BNP-gap": [0.0, 0.7291, 0.2814, 0.105, 0.0406, 0.0117, 0.0046, -0.002, -0.0007, -0.0039, -0.0014, -0.004, -0.0014, -0.0039, -0.0014, -0.0037, -0.0013, -0.0035, -0.0013, -0.0034], "KPI-inflasjon": [0.0, 0.028, 0.0108, 0.0038, 0.0015, 0.0002, 0.0001, -0.0003, -0.0001, -0.0004, -0.0001, -0.0004, -0.0001, -0.0004, -0.0001, -0.0004, -0.0001, -0.0003, -0.0001, -0.0003], "Styringsrente": [0.0, 0.0075, 0.0029, 0.0086, 0.0033, 0.0084, 0.0032, 0.0081, 0.0031, 0.0077, 0.003, 0.0073, 0.0028, 0.007, 0.0027, 0.0067, 0.0026, 0.0064, 0.0025, 0.0061], "RER-gap": [0.0, 0.0206, 0.008, -0.0048, -0.0018, -0.0082, -0.0032, -0.0084, -0.0033, -0.0081, -0.0032, -0.0078, -0.003, -0.0074, -0.0029, -0.0071, -0.0028, -0.0067, -0.0026, -0.0064], "Boligpris-gap": [0.0, 0.0206, 0.0205, 0.0077, 0.0028, -0.0065, -0.0072, -0.0128, -0.011, -0.0148, -0.0121, -0.0151, -0.0122, -0.0148, -0.0119, -0.0143, -0.0114, -0.0137, -0.0109, -0.0131]}, "Ettersp.": {"BNP-gap": [0.1424, 0.1172, 0.0958, 0.0788, 0.0641, 0.0528, 0.0427, 0.0352, 0.0282, 0.0233, 0.0185, 0.0152, 0.0119, 0.0098, 0.0075, 0.0062, 0.0045, 0.0037, 0.0025, 0.0021], "KPI-inflasjon": [0.0055, 0.0045, 0.0036, 0.003, 0.0024, 0.002, 0.0015, 0.0013, 0.001, 0.0008, 0.0006, 0.0005, 0.0003, 0.0003, 0.0002, 0.0001, 0.0001, 0.0001, -0.0, -0.0], "Styringsrente": [0.0015, 0.0012, 0.0025, 0.002, 0.0031, 0.0025, 0.0034, 0.0028, 0.0036, 0.0029, 0.0036, 0.003, 0.0036, 0.003, 0.0035, 0.0029, 0.0034, 0.0028, 0.0033, 0.0027], "RER-gap": [0.004, 0.0033, 0.0012, 0.001, -0.0007, -0.0005, -0.0019, -0.0015, -0.0026, -0.0021, -0.003, -0.0025, -0.0033, -0.0027, -0.0034, -0.0028, -0.0034, -0.0028, -0.0034, -0.0028], "Boligpris-gap": [0.004, 0.0058, 0.0047, 0.0038, 0.0017, 0.0005, -0.0016, -0.0025, -0.0041, -0.0046, -0.0059, -0.0061, -0.007, -0.0069, -0.0076, -0.0074, -0.0079, -0.0076, -0.008, -0.0076]}, "Risikopremie": {"BNP-gap": [0.4821, -0.0007, -0.0042, -0.0002, -0.0042, 0.0, -0.0039, 0.0001, -0.0037, 0.0001, -0.0035, 0.0001, -0.0033, 0.0001, -0.0032, 0.0001, -0.0031, 0.0001, -0.0029, 0.0001], "KPI-inflasjon": [0.0682, -0.0, -0.0004, -0.0, -0.0004, 0.0, -0.0003, 0.0, -0.0003, 0.0, -0.0003, 0.0, -0.0003, 0.0, -0.0003, 0.0, -0.0003, 0.0, -0.0003, 0.0], "Styringsrente": [0.006, -0.0, 0.0064, -0.0, 0.0061, -0.0, 0.0058, -0.0, 0.0056, -0.0, 0.0053, -0.0, 0.0051, -0.0, 0.0048, -0.0, 0.0046, -0.0, 0.0044, 0.0], "RER-gap": [1.6702, 0.0001, -0.0067, 0.0, -0.0065, 0.0, -0.0062, 0.0, -0.0059, -0.0, -0.0056, -0.0, -0.0054, -0.0, -0.0051, -0.0, -0.0049, -0.0, -0.0046, -0.0], "Boligpris-gap": [0.0624, 0.038, 0.0163, 0.0099, -0.0004, -0.0003, -0.0064, -0.0039, -0.0082, -0.005, -0.0087, -0.0053, -0.0086, -0.0052, -0.0083, -0.005, -0.0079, -0.0048, -0.0076, -0.0046]}, "Pengepol.": {"BNP-gap": [-0.0075, 0.0003, -0.007, 0.0004, -0.0067, 0.0004, -0.0064, 0.0004, -0.0061, 0.0004, -0.0058, 0.0003, -0.0056, 0.0003, -0.0053, 0.0003, -0.0051, 0.0003, -0.0049, 0.0002], "KPI-inflasjon": [-0.0011, 0.0, -0.0011, 0.0, -0.001, 0.0, -0.001, 0.0, -0.001, 0.0, -0.0009, 0.0, -0.0009, 0.0, -0.0008, 0.0, -0.0008, 0.0, -0.0008, 0.0], "Styringsrente": [0.0276, 0.0, 0.0264, 0.0, 0.0252, 0.0, 0.0241, 0.0, 0.0231, 0.0, 0.0221, 0.0, 0.0211, 0.0, 0.0202, 0.0, 0.0193, 0.0, 0.0185, 0.0], "RER-gap": [-0.0288, -0.0001, -0.0276, -0.0001, -0.0264, -0.0001, -0.0252, -0.0001, -0.0242, -0.0001, -0.0231, -0.0001, -0.0221, -0.0001, -0.0211, -0.0001, -0.0202, -0.0001, -0.0194, -0.0001], "Boligpris-gap": [-0.0288, -0.0175, -0.0382, -0.0233, -0.0405, -0.0247, -0.0402, -0.0245, -0.039, -0.0238, -0.0375, -0.0229, -0.036, -0.0219, -0.0345, -0.021, -0.033, -0.0201, -0.0316, -0.0193]}, "Bolig": {"BNP-gap": [-0.0012, -0.0008, -0.0004, -0.0003, -0.0001, -0.0001, -0.0, -0.0, 0.0, 0.0, 0.0001, 0.0, 0.0001, 0.0, 0.0001, 0.0, 0.0001, 0.0, 0.0001, 0.0], "KPI-inflasjon": [-0.0, -0.0, -0.0, -0.0, -0.0, -0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "Styringsrente": [-0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0, -0.0], "RER-gap": [0.0002, 0.0001, 0.0001, 0.0001, 0.0001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "Boligpris-gap": [0.0697, 0.0425, 0.0259, 0.0158, 0.0096, 0.0059, 0.0036, 0.0022, 0.0014, 0.0009, 0.0005, 0.0003, 0.0002, 0.0002, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0]}};
+const FEVD_DATA     = {"bnp": {"TFP": [0.19, 0.11, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.13], "Konsum": [29.43, 12.83, 11.81, 11.65, 11.58, 11.55, 11.55, 11.53, 11.55, 11.55, 11.56, 11.56, 11.58, 11.59, 11.6, 11.61, 11.62, 11.63, 11.64, 11.64], "Prismarkup": [0.79, 0.32, 0.32, 0.32, 0.34, 0.34, 0.36, 0.36, 0.38, 0.38, 0.39, 0.39, 0.41, 0.41, 0.42, 0.42, 0.43, 0.43, 0.44, 0.44], "Oljepris": [0.0, 57.77, 60.45, 60.48, 60.29, 60.13, 59.99, 59.92, 59.84, 59.81, 59.76, 59.75, 59.71, 59.71, 59.68, 59.67, 59.65, 59.65, 59.63, 59.63], "Ettersp.": [5.59, 3.7, 4.28, 4.81, 5.18, 5.43, 5.59, 5.7, 5.77, 5.82, 5.85, 5.87, 5.88, 5.89, 5.89, 5.89, 5.89, 5.9, 5.89, 5.89], "Risikopremie": [63.99, 25.26, 23.01, 22.61, 22.48, 22.42, 22.37, 22.34, 22.31, 22.3, 22.28, 22.28, 22.26, 22.26, 22.25, 22.25, 22.24, 22.24, 22.23, 22.23], "Pengepol.": [0.02, 0.01, 0.01, 0.01, 0.01, 0.01, 0.02, 0.02, 0.02, 0.02, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.04, 0.04], "Bolig": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, "pi": {"TFP": [0.15, 0.23, 0.26, 0.28, 0.29, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3], "Konsum": [0.04, 0.04, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05], "Prismarkup": [98.6, 98.31, 98.24, 98.22, 98.21, 98.2, 98.2, 98.2, 98.2, 98.2, 98.2, 98.2, 98.2, 98.19, 98.19, 98.19, 98.19, 98.19, 98.19, 98.19], "Oljepris": [0.0, 0.2, 0.23, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24], "Ettersp.": [0.01, 0.01, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02], "Risikopremie": [1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2], "Pengepol.": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "Bolig": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, "rente": {"TFP": [0.01, 0.01, 0.03, 0.04, 0.06, 0.07, 0.07, 0.08, 0.08, 0.09, 0.09, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1], "Konsum": [1.41, 1.45, 1.57, 1.6, 1.62, 1.63, 1.61, 1.61, 1.57, 1.57, 1.52, 1.52, 1.47, 1.47, 1.42, 1.41, 1.37, 1.36, 1.32, 1.32], "Prismarkup": [0.11, 0.1, 3.08, 2.94, 3.84, 3.72, 4.13, 4.04, 4.26, 4.19, 4.32, 4.26, 4.33, 4.28, 4.33, 4.29, 4.31, 4.27, 4.28, 4.25], "Oljepris": [0.0, 6.51, 3.86, 7.87, 5.96, 8.5, 7.04, 8.82, 7.67, 8.99, 8.07, 9.1, 8.34, 9.17, 8.54, 9.22, 8.69, 9.26, 8.8, 9.29], "Ettersp.": [0.27, 0.42, 0.57, 0.78, 0.92, 1.13, 1.25, 1.45, 1.54, 1.73, 1.8, 1.96, 2.02, 2.16, 2.2, 2.33, 2.35, 2.46, 2.48, 2.58], "Risikopremie": [4.48, 4.17, 4.62, 4.41, 4.59, 4.45, 4.56, 4.46, 4.53, 4.46, 4.51, 4.45, 4.49, 4.44, 4.48, 4.44, 4.46, 4.43, 4.45, 4.42], "Pengepol.": [93.73, 87.33, 86.26, 82.35, 83.02, 80.5, 81.34, 79.54, 80.34, 78.97, 79.69, 78.61, 79.25, 78.37, 78.94, 78.21, 78.72, 78.11, 78.57, 78.04], "Bolig": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, "rer": {"TFP": [0.02, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04], "Konsum": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01], "Prismarkup": [12.08, 12.07, 12.07, 12.07, 12.07, 12.07, 12.07, 12.07, 12.06, 12.06, 12.06, 12.06, 12.06, 12.06, 12.06, 12.06, 12.06, 12.06, 12.06, 12.06], "Oljepris": [0.0, 0.01, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03], "Ettersp.": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "Risikopremie": [87.88, 87.86, 87.83, 87.83, 87.8, 87.8, 87.78, 87.78, 87.76, 87.76, 87.74, 87.74, 87.73, 87.73, 87.71, 87.71, 87.7, 87.7, 87.68, 87.68], "Pengepol.": [0.03, 0.03, 0.05, 0.05, 0.07, 0.07, 0.09, 0.09, 0.11, 0.11, 0.13, 0.13, 0.14, 0.14, 0.16, 0.16, 0.17, 0.17, 0.18, 0.18], "Bolig": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, "bolig": {"TFP": [0.15, 0.29, 0.43, 0.53, 0.59, 0.64, 0.66, 0.67, 0.67, 0.67, 0.67, 0.67, 0.67, 0.67, 0.67, 0.67, 0.67, 0.67, 0.67, 0.66], "Konsum": [0.02, 0.03, 0.03, 0.03, 0.03, 0.03, 0.04, 0.04, 0.05, 0.05, 0.06, 0.06, 0.07, 0.07, 0.08, 0.08, 0.08, 0.09, 0.09, 0.09], "Prismarkup": [97.39, 97.16, 96.77, 96.61, 96.29, 96.15, 95.86, 95.73, 95.45, 95.32, 95.06, 94.94, 94.7, 94.58, 94.36, 94.25, 94.04, 93.94, 93.76, 93.67], "Oljepris": [0.0, 0.08, 0.14, 0.15, 0.15, 0.15, 0.16, 0.19, 0.2, 0.24, 0.26, 0.3, 0.32, 0.35, 0.38, 0.41, 0.43, 0.46, 0.47, 0.5], "Ettersp.": [0.0, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.02, 0.02, 0.02, 0.03, 0.03, 0.04, 0.05, 0.06, 0.07, 0.07, 0.08, 0.09, 0.1], "Risikopremie": [0.99, 0.99, 0.94, 0.93, 0.92, 0.91, 0.92, 0.92, 0.93, 0.93, 0.94, 0.94, 0.95, 0.95, 0.96, 0.96, 0.97, 0.97, 0.98, 0.98], "Pengepol.": [0.21, 0.21, 0.44, 0.51, 0.77, 0.86, 1.12, 1.21, 1.45, 1.54, 1.76, 1.84, 2.04, 2.11, 2.29, 2.36, 2.52, 2.58, 2.73, 2.79], "Bolig": [1.24, 1.23, 1.24, 1.24, 1.24, 1.24, 1.23, 1.23, 1.23, 1.23, 1.22, 1.22, 1.22, 1.22, 1.21, 1.21, 1.21, 1.21, 1.21, 1.2]}};
+const HIST_LEVEL    = {"dates": ["2001-01-01", "2001-04-01", "2001-07-01", "2001-10-01", "2002-01-01", "2002-04-01", "2002-07-01", "2002-10-01", "2003-01-01", "2003-04-01", "2003-07-01", "2003-10-01", "2004-01-01", "2004-04-01", "2004-07-01", "2004-10-01", "2005-01-01", "2005-04-01", "2005-07-01", "2005-10-01", "2006-01-01", "2006-04-01", "2006-07-01", "2006-10-01", "2007-01-01", "2007-04-01", "2007-07-01", "2007-10-01", "2008-01-01", "2008-04-01", "2008-07-01", "2008-10-01", "2009-01-01", "2009-04-01", "2009-07-01", "2009-10-01", "2010-01-01", "2010-04-01", "2010-07-01", "2010-10-01", "2011-01-01", "2011-04-01", "2011-07-01", "2011-10-01", "2012-01-01", "2012-04-01", "2012-07-01", "2012-10-01", "2013-01-01", "2013-04-01", "2013-07-01", "2013-10-01", "2014-01-01", "2014-04-01", "2014-07-01", "2014-10-01", "2015-01-01", "2015-04-01", "2015-07-01", "2015-10-01", "2016-01-01", "2016-04-01", "2016-07-01", "2016-10-01", "2017-01-01", "2017-04-01", "2017-07-01", "2017-10-01", "2018-01-01", "2018-04-01", "2018-07-01", "2018-10-01", "2019-01-01", "2019-04-01", "2019-07-01", "2019-10-01", "2022-01-01", "2022-04-01", "2022-07-01", "2022-10-01", "2023-01-01", "2023-04-01", "2023-07-01", "2023-10-01", "2024-01-01", "2024-04-01", "2024-07-01", "2024-10-01", "2025-01-01", "2025-04-01", "2025-07-01", "2025-10-01", "2026-01-01", "2026-04-01"], "y": [1.9149, -0.7594, -0.4126, 1.2948, 0.419, 0.8289, 0.3004, -0.7753, 0.813, 0.318, 1.3191, -0.3517, 3.4333, 0.6462, 1.2825, 0.8787, 1.2235, 2.3577, 0.0723, 1.6264, 1.8154, 1.081, 0.5341, 2.5043, 2.3341, 0.3075, 2.1335, 0.536, 0.0997, 1.2294, 0.3093, -1.987, -0.424, 0.1197, -0.2601, 0.5874, 1.9044, -0.2454, 0.3625, -0.1495, 1.2991, 0.6744, 0.4169, 0.5929, 2.3392, 0.2205, 0.5878, 0.6273, 1.1158, 0.02, 0.8379, 0.6501, 0.4677, 0.8091, 0.2171, 0.5533, 0.674, 0.2787, 0.1646, -0.1139, 0.4302, 0.1529, 0.4148, -0.1888, 1.3146, 1.0859, 0.6853, 0.6027, 0.4169, 0.6069, 0.397, 0.8046, 0.5384, 1.0769, 0.8778, -0.1286, 0.8403, 1.4657, 0.4359, 0.7328, 0.0035, 0.1952, 0.041, 0.0497, -0.0085, 0.2134, 0.9112, -0.1823, 0.8276, 0.5152, 0.111, 0.4207, null, null], "pi": [5.9029, 4.6263, -4.1096, 1.5461, 2.0522, 2.381, -0.3393, 4.7238, 11.2451, -6.7422, -1.6618, 1.9934, 0.6623, 2.3093, -0.1645, 2.1333, -0.3275, 4.3983, 0.8092, 2.4179, 1.2836, 4.9354, 0.1582, 3.3078, -4.4164, 2.2143, -0.4735, 8.1285, 4.0031, 1.071, 5.1614, 3.7531, -0.299, 3.721, 0.0, 2.2161, 5.705, 2.3172, -2.8986, 3.9081, 2.1548, 2.5705, -2.7138, 1.2878, 2.1371, 0.8517, -2.846, 4.6851, 2.2519, 3.6326, 1.2498, 1.9364, 1.5149, 2.7397, 2.3141, 1.4903, 1.2152, 3.7572, 1.4664, 3.4449, 3.8077, 4.9351, 3.4699, 1.7874, 0.0, 3.0457, 1.1362, 1.133, 2.6312, 4.5942, 4.542, 1.4621, 1.2143, 2.4177, 1.4436, 1.3187, 2.8133, 9.5295, 9.0938, 4.2588, 2.7441, 9.0476, 1.6419, 4.2781, 2.122, 4.1108, 0.4984, 2.6809, 3.939, 3.9976, 2.9963, 1.2499, null, null], "i": [7.0, null, 7.0, 6.9141, 6.5, 6.5, 6.9773, 6.9062, 5.9762, null, 3.4015, 2.4758, 2.0195, null, 1.75, 1.75, 1.75, 1.75, 2.0, 2.1602, 2.2923, null, 2.8731, 3.1984, 3.7266, null, 4.6308, 5.0397, 5.25, 5.4444, 5.75, 4.8095, 2.6587, null, 1.25, 1.457, 1.75, null, 2.0, 2.0, 2.0, null, 2.25, 2.1641, 1.7038, null, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, null, 1.5, 1.4563, 1.25, null, 0.9848, 0.75, 0.7213, 0.5, 0.5, 0.5, 0.5, null, 0.5, 0.5, 0.5, 0.5, 0.5231, 0.75, 0.7738, null, 1.2765, 1.5, 0.5195, null, 1.5303, 2.4453, 2.7731, null, 3.8923, 4.2857, 4.5, 4.5, 4.5, 4.5, 4.5, null, 4.2197, 4.0, 4.0, null], "rer": [8.2024, null, 8.0094, 7.9699, 7.8135, 7.5157, 7.3991, 7.3193, 7.5706, null, 8.2472, 8.2226, 8.631, null, 8.389, 8.1975, 8.2394, 8.0455, 7.8817, 7.8785, 8.0227, null, 8.0604, 8.2712, 8.169, null, 7.9175, 7.8761, 7.9555, 7.9417, 8.0604, 8.9191, 8.9472, null, 8.7397, 8.3943, 8.1019, null, 7.9561, 8.0536, 7.8236, null, 7.7652, 7.7602, 7.5868, null, 7.391, 7.3662, 7.4277, 7.6152, 7.9303, 8.2347, 8.3471, null, 8.2754, 8.5788, 8.7318, null, 9.1378, 9.3356, 9.5264, 9.3205, 9.2887, 9.0363, 8.9892, null, 9.3479, 9.6049, 9.633, 9.5525, 9.5773, 9.621, 9.7421, null, 9.8471, 10.0938, 9.9247, null, 10.0556, 10.391, 10.9901, null, 11.4044, 11.6581, 11.4113, 11.565, 11.7625, 11.7585, 11.6514, null, 11.7962, 11.7453, 11.382, null], "bolig": [3.415, 4.226, -0.0, -0.2301, 3.1749, 3.5091, -3.2862, -0.6704, 2.2174, 0.6557, -0.2181, 1.3015, 7.0716, 1.5937, 0.1974, 1.1765, 4.012, 2.7703, 0.9066, -0.0, 6.1261, 4.8062, 3.185, 1.2461, 6.0078, 3.72, -0.1405, -2.2761, 2.2761, 1.2579, -3.3902, -7.3003, 4.0884, 5.0625, 1.817, -0.0, 3.27, 3.6846, -0.5181, -0.13, 5.0708, 2.6831, 0.3604, -0.4808, 3.5507, 3.2039, 0.5615, -0.6742, 2.9986, 2.6985, -1.9355, -2.752, 2.3167, 3.7458, 0.105, -0.526, 3.6255, 3.2035, -0.3949, -1.9981, 3.6656, 4.0978, 1.8502, -0.0, 3.6891, 1.1419, -2.3863, -1.7141, 1.8928, 3.8534, -1.1231, -2.3737, 2.634, 2.8195, -0.7611, -2.1451, 4.5263, 3.9193, -1.8006, -4.0647, 1.8746, 3.8534, -2.9291, -3.5294, 3.812, 4.1471, -1.2262, -2.0077, 5.3773, 2.2929, -0.7802, -1.1159, 3.3748, null]};
+const HIST_DECOMP   = {"y": {"TFP": [-0.051958, 0.013634, -0.039175, -0.049017, -0.038107, 0.008364, -0.028218, -0.09014, 0.053283, -0.003601, -0.039512, -0.047152, -0.025149, -0.001199, -0.02881, -0.030519, -0.051116, -0.020181, -0.054434, -0.058415, -0.069152, -0.017203, -0.054108, 0.001171, -0.042731, 0.010099, -0.042884, -0.021479, 0.023015, 0.01939, 0.050605, 0.010175, 0.009082, 0.052011, 0.038552, -0.002963, 0.030421, 0.080552, 0.009577, 0.008399, 0.012975, 0.053119, 0.026189, 0.000893, 0.024613, 0.058586, 0.006741, 0.01038, 0.01048, 0.042622, 0.037308, 0.009456, 0.017724, 0.037857, 0.037272, 0.01515, 0.016691, 0.043926, 0.039538, 0.001417, 0.01141, 0.034445, 0.034446, 0.025022, 0.028622, 0.051595, 0.042747, 0.022653, 0.017031, 0.043081, 0.049608, 0.025588, 0.028729, 0.056227, 0.055486, 0.021092, 0.0158, 0.038521, 0.065763, 0.031208, 0.003457, 0.08173, 0.048668, 0.031543, 0.023923, 0.06856, 0.035242, -0.000298, 0.02404, 0.036259, 0.032169, -0.101263, 0.0], "Konsum": [0.072789, -0.1232, 0.075668, 0.081201, -0.119717, 0.157719, -0.054374, -0.045492, -0.125114, 0.133281, -0.146422, 0.201855, -0.152918, -0.10983, -0.061338, 0.062737, -0.103813, -0.418712, -0.163087, -0.06328, -0.05788, -0.380914, 0.001184, -0.213501, 0.06702, -0.06, -0.023499, -0.336258, 0.192686, 0.359119, -0.207593, 0.720069, 0.115739, 0.026679, 0.036769, 0.276761, -0.017622, 0.096977, 0.042749, 0.062628, 0.077476, 0.010352, 0.067494, 0.210783, 0.009447, 0.222693, 0.031227, 0.259467, -0.063782, 0.295543, 0.023586, 0.299925, 0.062083, 0.083553, 0.087234, 0.443648, 0.032746, 0.120865, 0.067766, 0.49156, -0.020015, -0.245517, 0.150456, 0.339036, -0.279683, 0.045209, 0.321804, -0.047037, -0.036325, -0.113342, 0.301787, -0.065201, 0.00264, 0.320244, -0.226251, 0.135177, 0.060033, -0.042489, 0.473215, -0.038973, -0.04373, 0.002348, 0.014399, 0.022675, 0.026494, 0.163881, -0.035532, 0.17785, -0.011072, -0.104901, -0.102307, 0.019573, 0.0], "Prismarkup": [0.002523, -0.000316, 0.002046, 0.002647, 0.00209, -0.000306, 0.00138, 0.004327, -0.001941, 0.000683, 0.002349, 0.002766, 0.001491, 0.000383, 0.001656, 0.001838, 0.002688, 0.001325, 0.002944, 0.003242, 0.003554, 0.001139, 0.002758, 0.000416, 0.002213, -0.000397, 0.001794, 0.001039, -0.001191, -0.001374, -0.002815, -0.000324, -0.000471, -0.002477, -0.001824, -0.000114, -0.00168, -0.003962, -0.000659, -0.000429, -0.000751, -0.002542, -0.001308, -6e-05, -0.001188, -0.002783, -0.000471, -0.000587, -0.000661, -0.00232, -0.001991, -0.00058, -0.001014, -0.002045, -0.001981, -0.000847, -0.00103, -0.002349, -0.002156, -0.00029, -0.000781, -0.0018, -0.001796, -0.001202, -0.001563, -0.002694, -0.002195, -0.001236, -0.001057, -0.002415, -0.002651, -0.001344, -0.001652, -0.003028, -0.002947, -0.001174, -0.001379, -0.002663, -0.003684, -0.001996, -0.000845, -0.004539, -0.002812, -0.001803, -0.001487, -0.003585, -0.001967, -0.000152, -0.001438, -0.001972, -0.001583, 0.004794, 0.0], "Oljepris": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "Ettersp.": [-0.330601, 0.207472, -0.271624, -0.320671, -0.050964, -0.104622, -0.073009, -0.414429, 0.412618, -0.186153, -0.038843, -0.464709, 0.030798, 0.117991, -0.067347, -0.210944, -0.142223, 0.335364, -0.107737, -0.236813, -0.294541, 0.299755, -0.288563, 0.215815, -0.28373, 0.120119, -0.188087, 0.23287, -0.078104, -0.263042, 0.434757, -0.67249, -0.069537, 0.256774, 0.176385, -0.278933, 0.173172, 0.30974, -0.00151, -0.012592, -0.002801, 0.259908, 0.063151, -0.204684, 0.122117, 0.076378, 0.00507, -0.21059, 0.107274, -0.103778, 0.148922, -0.257853, 0.025117, 0.110525, 0.083048, -0.382462, 0.036986, 0.083874, 0.117048, -0.498402, 0.083242, 0.428548, 0.036853, -0.213001, 0.425667, 0.194962, -0.118565, 0.164118, 0.125744, 0.328563, -0.060509, 0.184276, 0.130957, -0.045326, 0.495864, -0.025853, 0.02407, 0.229874, -0.161691, 0.170272, 0.055917, 0.39019, 0.223901, 0.144237, 0.086338, 0.168225, 0.212232, -0.177394, 0.13072, 0.279716, 0.263048, -0.509279, 0.0], "Risikopremie": [0.370601, -0.046407, 0.300458, 0.388716, 0.306895, -0.045013, 0.202729, 0.63556, -0.2851, 0.100282, 0.345012, 0.406238, 0.219021, 0.056242, 0.243193, 0.270015, 0.394798, 0.19454, 0.432425, 0.476124, 0.521912, 0.167262, 0.40512, 0.061159, 0.325078, -0.058245, 0.263419, 0.152541, -0.174907, -0.201839, -0.413502, -0.047624, -0.069201, -0.363789, -0.267949, -0.016772, -0.246794, -0.581973, -0.096839, -0.063032, -0.110314, -0.373419, -0.192139, -0.008744, -0.17451, -0.408694, -0.069151, -0.086189, -0.097078, -0.340787, -0.292432, -0.085234, -0.14893, -0.300353, -0.290881, -0.124339, -0.151234, -0.345046, -0.316652, -0.042659, -0.11464, -0.264361, -0.263847, -0.176531, -0.229531, -0.39567, -0.322389, -0.181592, -0.155287, -0.35476, -0.38943, -0.197382, -0.242698, -0.444728, -0.432794, -0.172451, -0.202588, -0.391193, -0.541027, -0.293107, -0.124096, -0.666677, -0.412999, -0.264872, -0.218414, -0.526497, -0.288876, -0.022284, -0.211246, -0.289598, -0.23245, 0.704061, 0.0], "Pengepol.": [-0.007676, 0.000961, -0.006223, -0.008051, -0.006357, 0.000932, -0.004199, -0.013164, 0.005905, -0.002077, -0.007146, -0.008414, -0.004537, -0.001165, -0.005037, -0.005593, -0.008177, -0.004029, -0.008957, -0.009862, -0.01081, -0.003464, -0.008391, -0.001267, -0.006733, 0.001206, -0.005456, -0.00316, 0.003623, 0.004181, 0.008565, 0.000986, 0.001433, 0.007535, 0.00555, 0.000347, 0.005112, 0.012054, 0.002006, 0.001306, 0.002285, 0.007735, 0.00398, 0.000181, 0.003615, 0.008465, 0.001432, 0.001785, 0.002011, 0.007059, 0.006057, 0.001765, 0.003085, 0.006221, 0.006025, 0.002575, 0.003132, 0.007147, 0.006559, 0.000884, 0.002375, 0.005476, 0.005465, 0.003656, 0.004754, 0.008195, 0.006678, 0.003761, 0.003216, 0.007348, 0.008066, 0.004088, 0.005027, 0.009212, 0.008964, 0.003572, 0.004196, 0.008103, 0.011206, 0.006071, 0.00257, 0.013809, 0.008554, 0.005486, 0.004524, 0.010905, 0.005983, 0.000462, 0.004375, 0.005998, 0.004815, -0.014583, 0.0], "Bolig": [3.1e-05, 0.000705, -9.7e-05, 1.1e-05, 0.001108, -0.000754, 0.00063, 0.00081, 0.000485, -0.000998, 0.001186, -0.00095, 0.001018, 0.000728, 0.000694, -4.2e-05, 0.001016, 0.002489, 0.001263, 0.000685, 0.000747, 0.00214, 0.000224, 0.00106, -5.6e-05, 0.000332, 0.000459, 0.001926, -0.001168, -0.002008, 0.000416, -0.003798, -0.000652, -0.000278, -0.00026, -0.001276, -0.000106, -0.001057, -0.000364, -0.000302, -0.000397, -0.000399, -0.000545, -0.001073, -0.000143, -0.001514, -0.000186, -0.001443, 0.000155, -0.00206, -0.000547, -0.001667, -0.000469, -0.000666, -0.000894, -0.002543, -0.000439, -0.001104, -0.000779, -0.002683, 7.6e-05, 0.001114, -0.000876, -0.001917, 0.001249, -0.000803, -0.00208, 0.000109, 9.9e-05, 0.000253, -0.001994, 5e-05, -0.000338, -0.002134, 0.000663, -0.000813, -0.00039, -0.000143, -0.003108, -0.000301, 0.000126, -0.000802, -0.000499, -0.000265, -0.000392, -0.001468, -8.1e-05, -0.000896, -0.000135, 0.000198, 0.000286, 0.00082, 0.0]}, "pi": {"TFP": [-0.190874, 0.050086, -0.143916, -0.180071, -0.139991, 0.030725, -0.103664, -0.331143, 0.195743, -0.013229, -0.145154, -0.173218, -0.092389, -0.004406, -0.105838, -0.112116, -0.187781, -0.074139, -0.199971, -0.214597, -0.254042, -0.063196, -0.198775, 0.004303, -0.156978, 0.037102, -0.15754, -0.078905, 0.084549, 0.07123, 0.185904, 0.03738, 0.033364, 0.19107, 0.141628, -0.010884, 0.111754, 0.295919, 0.035181, 0.030856, 0.047665, 0.19514, 0.096208, 0.003279, 0.09042, 0.215225, 0.024763, 0.038134, 0.038499, 0.156578, 0.137057, 0.034738, 0.065112, 0.139072, 0.136924, 0.055656, 0.061316, 0.161369, 0.145247, 0.005204, 0.041915, 0.126538, 0.126541, 0.091921, 0.105148, 0.189541, 0.157036, 0.08322, 0.062567, 0.158263, 0.182243, 0.094, 0.105539, 0.206559, 0.203836, 0.077486, 0.058042, 0.141513, 0.241588, 0.114645, 0.012699, 0.300246, 0.178788, 0.115877, 0.087883, 0.251864, 0.129467, -0.001093, 0.088314, 0.133202, 0.118178, -0.372006, 0.0], "Konsum": [0.011197, -0.018952, 0.01164, 0.012491, -0.018416, 0.024262, -0.008364, -0.006998, -0.019246, 0.020503, -0.022524, 0.031051, -0.023523, -0.016895, -0.009436, 0.009651, -0.01597, -0.06441, -0.025088, -0.009734, -0.008904, -0.058596, 0.000182, -0.032843, 0.01031, -0.00923, -0.003615, -0.051726, 0.029641, 0.055243, -0.031934, 0.110768, 0.017804, 0.004104, 0.005656, 0.042574, -0.002711, 0.014918, 0.006576, 0.009634, 0.011918, 0.001592, 0.010383, 0.032425, 0.001453, 0.034257, 0.004804, 0.039914, -0.009812, 0.045463, 0.003628, 0.046137, 0.00955, 0.012853, 0.013419, 0.068246, 0.005037, 0.018593, 0.010424, 0.075617, -0.003079, -0.037768, 0.023145, 0.052154, -0.043024, 0.006954, 0.049503, -0.007236, -0.005588, -0.017435, 0.046424, -0.01003, 0.000406, 0.049263, -0.034804, 0.020794, 0.009235, -0.006536, 0.072795, -0.005995, -0.006727, 0.000361, 0.002215, 0.003488, 0.004076, 0.02521, -0.005466, 0.027359, -0.001703, -0.016137, -0.015738, 0.003011, 0.0], "Prismarkup": [0.116597, -0.0146, 0.094528, 0.122296, 0.096554, -0.014162, 0.063781, 0.199956, -0.089697, 0.03155, 0.108546, 0.127809, 0.068907, 0.017694, 0.076512, 0.084951, 0.124209, 0.061205, 0.136047, 0.149796, 0.164201, 0.052623, 0.127457, 0.019242, 0.102274, -0.018325, 0.082876, 0.047992, -0.055028, -0.063501, -0.130094, -0.014983, -0.021772, -0.114453, -0.084301, -0.005277, -0.077645, -0.183097, -0.030467, -0.019831, -0.034706, -0.117483, -0.06045, -0.002751, -0.054903, -0.128581, -0.021756, -0.027116, -0.030542, -0.107217, -0.092003, -0.026816, -0.046856, -0.094495, -0.091515, -0.039119, -0.04758, -0.108557, -0.099623, -0.013421, -0.036067, -0.083172, -0.08301, -0.055539, -0.072214, -0.124484, -0.101428, -0.057132, -0.048856, -0.111613, -0.12252, -0.062099, -0.076356, -0.139918, -0.136163, -0.054256, -0.063737, -0.123075, -0.170215, -0.092216, -0.039042, -0.209746, -0.129935, -0.083333, -0.068716, -0.165644, -0.090884, -0.007011, -0.066461, -0.091112, -0.073132, 0.221508, 0.0], "Oljepris": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "Ettersp.": [-0.050856, 0.031915, -0.041784, -0.049329, -0.00784, -0.016094, -0.011231, -0.063751, 0.063473, -0.028636, -0.005975, -0.071486, 0.004738, 0.018151, -0.01036, -0.03245, -0.021878, 0.051589, -0.016573, -0.036429, -0.045309, 0.046111, -0.04439, 0.033199, -0.043646, 0.018478, -0.028933, 0.035822, -0.012015, -0.040464, 0.066879, -0.103449, -0.010697, 0.039499, 0.027133, -0.042908, 0.026639, 0.047647, -0.000232, -0.001937, -0.000431, 0.039982, 0.009714, -0.031486, 0.018785, 0.011749, 0.00078, -0.032395, 0.016502, -0.015964, 0.022909, -0.039665, 0.003864, 0.017002, 0.012775, -0.058834, 0.00569, 0.012902, 0.018005, -0.076669, 0.012805, 0.065923, 0.005669, -0.032766, 0.06548, 0.029991, -0.018239, 0.025246, 0.019343, 0.050543, -0.009308, 0.028347, 0.020145, -0.006973, 0.076279, -0.003977, 0.003703, 0.035361, -0.024873, 0.026193, 0.008602, 0.060023, 0.034443, 0.022188, 0.013281, 0.025878, 0.032648, -0.027289, 0.020109, 0.043029, 0.040465, -0.078342, 0.0], "Risikopremie": [0.209819, -0.026274, 0.170106, 0.220074, 0.173751, -0.025484, 0.114776, 0.359826, -0.161412, 0.056775, 0.195331, 0.229994, 0.124, 0.031842, 0.137685, 0.152871, 0.223517, 0.11014, 0.24482, 0.269561, 0.295484, 0.094697, 0.229362, 0.034626, 0.184045, -0.032976, 0.149137, 0.086362, -0.099025, -0.114272, -0.234107, -0.026963, -0.039179, -0.205962, -0.151701, -0.009496, -0.139724, -0.329488, -0.054826, -0.035686, -0.062455, -0.211413, -0.108781, -0.00495, -0.0988, -0.231385, -0.03915, -0.048796, -0.054962, -0.192939, -0.165562, -0.048256, -0.084318, -0.170047, -0.164684, -0.070395, -0.085622, -0.19535, -0.179275, -0.024152, -0.064904, -0.14967, -0.149378, -0.099944, -0.129951, -0.224011, -0.182523, -0.10281, -0.087917, -0.20085, -0.220479, -0.111749, -0.137405, -0.251786, -0.245029, -0.097634, -0.114697, -0.221476, -0.306306, -0.165945, -0.070258, -0.377443, -0.233822, -0.149959, -0.123657, -0.29808, -0.163549, -0.012616, -0.119598, -0.163958, -0.131603, 0.398609, 0.0], "Pengepol.": [-0.004674, 0.000585, -0.003789, -0.004902, -0.00387, 0.000568, -0.002557, -0.008015, 0.003596, -0.001265, -0.004351, -0.005123, -0.002762, -0.000709, -0.003067, -0.003405, -0.004979, -0.002453, -0.005454, -0.006005, -0.006582, -0.002109, -0.005109, -0.000771, -0.0041, 0.000735, -0.003322, -0.001924, 0.002206, 0.002545, 0.005215, 0.000601, 0.000873, 0.004588, 0.003379, 0.000212, 0.003112, 0.00734, 0.001221, 0.000795, 0.001391, 0.004709, 0.002423, 0.00011, 0.002201, 0.005154, 0.000872, 0.001087, 0.001224, 0.004298, 0.003688, 0.001075, 0.001878, 0.003788, 0.003668, 0.001568, 0.001907, 0.004352, 0.003993, 0.000538, 0.001446, 0.003334, 0.003328, 0.002226, 0.002895, 0.00499, 0.004066, 0.00229, 0.001958, 0.004474, 0.004911, 0.002489, 0.003061, 0.005609, 0.005458, 0.002175, 0.002555, 0.004934, 0.006823, 0.003697, 0.001565, 0.008408, 0.005209, 0.00334, 0.002755, 0.00664, 0.003643, 0.000281, 0.002664, 0.003652, 0.002932, -0.008879, 0.0], "Bolig": [4e-06, 9.2e-05, -1.3e-05, 1e-06, 0.000144, -9.8e-05, 8.2e-05, 0.000105, 6.3e-05, -0.00013, 0.000155, -0.000124, 0.000133, 9.5e-05, 9e-05, -5e-06, 0.000132, 0.000324, 0.000165, 8.9e-05, 9.7e-05, 0.000279, 2.9e-05, 0.000138, -7e-06, 4.3e-05, 6e-05, 0.000251, -0.000152, -0.000262, 5.4e-05, -0.000495, -8.5e-05, -3.6e-05, -3.4e-05, -0.000166, -1.4e-05, -0.000138, -4.7e-05, -3.9e-05, -5.2e-05, -5.2e-05, -7.1e-05, -0.00014, -1.9e-05, -0.000197, -2.4e-05, -0.000188, 2e-05, -0.000268, -7.1e-05, -0.000217, -6.1e-05, -8.7e-05, -0.000116, -0.000331, -5.7e-05, -0.000144, -0.000101, -0.00035, 1e-05, 0.000145, -0.000114, -0.00025, 0.000163, -0.000105, -0.000271, 1.4e-05, 1.3e-05, 3.3e-05, -0.00026, 7e-06, -4.4e-05, -0.000278, 8.6e-05, -0.000106, -5.1e-05, -1.9e-05, -0.000405, -3.9e-05, 1.6e-05, -0.000104, -6.5e-05, -3.5e-05, -5.1e-05, -0.000191, -1.1e-05, -0.000117, -1.8e-05, 2.6e-05, 3.7e-05, 0.000107, 0.0]}, "i": {"TFP": [-0.002262, 0.000594, -0.001705, -0.002134, -0.001659, 0.000364, -0.001228, -0.003924, 0.00232, -0.000157, -0.00172, -0.002053, -0.001095, -5.2e-05, -0.001254, -0.001329, -0.002225, -0.000879, -0.00237, -0.002543, -0.00301, -0.000749, -0.002355, 5.1e-05, -0.00186, 0.00044, -0.001867, -0.000935, 0.001002, 0.000844, 0.002203, 0.000443, 0.000395, 0.002264, 0.001678, -0.000129, 0.001324, 0.003507, 0.000417, 0.000366, 0.000565, 0.002312, 0.00114, 3.9e-05, 0.001071, 0.00255, 0.000293, 0.000452, 0.000456, 0.001855, 0.001624, 0.000412, 0.000772, 0.001648, 0.001623, 0.00066, 0.000727, 0.001912, 0.001721, 6.2e-05, 0.000497, 0.001499, 0.001499, 0.001089, 0.001246, 0.002246, 0.001861, 0.000986, 0.000741, 0.001875, 0.00216, 0.001114, 0.001251, 0.002448, 0.002415, 0.000918, 0.000688, 0.001677, 0.002863, 0.001359, 0.00015, 0.003558, 0.002119, 0.001373, 0.001041, 0.002985, 0.001534, -1.3e-05, 0.001046, 0.001578, 0.0014, -0.004408, 0.0], "Konsum": [0.003006, -0.005088, 0.003125, 0.003353, -0.004944, 0.006514, -0.002246, -0.001879, -0.005167, 0.005504, -0.006047, 0.008336, -0.006315, -0.004536, -0.002533, 0.002591, -0.004287, -0.017292, -0.006735, -0.002613, -0.00239, -0.015731, 4.9e-05, -0.008817, 0.002768, -0.002478, -0.00097, -0.013887, 0.007958, 0.014831, -0.008573, 0.029738, 0.00478, 0.001102, 0.001519, 0.01143, -0.000728, 0.004005, 0.001765, 0.002586, 0.0032, 0.000428, 0.002787, 0.008705, 0.00039, 0.009197, 0.00129, 0.010716, -0.002634, 0.012205, 0.000974, 0.012386, 0.002564, 0.003451, 0.003603, 0.018322, 0.001352, 0.004992, 0.002799, 0.020301, -0.000827, -0.010139, 0.006214, 0.014002, -0.01155, 0.001867, 0.01329, -0.001943, -0.0015, -0.004681, 0.012463, -0.002693, 0.000109, 0.013226, -0.009344, 0.005583, 0.002479, -0.001755, 0.019543, -0.00161, -0.001806, 9.7e-05, 0.000595, 0.000936, 0.001094, 0.006768, -0.001467, 0.007345, -0.000457, -0.004332, -0.004225, 0.000808, 0.0], "Prismarkup": [0.000178, -2.2e-05, 0.000144, 0.000187, 0.000147, -2.2e-05, 9.7e-05, 0.000305, -0.000137, 4.8e-05, 0.000166, 0.000195, 0.000105, 2.7e-05, 0.000117, 0.00013, 0.00019, 9.3e-05, 0.000208, 0.000229, 0.000251, 8e-05, 0.000195, 2.9e-05, 0.000156, -2.8e-05, 0.000126, 7.3e-05, -8.4e-05, -9.7e-05, -0.000199, -2.3e-05, -3.3e-05, -0.000175, -0.000129, -8e-06, -0.000118, -0.000279, -4.6e-05, -3e-05, -5.3e-05, -0.000179, -9.2e-05, -4e-06, -8.4e-05, -0.000196, -3.3e-05, -4.1e-05, -4.7e-05, -0.000164, -0.00014, -4.1e-05, -7.2e-05, -0.000144, -0.00014, -6e-05, -7.3e-05, -0.000166, -0.000152, -2e-05, -5.5e-05, -0.000127, -0.000127, -8.5e-05, -0.00011, -0.00019, -0.000155, -8.7e-05, -7.5e-05, -0.00017, -0.000187, -9.5e-05, -0.000117, -0.000214, -0.000208, -8.3e-05, -9.7e-05, -0.000188, -0.00026, -0.000141, -6e-05, -0.00032, -0.000198, -0.000127, -0.000105, -0.000253, -0.000139, -1.1e-05, -0.000101, -0.000139, -0.000112, 0.000338, 0.0], "Oljepris": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "Ettersp.": [-0.013653, 0.008568, -0.011218, -0.013243, -0.002105, -0.004321, -0.003015, -0.017115, 0.01704, -0.007688, -0.001604, -0.019192, 0.001272, 0.004873, -0.002781, -0.008712, -0.005874, 0.01385, -0.004449, -0.00978, -0.012164, 0.012379, -0.011917, 0.008913, -0.011718, 0.004961, -0.007768, 0.009617, -0.003226, -0.010863, 0.017955, -0.027773, -0.002872, 0.010604, 0.007284, -0.011519, 0.007152, 0.012792, -6.2e-05, -0.00052, -0.000116, 0.010734, 0.002608, -0.008453, 0.005043, 0.003154, 0.000209, -0.008697, 0.00443, -0.004286, 0.00615, -0.010649, 0.001037, 0.004565, 0.00343, -0.015795, 0.001527, 0.003464, 0.004834, -0.020583, 0.003438, 0.017698, 0.001522, -0.008797, 0.017579, 0.008052, -0.004897, 0.006778, 0.005193, 0.013569, -0.002499, 0.00761, 0.005408, -0.001872, 0.020478, -0.001068, 0.000994, 0.009493, -0.006678, 0.007032, 0.002309, 0.016114, 0.009247, 0.005957, 0.003566, 0.006947, 0.008765, -0.007326, 0.005399, 0.011552, 0.010863, -0.021032, 0.0], "Risikopremie": [0.018528, -0.00232, 0.015021, 0.019434, 0.015343, -0.00225, 0.010135, 0.031775, -0.014254, 0.005014, 0.017249, 0.02031, 0.01095, 0.002812, 0.012158, 0.013499, 0.019738, 0.009726, 0.021619, 0.023804, 0.026093, 0.008362, 0.020254, 0.003058, 0.016252, -0.002912, 0.01317, 0.007626, -0.008744, -0.010091, -0.020673, -0.002381, -0.00346, -0.018188, -0.013396, -0.000839, -0.012338, -0.029096, -0.004841, -0.003151, -0.005515, -0.018669, -0.009606, -0.000437, -0.008725, -0.020433, -0.003457, -0.004309, -0.004853, -0.017038, -0.01462, -0.004261, -0.007446, -0.015016, -0.014543, -0.006216, -0.007561, -0.01725, -0.015831, -0.002133, -0.005731, -0.013217, -0.013191, -0.008826, -0.011475, -0.019781, -0.016118, -0.009079, -0.007764, -0.017736, -0.019469, -0.009868, -0.012134, -0.022234, -0.021637, -0.008622, -0.010128, -0.019558, -0.027048, -0.014654, -0.006204, -0.03333, -0.020648, -0.013242, -0.01092, -0.026322, -0.014442, -0.001114, -0.010561, -0.014478, -0.011621, 0.035199, 0.0], "Pengepol.": [0.112322, -0.014065, 0.091063, 0.117812, 0.093014, -0.013642, 0.061443, 0.192625, -0.086408, 0.030393, 0.104566, 0.123123, 0.066381, 0.017046, 0.073707, 0.081836, 0.119655, 0.058961, 0.131059, 0.144304, 0.158181, 0.050694, 0.122784, 0.018536, 0.098525, -0.017653, 0.079837, 0.046232, -0.053011, -0.061173, -0.125324, -0.014434, -0.020974, -0.110257, -0.08121, -0.005083, -0.074798, -0.176384, -0.02935, -0.019104, -0.033434, -0.113176, -0.058234, -0.00265, -0.05289, -0.123867, -0.020958, -0.026122, -0.029422, -0.103286, -0.08863, -0.025833, -0.045138, -0.091031, -0.08816, -0.037685, -0.045836, -0.104576, -0.095971, -0.012929, -0.034745, -0.080122, -0.079967, -0.053503, -0.069566, -0.11992, -0.09771, -0.055037, -0.047064, -0.107521, -0.118029, -0.059822, -0.073557, -0.134788, -0.131171, -0.052267, -0.0614, -0.118563, -0.163974, -0.088835, -0.037611, -0.202056, -0.125172, -0.080278, -0.066197, -0.159571, -0.087552, -0.006754, -0.064024, -0.087771, -0.070451, 0.213387, 0.0], "Bolig": [1e-06, 2.9e-05, -4e-06, 0.0, 4.5e-05, -3.1e-05, 2.6e-05, 3.3e-05, 2e-05, -4.1e-05, 4.8e-05, -3.9e-05, 4.2e-05, 3e-05, 2.8e-05, -2e-06, 4.1e-05, 0.000102, 5.2e-05, 2.8e-05, 3e-05, 8.7e-05, 9e-06, 4.3e-05, -2e-06, 1.4e-05, 1.9e-05, 7.9e-05, -4.8e-05, -8.2e-05, 1.7e-05, -0.000155, -2.7e-05, -1.1e-05, -1.1e-05, -5.2e-05, -4e-06, -4.3e-05, -1.5e-05, -1.2e-05, -1.6e-05, -1.6e-05, -2.2e-05, -4.4e-05, -6e-06, -6.2e-05, -8e-06, -5.9e-05, 6e-06, -8.4e-05, -2.2e-05, -6.8e-05, -1.9e-05, -2.7e-05, -3.6e-05, -0.000104, -1.8e-05, -4.5e-05, -3.2e-05, -0.000109, 3e-06, 4.5e-05, -3.6e-05, -7.8e-05, 5.1e-05, -3.3e-05, -8.5e-05, 4e-06, 4e-06, 1e-05, -8.1e-05, 2e-06, -1.4e-05, -8.7e-05, 2.7e-05, -3.3e-05, -1.6e-05, -6e-06, -0.000127, -1.2e-05, 5e-06, -3.3e-05, -2e-05, -1.1e-05, -1.6e-05, -6e-05, -3e-06, -3.7e-05, -5e-06, 8e-06, 1.2e-05, 3.3e-05, 0.0]}, "rer": {"TFP": [-0.047315, 0.012415, -0.035674, -0.044637, -0.034702, 0.007616, -0.025697, -0.082085, 0.048522, -0.003279, -0.035981, -0.042938, -0.022902, -0.001092, -0.026236, -0.027792, -0.046548, -0.018378, -0.04957, -0.053195, -0.062973, -0.015665, -0.049273, 0.001067, -0.038912, 0.009197, -0.039052, -0.019559, 0.020958, 0.017657, 0.046083, 0.009266, 0.008271, 0.047363, 0.035107, -0.002698, 0.027702, 0.073354, 0.008721, 0.007649, 0.011815, 0.048372, 0.023848, 0.000813, 0.022414, 0.053351, 0.006138, 0.009453, 0.009543, 0.038813, 0.033974, 0.008611, 0.01614, 0.034474, 0.033941, 0.013796, 0.015199, 0.040001, 0.036004, 0.00129, 0.01039, 0.031367, 0.031368, 0.022786, 0.026064, 0.046984, 0.038927, 0.020629, 0.015509, 0.039231, 0.045175, 0.023301, 0.026161, 0.051203, 0.050528, 0.019208, 0.014388, 0.035079, 0.059886, 0.028419, 0.003148, 0.074426, 0.044319, 0.028724, 0.021785, 0.062433, 0.032093, -0.000271, 0.021892, 0.033019, 0.029294, -0.092214, 0.0], "Konsum": [0.002055, -0.003479, 0.002137, 0.002293, -0.003381, 0.004454, -0.001535, -0.001285, -0.003533, 0.003764, -0.004135, 0.0057, -0.004318, -0.003101, -0.001732, 0.001772, -0.002931, -0.011823, -0.004605, -0.001787, -0.001634, -0.010756, 3.3e-05, -0.006029, 0.001892, -0.001694, -0.000664, -0.009495, 0.005441, 0.010141, -0.005862, 0.020333, 0.003268, 0.000753, 0.001038, 0.007815, -0.000498, 0.002738, 0.001207, 0.001768, 0.002188, 0.000292, 0.001906, 0.005952, 0.000267, 0.006288, 0.000882, 0.007327, -0.001801, 0.008345, 0.000666, 0.008469, 0.001753, 0.002359, 0.002463, 0.012528, 0.000925, 0.003413, 0.001914, 0.01388, -0.000565, -0.006933, 0.004249, 0.009574, -0.007898, 0.001277, 0.009087, -0.001328, -0.001026, -0.0032, 0.008522, -0.001841, 7.5e-05, 0.009043, -0.006389, 0.003817, 0.001695, -0.0012, 0.013362, -0.0011, -0.001235, 6.6e-05, 0.000407, 0.00064, 0.000748, 0.004628, -0.001003, 0.005022, -0.000313, -0.002962, -0.002889, 0.000553, 0.0], "Prismarkup": [0.029204, -0.003657, 0.023677, 0.030632, 0.024184, -0.003547, 0.015975, 0.050083, -0.022466, 0.007902, 0.027188, 0.032012, 0.017259, 0.004432, 0.019164, 0.021278, 0.031111, 0.01533, 0.034076, 0.03752, 0.041128, 0.013181, 0.031924, 0.004819, 0.025617, -0.00459, 0.020758, 0.012021, -0.013783, -0.015905, -0.032585, -0.003753, -0.005453, -0.028667, -0.021115, -0.001322, -0.019448, -0.045861, -0.007631, -0.004967, -0.008693, -0.029426, -0.015141, -0.000689, -0.013752, -0.032206, -0.005449, -0.006792, -0.00765, -0.026855, -0.023044, -0.006717, -0.011736, -0.023668, -0.022922, -0.009798, -0.011918, -0.02719, -0.024953, -0.003362, -0.009034, -0.020832, -0.020792, -0.013911, -0.018088, -0.03118, -0.025405, -0.01431, -0.012237, -0.027956, -0.030688, -0.015554, -0.019125, -0.035045, -0.034105, -0.01359, -0.015964, -0.030827, -0.042634, -0.023097, -0.009779, -0.052535, -0.032545, -0.020872, -0.017211, -0.041489, -0.022764, -0.001756, -0.016647, -0.022821, -0.018318, 0.055481, 0.0], "Oljepris": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "Ettersp.": [-0.009335, 0.005859, -0.00767, -0.009055, -0.001439, -0.002954, -0.002062, -0.011702, 0.011651, -0.005256, -0.001097, -0.013122, 0.00087, 0.003332, -0.001902, -0.005957, -0.004016, 0.00947, -0.003042, -0.006687, -0.008317, 0.008464, -0.008148, 0.006094, -0.008012, 0.003392, -0.005311, 0.006576, -0.002205, -0.007428, 0.012276, -0.018989, -0.001964, 0.007251, 0.004981, -0.007876, 0.00489, 0.008746, -4.3e-05, -0.000356, -7.9e-05, 0.007339, 0.001783, -0.00578, 0.003448, 0.002157, 0.000143, -0.005947, 0.003029, -0.00293, 0.004205, -0.007281, 0.000709, 0.003121, 0.002345, -0.0108, 0.001044, 0.002368, 0.003305, -0.014074, 0.002351, 0.012101, 0.001041, -0.006015, 0.01202, 0.005505, -0.003348, 0.004634, 0.003551, 0.009278, -0.001709, 0.005204, 0.003698, -0.00128, 0.014002, -0.00073, 0.00068, 0.006491, -0.004566, 0.004808, 0.001579, 0.011018, 0.006322, 0.004073, 0.002438, 0.00475, 0.005993, -0.005009, 0.003691, 0.007898, 0.007428, -0.014381, 0.0], "Risikopremie": [1.283873, -0.160767, 1.040874, 1.346626, 1.063176, -0.155937, 0.702313, 2.201766, -0.987672, 0.347405, 1.195225, 1.407329, 0.758753, 0.194837, 0.842493, 0.935412, 1.367696, 0.673943, 1.498047, 1.649433, 1.808057, 0.579446, 1.403457, 0.211874, 1.126166, -0.201778, 0.912562, 0.528446, -0.605928, -0.699229, -1.432494, -0.164983, -0.239734, -1.260274, -0.928256, -0.058104, -0.854968, -2.016125, -0.335477, -0.218361, -0.382161, -1.293632, -0.665627, -0.030291, -0.604554, -1.415838, -0.23956, -0.298584, -0.336308, -1.180587, -1.013071, -0.295276, -0.515938, -1.04051, -1.007698, -0.430747, -0.523918, -1.195341, -1.096976, -0.147784, -0.397147, -0.915823, -0.914042, -0.611557, -0.795163, -1.370718, -1.116853, -0.629088, -0.53796, -1.228994, -1.349102, -0.683788, -0.840778, -1.540668, -1.499327, -0.597423, -0.701826, -1.355208, -1.874278, -1.01541, -0.429904, -2.309565, -1.43075, -0.917596, -0.756652, -1.82394, -1.00075, -0.077197, -0.731818, -1.003253, -0.805276, 2.439075, 0.0], "Pengepol.": [-0.029325, 0.003672, -0.023775, -0.030759, -0.024284, 0.003562, -0.016042, -0.050291, 0.02256, -0.007935, -0.027301, -0.032145, -0.017331, -0.00445, -0.019244, -0.021366, -0.03124, -0.015394, -0.034217, -0.037675, -0.041298, -0.013235, -0.032057, -0.004839, -0.025723, 0.004609, -0.020844, -0.01207, 0.01384, 0.015971, 0.03272, 0.003768, 0.005476, 0.028786, 0.021203, 0.001327, 0.019529, 0.046051, 0.007663, 0.004988, 0.008729, 0.029548, 0.015204, 0.000692, 0.013809, 0.03234, 0.005472, 0.00682, 0.007682, 0.026966, 0.02314, 0.006745, 0.011785, 0.023767, 0.023017, 0.009839, 0.011967, 0.027303, 0.025056, 0.003376, 0.009071, 0.020919, 0.020878, 0.013969, 0.018163, 0.031309, 0.02551, 0.014369, 0.012288, 0.028072, 0.030815, 0.015619, 0.019205, 0.035191, 0.034247, 0.013646, 0.016031, 0.030955, 0.042811, 0.023193, 0.00982, 0.052754, 0.03268, 0.020959, 0.017283, 0.041661, 0.022858, 0.001763, 0.016716, 0.022916, 0.018394, -0.055712, 0.0], "Bolig": [-5e-06, -0.000118, 1.6e-05, -2e-06, -0.000186, 0.000127, -0.000106, -0.000136, -8.1e-05, 0.000168, -0.000199, 0.00016, -0.000171, -0.000122, -0.000117, 7e-06, -0.000171, -0.000418, -0.000212, -0.000115, -0.000126, -0.000359, -3.8e-05, -0.000178, 9e-06, -5.6e-05, -7.7e-05, -0.000323, 0.000196, 0.000337, -7e-05, 0.000638, 0.00011, 4.7e-05, 4.4e-05, 0.000214, 1.8e-05, 0.000178, 6.1e-05, 5.1e-05, 6.7e-05, 6.7e-05, 9.2e-05, 0.00018, 2.4e-05, 0.000254, 3.1e-05, 0.000242, -2.6e-05, 0.000346, 9.2e-05, 0.00028, 7.9e-05, 0.000112, 0.00015, 0.000427, 7.4e-05, 0.000185, 0.000131, 0.000451, -1.3e-05, -0.000187, 0.000147, 0.000322, -0.00021, 0.000135, 0.000349, -1.8e-05, -1.7e-05, -4.2e-05, 0.000335, -8e-06, 5.7e-05, 0.000358, -0.000111, 0.000137, 6.6e-05, 2.4e-05, 0.000522, 5.1e-05, -2.1e-05, 0.000135, 8.4e-05, 4.5e-05, 6.6e-05, 0.000246, 1.4e-05, 0.00015, 2.3e-05, -3.3e-05, -4.8e-05, -0.000138, 0.0]}, "bolig": {"TFP": [-0.047315, 0.012415, -0.035674, -0.044637, -0.034702, 0.007616, -0.025697, -0.082085, 0.048522, -0.003279, -0.035981, -0.042938, -0.022902, -0.001092, -0.026236, -0.027792, -0.046548, -0.018378, -0.04957, -0.053195, -0.062973, -0.015665, -0.049273, 0.001067, -0.038912, 0.009197, -0.039052, -0.019559, 0.020958, 0.017657, 0.046083, 0.009266, 0.008271, 0.047363, 0.035107, -0.002698, 0.027702, 0.073354, 0.008721, 0.007649, 0.011815, 0.048372, 0.023848, 0.000813, 0.022414, 0.053351, 0.006138, 0.009453, 0.009543, 0.038813, 0.033974, 0.008611, 0.01614, 0.034474, 0.033941, 0.013796, 0.015199, 0.040001, 0.036004, 0.00129, 0.01039, 0.031367, 0.031368, 0.022786, 0.026064, 0.046984, 0.038927, 0.020629, 0.015509, 0.039231, 0.045175, 0.023301, 0.026161, 0.051203, 0.050528, 0.019208, 0.014388, 0.035079, 0.059886, 0.028419, 0.003148, 0.074426, 0.044319, 0.028724, 0.021785, 0.062433, 0.032093, -0.000271, 0.021892, 0.033019, 0.029294, -0.092214, 0.0], "Konsum": [0.002055, -0.003479, 0.002137, 0.002293, -0.003381, 0.004454, -0.001535, -0.001285, -0.003533, 0.003764, -0.004135, 0.0057, -0.004318, -0.003101, -0.001732, 0.001772, -0.002931, -0.011823, -0.004605, -0.001787, -0.001634, -0.010756, 3.3e-05, -0.006029, 0.001892, -0.001694, -0.000664, -0.009495, 0.005441, 0.010141, -0.005862, 0.020333, 0.003268, 0.000753, 0.001038, 0.007815, -0.000498, 0.002738, 0.001207, 0.001768, 0.002188, 0.000292, 0.001906, 0.005952, 0.000267, 0.006288, 0.000882, 0.007327, -0.001801, 0.008345, 0.000666, 0.008469, 0.001753, 0.002359, 0.002463, 0.012528, 0.000925, 0.003413, 0.001914, 0.01388, -0.000565, -0.006933, 0.004249, 0.009574, -0.007898, 0.001277, 0.009087, -0.001328, -0.001026, -0.0032, 0.008522, -0.001841, 7.5e-05, 0.009043, -0.006389, 0.003817, 0.001695, -0.0012, 0.013362, -0.0011, -0.001235, 6.6e-05, 0.000407, 0.00064, 0.000748, 0.004628, -0.001003, 0.005022, -0.000313, -0.002962, -0.002889, 0.000553, 0.0], "Prismarkup": [0.029204, -0.003657, 0.023677, 0.030632, 0.024184, -0.003547, 0.015975, 0.050083, -0.022466, 0.007902, 0.027188, 0.032012, 0.017259, 0.004432, 0.019164, 0.021278, 0.031111, 0.01533, 0.034076, 0.03752, 0.041128, 0.013181, 0.031924, 0.004819, 0.025617, -0.00459, 0.020758, 0.012021, -0.013783, -0.015905, -0.032585, -0.003753, -0.005453, -0.028667, -0.021115, -0.001322, -0.019448, -0.045861, -0.007631, -0.004967, -0.008693, -0.029426, -0.015141, -0.000689, -0.013752, -0.032206, -0.005449, -0.006792, -0.00765, -0.026855, -0.023044, -0.006717, -0.011736, -0.023668, -0.022922, -0.009798, -0.011918, -0.02719, -0.024953, -0.003362, -0.009034, -0.020832, -0.020792, -0.013911, -0.018088, -0.03118, -0.025405, -0.01431, -0.012237, -0.027956, -0.030688, -0.015554, -0.019125, -0.035045, -0.034105, -0.01359, -0.015964, -0.030827, -0.042634, -0.023097, -0.009779, -0.052535, -0.032545, -0.020872, -0.017211, -0.041489, -0.022764, -0.001756, -0.016647, -0.022821, -0.018318, 0.055481, 0.0], "Oljepris": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "Ettersp.": [-0.009335, 0.005859, -0.00767, -0.009055, -0.001439, -0.002954, -0.002062, -0.011702, 0.011651, -0.005256, -0.001097, -0.013122, 0.00087, 0.003332, -0.001902, -0.005957, -0.004016, 0.00947, -0.003042, -0.006687, -0.008317, 0.008464, -0.008148, 0.006094, -0.008012, 0.003392, -0.005311, 0.006576, -0.002205, -0.007428, 0.012276, -0.018989, -0.001964, 0.007251, 0.004981, -0.007876, 0.00489, 0.008746, -4.3e-05, -0.000356, -7.9e-05, 0.007339, 0.001783, -0.00578, 0.003448, 0.002157, 0.000143, -0.005947, 0.003029, -0.00293, 0.004205, -0.007281, 0.000709, 0.003121, 0.002345, -0.0108, 0.001044, 0.002368, 0.003305, -0.014074, 0.002351, 0.012101, 0.001041, -0.006015, 0.01202, 0.005505, -0.003348, 0.004634, 0.003551, 0.009278, -0.001709, 0.005204, 0.003698, -0.00128, 0.014002, -0.00073, 0.00068, 0.006491, -0.004566, 0.004808, 0.001579, 0.011018, 0.006322, 0.004073, 0.002438, 0.00475, 0.005993, -0.005009, 0.003691, 0.007898, 0.007428, -0.014381, 0.0], "Risikopremie": [0.04799, -0.006009, 0.038907, 0.050335, 0.03974, -0.005829, 0.026252, 0.0823, -0.036918, 0.012986, 0.044676, 0.052605, 0.028361, 0.007283, 0.031492, 0.034965, 0.051123, 0.025191, 0.055995, 0.061654, 0.067583, 0.021659, 0.05246, 0.00792, 0.042095, -0.007542, 0.034111, 0.019753, -0.022649, -0.026136, -0.053545, -0.006167, -0.008961, -0.047108, -0.034697, -0.002172, -0.031958, -0.075361, -0.01254, -0.008162, -0.014285, -0.048355, -0.02488, -0.001132, -0.022598, -0.052923, -0.008955, -0.011161, -0.012571, -0.044129, -0.037868, -0.011037, -0.019285, -0.038893, -0.037667, -0.016101, -0.019583, -0.044681, -0.041004, -0.005524, -0.014845, -0.034233, -0.034166, -0.022859, -0.029722, -0.051236, -0.041747, -0.023515, -0.020108, -0.045939, -0.050428, -0.025559, -0.031427, -0.057589, -0.056043, -0.022331, -0.026234, -0.050656, -0.070059, -0.037955, -0.016069, -0.086329, -0.05348, -0.034299, -0.028283, -0.068177, -0.037407, -0.002886, -0.027355, -0.037501, -0.0301, 0.09117, 0.0], "Pengepol.": [-0.029325, 0.003672, -0.023775, -0.030759, -0.024284, 0.003562, -0.016042, -0.050291, 0.02256, -0.007935, -0.027301, -0.032145, -0.017331, -0.00445, -0.019244, -0.021366, -0.03124, -0.015394, -0.034217, -0.037675, -0.041298, -0.013235, -0.032057, -0.004839, -0.025723, 0.004609, -0.020844, -0.01207, 0.01384, 0.015971, 0.03272, 0.003768, 0.005476, 0.028786, 0.021203, 0.001327, 0.019529, 0.046051, 0.007663, 0.004988, 0.008729, 0.029548, 0.015204, 0.000692, 0.013809, 0.03234, 0.005472, 0.00682, 0.007682, 0.026966, 0.02314, 0.006745, 0.011785, 0.023767, 0.023017, 0.009839, 0.011967, 0.027303, 0.025056, 0.003376, 0.009071, 0.020919, 0.020878, 0.013969, 0.018163, 0.031309, 0.02551, 0.014369, 0.012288, 0.028072, 0.030815, 0.015619, 0.019205, 0.035191, 0.034247, 0.013646, 0.016031, 0.030955, 0.042811, 0.023193, 0.00982, 0.052754, 0.03268, 0.020959, 0.017283, 0.041661, 0.022858, 0.001763, 0.016716, 0.022916, 0.018394, -0.055712, 0.0], "Bolig": [-0.001728, -0.039416, 0.00544, -0.000622, -0.061956, 0.042163, -0.035218, -0.045264, -0.027092, 0.055789, -0.066325, 0.053097, -0.05692, -0.040702, -0.038808, 0.002333, -0.056828, -0.139134, -0.070605, -0.038303, -0.041781, -0.119633, -0.012525, -0.059266, 0.003139, -0.018564, -0.025648, -0.107665, 0.0653, 0.112244, -0.02328, 0.212346, 0.03645, 0.015534, 0.014527, 0.07134, 0.005938, 0.059117, 0.020322, 0.016896, 0.022203, 0.022319, 0.030475, 0.059966, 0.008015, 0.08463, 0.010396, 0.080676, -0.008649, 0.115164, 0.030564, 0.093207, 0.026237, 0.037224, 0.049977, 0.142191, 0.024535, 0.061742, 0.043528, 0.15, -0.004276, -0.062301, 0.04899, 0.107166, -0.069828, 0.044901, 0.116308, -0.006116, -0.005509, -0.014127, 0.11149, -0.002816, 0.01892, 0.119317, -0.037053, 0.045468, 0.021811, 0.007969, 0.173772, 0.016835, -0.007059, 0.044832, 0.027903, 0.014832, 0.02194, 0.082048, 0.004525, 0.05009, 0.007526, -0.011068, -0.015994, -0.045826, 0.0]}};
+const FCST_LEVEL    = {"dates": ["2026-07-01", "2026-10-01", "2027-01-01", "2027-04-01", "2027-07-01", "2027-10-01", "2028-01-01", "2028-04-01", "2028-07-01", "2028-10-01", "2029-01-01", "2029-04-01", "2029-07-01", "2029-10-01", "2030-01-01", "2030-04-01"], "y": [1.0603, 0.857, 0.6568, 0.6985, 0.5985, 0.6731, 0.5909, 0.6672, 0.5906, 0.6643, 0.5915, 0.662, 0.5925, 0.6598, 0.5935, 0.6579], "pi": [2.4211, 2.3879, 2.3523, 2.3589, 2.3405, 2.353, 2.3382, 2.3514, 2.338, 2.3508, 2.3383, 2.3505, 2.3388, 2.3505, 2.3394, 2.3505], "i": [4.783, 4.4933, 4.7089, 4.4364, 4.6252, 4.3764, 4.5432, 4.3175, 4.4644, 4.2605, 4.3888, 4.2054, 4.3165, 4.1522, 4.2473, 4.1007], "rer": [0.3353, 0.3445, 0.3218, 0.3403, 0.3237, 0.3424, 0.3282, 0.3456, 0.333, 0.349, 0.3378, 0.3524, 0.3425, 0.3557, 0.347, 0.359], "bolig": [1.4313, 1.2773, 1.1611, 1.1091, 1.0609, 1.0503, 1.0297, 1.0346, 1.025, 1.0352, 1.0302, 1.0417, 1.0388, 1.0503, 1.0485, 1.0594], "y_bl": [1.0603, 0.857, 0.6568, 0.6985, 0.5985, 0.6731, 0.5909, 0.6672, 0.5906, 0.6643, 0.5915, 0.662, 0.5925, 0.6598, 0.5935, 0.6579], "pi_bl": [2.4211, 2.3879, 2.3523, 2.3589, 2.3405, 2.353, 2.3382, 2.3514, 2.338, 2.3508, 2.3383, 2.3505, 2.3388, 2.3505, 2.3394, 2.3505], "i_bl": [4.783, 4.4933, 4.7089, 4.4364, 4.6252, 4.3764, 4.5432, 4.3175, 4.4644, 4.2605, 4.3888, 4.2054, 4.3165, 4.1522, 4.2473, 4.1007]};
+const ACTIVE_SHOCKS = {"TFP": 0.0, "Konsum": 0.0, "Prismarkup": 0.0, "Oljepris": 0.0, "Ettersp.": 0.0, "Risikopremie": 0.0, "Pengepol.": 0.0, "Bolig": 0.0};
+const META          = {"eig_max": 0.994429, "n_states": 48, "n_shocks": 13, "last_obs_date": "2026-04-01"};
 
-// ── Farger ────────────────────────────────────────────────────────────────────
-const COLORS = ['#2563eb','#16a34a','#dc2626','#d97706','#7c3aed','#0891b2','#be185d','#65a30d'];
-const SHOCKS = Object.keys(IRF_DATA);
-const IRF_VARS = { 'BNP-gap':'bnp', 'KPI-inflasjon':'pi', 'Styringsrente':'rente', 'RER-gap':'rer', 'Boligpris-gap':'bolig' };
-const FEVD_LABELS = { bnp:'BNP-gap', pi:'KPI-inflasjon', rente:'Styringsrente', rer:'RER-gap', bolig:'Boligpris-gap' };
-const HIST_LABELS  = { y:'BNP-gap', pi:'KPI-inflasjon', i:'Styringsrente', rer:'Valutakurs', bolig:'Boligpris-gap' };
+// ════════════ FIN-palett ════════════
+const FIN = {
+  darkblue:'#181c62', blue:'#4156a6', lightblue:'#5b91cc', red:'#f15d61',
+  gray:'#ededee', purple:'#97499c', tealDark:'#008286', teal:'#60c3ad', yellow:'#ffdf4f'
+};
+// Kategorisk rekkefolge for sjokk (rodt er reservert, derfor utelatt her)
+const FIN_CAT = [FIN.darkblue, FIN.blue, FIN.lightblue, FIN.teal, FIN.tealDark,
+                 FIN.purple, FIN.yellow, '#2b3f8f', '#7da8d8', '#b58fc0'];
 
-// ── Utils ─────────────────────────────────────────────────────────────────────
-function zeros(n) { return Array(n).fill(0); }
-function makeChart(id, type, labels, datasets, opts={}) {
-  const ctx = document.getElementById(id).getContext('2d');
-  return new Chart(ctx, {
-    type,
-    data: { labels, datasets },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
-      scales: {
-        x: { grid: { color: '#e2e8f0' }, ticks: { font: { size: 11 } } },
-        y: { grid: { color: '#e2e8f0' }, ticks: { font: { size: 11 } } },
-      },
-      ...opts
-    }
-  });
+// ════════════ Stabil sjokk-til-farge over alle figurer ════════════
+function unionShocks() {
+  const out = [];
+  const add = n => { if (n != null && !out.includes(n)) out.push(n); };
+  Object.keys(IRF_DATA || {}).forEach(add);
+  Object.values(FEVD_DATA || {}).forEach(o => Object.keys(o).forEach(add));
+  Object.values(HIST_DECOMP || {}).forEach(o => Object.keys(o).forEach(add));
+  Object.keys(ACTIVE_SHOCKS || {}).forEach(add);
+  return out;
 }
-function lineDs(label, data, color, opts={}) {
-  return { label, data, borderColor: color, backgroundColor: color+'22',
-           borderWidth: 2, pointRadius: 2, tension: 0.3, fill: false, ...opts };
+const SHOCKS = unionShocks();
+const SHOCK_COLOR = {};
+SHOCKS.forEach((s, i) => SHOCK_COLOR[s] = FIN_CAT[i % FIN_CAT.length]);
+
+const HIST_LABELS = { y:'BNP-gap', pi:'KPI-inflasjon', i:'Styringsrente', rer:'Valutakurs', bolig:'Boligpris-gap' };
+const FEVD_LABELS = { bnp:'BNP-gap', pi:'KPI-inflasjon', rente:'Styringsrente', rer:'Valutakurs (RER)', bolig:'Boligpris-gap' };
+const IRF_VARMAP = [
+  { id:'irf-bnp',   key:'BNP-gap' },
+  { id:'irf-pi',    key:'KPI-inflasjon' },
+  { id:'irf-rente', key:'Styringsrente' },
+  { id:'irf-rer',   key:'RER-gap' },
+  { id:'irf-bolig', key:'Boligpris-gap' },
+];
+
+// ════════════ Norsk tallformat ════════════
+function nf(x, d) {
+  if (x == null || isNaN(x)) return '–';
+  return Number(x).toLocaleString('nb-NO', { minimumFractionDigits: d ?? 1, maximumFractionDigits: d ?? 1 });
 }
-function barDs(label, data, color) {
-  return { label, data, backgroundColor: color+'cc', borderColor: color, borderWidth: 1 };
-}
+function pct(x, d) { return nf(x, d ?? 1) + ' %'; }
 function fmtQ(dateStr) {
-  // '2001-01-01' → '2001Q1'
   if (!dateStr) return '';
   const d = new Date(dateStr);
-  const q = Math.floor(d.getMonth() / 3) + 1;
-  return `${d.getFullYear()}Q${q}`;
+  return d.getFullYear() + 'K' + (Math.floor(d.getMonth() / 3) + 1);
+}
+function fmtQlong(dateStr) {
+  if (!dateStr) return '–';
+  const d = new Date(dateStr);
+  return (Math.floor(d.getMonth() / 3) + 1) + '. kvartal ' + d.getFullYear();
 }
 function histLabels() { return (HIST_LEVEL.dates || []).map(fmtQ); }
 function fcstLabels() { return (FCST_LEVEL.dates || []).map(fmtQ); }
 
-// ── Meta-badge ────────────────────────────────────────────────────────────────
-document.getElementById('meta-badge').textContent =
-  `Siste obs: ${META.last_obs_date || '—'} · max|λ| = ${(META.eig_max||0).toFixed(4)} · NZ=${META.n_states||'?'}`;
+// ════════════ Chart.js standardoppsett (FIN) ════════════
+Chart.defaults.font.family = "'Open Sans', system-ui, -apple-system, 'Segoe UI', sans-serif";
+Chart.defaults.font.size = 11;
+Chart.defaults.color = '#000';
+Chart.defaults.plugins.legend.labels.boxWidth = 11;
+Chart.defaults.plugins.legend.labels.boxHeight = 11;
+Chart.defaults.plugins.legend.labels.padding = 12;
 
-// ── Tab-navigasjon ────────────────────────────────────────────────────────────
+// Plugin: gra plotbakgrunn (FIN: diagrammet ligger pa lyst gratt felt)
+const plotBg = {
+  id: 'plotBg',
+  beforeDraw(c) {
+    const { ctx, chartArea } = c;
+    if (!chartArea) return;
+    ctx.save();
+    ctx.fillStyle = FIN.gray;
+    ctx.fillRect(chartArea.left, chartArea.top, chartArea.right - chartArea.left, chartArea.bottom - chartArea.top);
+    ctx.restore();
+  }
+};
+// Plugin: skille mellom historikk og anslag
+const fcDivider = {
+  id: 'fcDivider',
+  afterDatasetsDraw(c, args, opts) {
+    const b = c.$boundary;
+    if (b == null) return;
+    const x = c.scales.x.getPixelForValue(b);
+    const { top, bottom } = c.chartArea;
+    const ctx = c.ctx;
+    ctx.save();
+    ctx.strokeStyle = '#6b7180';
+    ctx.setLineDash([4, 3]);
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#3b414e';
+    ctx.font = "600 10px 'Open Sans', sans-serif";
+    ctx.textAlign = 'left';
+    ctx.fillText('Anslag →', x + 4, top + 11);
+    ctx.restore();
+  }
+};
+Chart.register(plotBg, fcDivider);
+
+// ════════════ Hjelpere for FIN-akser (y pa begge sider, ingen x-tickmarks) ════════════
+function dataRange(arrays) {
+  let lo = Infinity, hi = -Infinity;
+  arrays.forEach(a => (a || []).forEach(v => {
+    if (v != null && isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+  }));
+  if (!isFinite(lo) || !isFinite(hi)) { lo = -1; hi = 1; }
+  if (lo === hi) { lo -= 1; hi += 1; }
+  const pad = (hi - lo) * 0.10;
+  return { min: lo - pad, max: hi + pad };
+}
+// Velg antall desimaler ut fra verdiomradet, slik at nabotall ikke kollapser
+function decimalsFor(span) {
+  span = Math.abs(span);
+  if (span < 0.05) return 3;
+  if (span < 0.5)  return 2;
+  if (span < 5)    return 1;
+  return 0;
+}
+// Akse-tick: rund av og fjern negativ null (-0,00)
+function fmtTick(v, d) {
+  let r = Number(Number(v).toFixed(d));
+  if (Object.is(r, -0)) r = 0;
+  return nf(r, d);
+}
+function yScale(min, max, isPct, dec) {
+  const zeroSpan = (min < 0 && max > 0);
+  const d = dec ?? decimalsFor(max - min);
+  return {
+    min, max,
+    grid: {
+      color: ctx => ctx.tick.value === 0 ? '#000' : 'rgba(0,0,0,0.12)',
+      lineWidth: ctx => (zeroSpan && ctx.tick.value === 0) ? 1.2 : 0.5,
+      tickLength: 4, tickColor: '#000', drawTicks: true
+    },
+    border: { color: '#000', width: 0.6 },
+    ticks: { padding: 4, callback: v => fmtTick(v, d) }
+  };
+}
+function yScaleRight(min, max) {
+  return {
+    position: 'right', min, max,
+    grid: { drawOnChartArea: false, tickLength: 4, tickColor: '#000', drawTicks: true },
+    border: { color: '#000', width: 0.6 },
+    ticks: { display: true, padding: 4, callback: () => '' }
+  };
+}
+const xScaleFIN = {
+  grid: { display: false, drawTicks: false },
+  border: { color: '#000', width: 0.6 },
+  ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 9, padding: 5 }
+};
+
+function lineDs(label, data, color, opts = {}) {
+  return {
+    label, data, borderColor: color, backgroundColor: 'transparent',
+    borderWidth: 2, pointRadius: 0, pointHoverRadius: 3, tension: 0.2,
+    borderCapStyle: 'round', spanGaps: false, ...opts
+  };
+}
+
+function makeLine(id, labels, datasets, { isPct = true, boundary = null, legend = false } = {}) {
+  const r = dataRange(datasets.map(d => d.data));
+  const dec = Math.max(decimalsFor(r.max - r.min), isPct ? 1 : 2);
+  const c = new Chart(document.getElementById(id), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: legend, position: 'bottom' },
+        tooltip: {
+          backgroundColor: FIN.darkblue, padding: 10, titleFont: { weight: '700' },
+          callbacks: { label: it => `${it.dataset.label}: ${nf(it.parsed.y, dec)}${isPct ? ' %' : ''}` }
+        }
+      },
+      scales: { x: xScaleFIN, y: yScale(r.min, r.max, isPct, dec), y1: yScaleRight(r.min, r.max) }
+    }
+  });
+  if (boundary != null) c.$boundary = boundary;
+  return c;
+}
+
+function makeStacked(id, labels, datasets, { max = null, legend = true } = {}) {
+  let yopts;
+  if (max != null) {
+    yopts = { min: 0, max,
+      grid: { color: 'rgba(0,0,0,0.12)', tickLength: 4, tickColor: '#000' },
+      border: { color: '#000', width: 0.6 }, stacked: true,
+      ticks: { padding: 4, callback: v => fmtTick(v, 0) } };
+  } else {
+    // negativ/positiv (historisk dekomponering)
+    let lo = 0, hi = 0;
+    for (let i = 0; i < labels.length; i++) {
+      let p = 0, n = 0;
+      datasets.forEach(d => { const v = d.data[i] || 0; if (v >= 0) p += v; else n += v; });
+      hi = Math.max(hi, p); lo = Math.min(lo, n);
+    }
+    const pad = (hi - lo) * 0.08 || 1;
+    yopts = { min: lo - pad, max: hi + pad, stacked: true,
+      grid: { color: ctx => ctx.tick.value === 0 ? '#000' : 'rgba(0,0,0,0.12)',
+              lineWidth: ctx => ctx.tick.value === 0 ? 1.2 : 0.5, tickLength: 4, tickColor: '#000' },
+      border: { color: '#000', width: 0.6 }, ticks: { padding: 4, callback: v => fmtTick(v, 1) } };
+  }
+  return new Chart(document.getElementById(id), {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: legend, position: 'bottom', labels: { font: { size: 10.5 } } },
+        tooltip: {
+          backgroundColor: FIN.darkblue, padding: 10,
+          callbacks: { label: it => `${it.dataset.label}: ${nf(it.parsed.y, max != null ? 1 : 2)}${max != null ? ' %' : ''}` }
+        }
+      },
+      scales: {
+        x: { stacked: true, grid: { display: false, drawTicks: false }, border: { color: '#000', width: 0.6 },
+             ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 10 } },
+        y: yopts
+      }
+    }
+  });
+}
+
+// ════════════ Header-meta ════════════
+(function initMeta() {
+  document.getElementById('meta-last').textContent = fmtQlong(META.last_obs_date);
+  const eig = META.eig_max || 0;
+  const stable = eig < 1.0;
+  document.getElementById('meta-stab').textContent =
+    stable ? 'Modellen er stabil' : 'Ustabil løsning';
+  if (!stable) document.getElementById('stab-dot').style.background = FIN.red;
+})();
+
+// ════════════ Fanenavigasjon (med tastatur) ════════════
 const chartInited = {};
-document.querySelectorAll('nav button').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    const tab = btn.dataset.tab;
-    document.getElementById('pane-' + tab).classList.add('active');
-    if (!chartInited[tab]) { initTab(tab); chartInited[tab] = true; }
+const tabButtons = Array.from(document.querySelectorAll('nav.tabs button'));
+function selectTab(tab) {
+  tabButtons.forEach(b => {
+    const on = b.dataset.tab === tab;
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+  document.getElementById('pane-' + tab).classList.add('active');
+  if (!chartInited[tab]) { initTab(tab); chartInited[tab] = true; }
+}
+tabButtons.forEach((btn, idx) => {
+  btn.addEventListener('click', () => selectTab(btn.dataset.tab));
+  btn.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const dir = e.key === 'ArrowRight' ? 1 : -1;
+      const next = tabButtons[(idx + dir + tabButtons.length) % tabButtons.length];
+      next.focus(); selectTab(next.dataset.tab);
+    }
   });
 });
 
-// ── Oversikt stats ────────────────────────────────────────────────────────────
+// ════════════ PNG-nedlasting ════════════
+const chartReg = {};
+document.querySelectorAll('.pngbtn').forEach(b => {
+  b.addEventListener('click', () => {
+    const ch = chartReg[b.dataset.png];
+    if (!ch) return;
+    const a = document.createElement('a');
+    a.href = ch.toBase64Image('image/png', 1);
+    a.download = 'nemo_' + b.dataset.name + '.png';
+    a.click();
+  });
+});
+
+// ════════════ OVERSIKT ════════════
 function initOversikt() {
-  const lastY = HIST_LEVEL.y?.at(-1);
-  const lastPi = HIST_LEVEL.pi?.at(-1);
-  const lastI  = HIST_LEVEL.i?.at(-1);
-  const lastRer = HIST_LEVEL.rer?.at(-1);
-  const stats = [
-    { val: lastY  != null ? lastY.toFixed(2)+'%'  : '—', lbl: 'BNP-gap (siste)' },
-    { val: lastPi != null ? lastPi.toFixed(2)+'%' : '—', lbl: 'KPI-inflasjon (siste)' },
-    { val: lastI  != null ? lastI.toFixed(2)+'%'  : '—', lbl: 'Styringsrente (siste)' },
-    { val: lastRer!= null ? lastRer.toFixed(3)    : '—', lbl: 'NOK/EUR (siste)' },
-    { val: (META.eig_max||0).toFixed(4), lbl: 'max|eig(T)|' },
+  // KPI-kort
+  const kpis = [
+    { key: 'y',  lbl: 'BNP-gap',       unit: '%' },
+    { key: 'pi', lbl: 'KPI-inflasjon', unit: '%' },
+    { key: 'i',  lbl: 'Styringsrente', unit: '%' },
+    { key: 'rer',lbl: 'Valutakurs',    unit: '' },
   ];
-  const row = document.getElementById('stat-row');
-  row.innerHTML = stats.map(s =>
-    `<div class="stat"><div class="val">${s.val}</div><div class="lbl">${s.lbl}</div></div>`
-  ).join('');
+  const row = document.getElementById('kpi-row');
+  row.innerHTML = kpis.map(k => {
+    const arr = HIST_LEVEL[k.key] || [];
+    const last = arr.length ? arr[arr.length - 1] : null;
+    const prev = arr.length > 1 ? arr[arr.length - 2] : null;
+    const delta = (last != null && prev != null) ? last - prev : null;
+    const deltaTxt = delta == null ? '' :
+      `Endring fra forrige kvartal: ${delta >= 0 ? '+' : '−'}${nf(Math.abs(delta), 2)}`;
+    return `<div class="kpi">
+      <div class="lbl">${k.lbl}</div>
+      <div class="val">${nf(last, k.unit ? 1 : 2)}<span class="unit">${k.unit ? ' ' + k.unit : ''}</span></div>
+      <div class="delta">${deltaTxt}</div>
+    </div>`;
+  }).join('');
 
   const hl = histLabels(), fl = fcstLabels();
-  const combLabels = [...hl, ...fl];
+  const comb = [...hl, ...fl];
   const gap = Array(hl.length).fill(null);
+  const bnd = hl.length - 0.5;
 
-  function ovChart(id, histKey, fcstKey, fcstBlKey) {
-    const hd = HIST_LEVEL[histKey] || [];
-    const fd = FCST_LEVEL[fcstKey] || [];
-    const fb = FCST_LEVEL[fcstBlKey] || [];
-    const datasets = [
-      lineDs('Historisk', hd, '#2563eb'),
-      lineDs('Prognose', [...gap, ...fd], '#dc2626', { borderDash: [4,3] }),
+  function ov(id, key) {
+    const hist = HIST_LEVEL[key] || [];
+    const fc = FCST_LEVEL[key] || [];
+    const ds = [
+      lineDs('Historikk', hist, FIN.darkblue),
+      lineDs('Anslag', [...gap, ...fc], FIN.blue, { borderDash: [5, 4] }),
     ];
-    if (fb.length) datasets.push(lineDs('Betinget', [...gap, ...fb], '#16a34a', { borderDash: [2,2] }));
-    makeChart(id, 'line', combLabels, datasets);
+    chartReg[id] = makeLine(id, comb, ds, { boundary: bnd });
   }
-  ovChart('ov-bnp',   'y',  'y',  'y_bl');
-  ovChart('ov-pi',    'pi', 'pi', 'pi_bl');
-  ovChart('ov-rente', 'i',  'i',  'i_bl');
-  makeChart('ov-rer', 'line', hl, [lineDs('NOK/EUR', HIST_LEVEL.rer || [], '#7c3aed')]);
+  ov('ov-bnp', 'y');
+  ov('ov-pi', 'pi');
+  ov('ov-rente', 'i');
+  chartReg['ov-rer'] = makeLine('ov-rer', hl, [lineDs('Valutakurs', HIST_LEVEL.rer || [], FIN.darkblue)], { isPct: false });
 }
-
-// Oversikt initieres med én gang (aktiv fane ved start)
 initOversikt();
 chartInited['oversikt'] = true;
 
-// ── IRF ───────────────────────────────────────────────────────────────────────
-const irfCharts = {};
+// ════════════ IRF ════════════
 function initIRF() {
   const sel = document.getElementById('irf-shock');
-  SHOCKS.forEach((s,i) => {
-    const opt = document.createElement('option'); opt.value = s; opt.textContent = s; sel.appendChild(opt);
+  Object.keys(IRF_DATA).forEach(s => {
+    const o = document.createElement('option'); o.value = s; o.textContent = s; sel.appendChild(o);
   });
+  const hr = document.getElementById('irf-horizon');
+  const hl = document.getElementById('irf-horizon-label');
+  const sub = document.getElementById('irf-bnp-sub');
 
-  const hlabel = document.getElementById('irf-horizon-label');
-  const hrange = document.getElementById('irf-horizon');
-  hlabel.textContent = hrange.value + 'Q';
-
-  const irfVarMap = [
-    { id: 'irf-bnp',   key: 'BNP-gap' },
-    { id: 'irf-pi',    key: 'KPI-inflasjon' },
-    { id: 'irf-rente', key: 'Styringsrente' },
-    { id: 'irf-rer',   key: 'RER-gap' },
-    { id: 'irf-bolig', key: 'Boligpris-gap' },
-  ];
-
-  function updateIRF() {
-    const shock = sel.value;
-    const h     = parseInt(hrange.value);
-    hlabel.textContent = h + 'Q';
-    const labels = Array.from({length: h}, (_,i) => `Q${i+1}`);
-    irfVarMap.forEach(({id, key}) => {
+  function update() {
+    const shock = sel.value, h = parseInt(hr.value);
+    hl.textContent = h + 'K';
+    sub.textContent = 'Respons på: ' + shock + '. Prosent.';
+    const labels = Array.from({ length: h }, (_, i) => 'K' + (i + 1));
+    IRF_VARMAP.forEach(({ id, key }) => {
       const vals = (IRF_DATA[shock]?.[key] || []).slice(0, h);
-      const color = COLORS[SHOCKS.indexOf(shock) % COLORS.length];
-      if (irfCharts[id]) {
-        irfCharts[id].data.labels = labels;
-        irfCharts[id].data.datasets[0].data = vals;
-        irfCharts[id].data.datasets[0].borderColor = color;
-        irfCharts[id].update();
+      if (chartReg[id]) {
+        chartReg[id].data.labels = labels;
+        chartReg[id].data.datasets[0].data = vals;
+        chartReg[id].update();
       } else {
-        irfCharts[id] = makeChart(id, 'line', labels, [lineDs(shock, vals, color)]);
+        chartReg[id] = makeLine(id, labels, [lineDs(shock, vals, FIN.darkblue)]);
       }
     });
   }
-
-  sel.addEventListener('change', updateIRF);
-  hrange.addEventListener('input', updateIRF);
-  updateIRF();
+  sel.addEventListener('change', update);
+  hr.addEventListener('input', update);
+  update();
 }
 
-// ── FEVD ──────────────────────────────────────────────────────────────────────
-let fevdBarChart = null;
+// ════════════ FEVD ════════════
 function initFEVD() {
-  const sel  = document.getElementById('fevd-var');
-  const hRange = document.getElementById('fevd-horizon');
-  const hLabel = document.getElementById('fevd-horizon-label');
-  const hTblH  = document.getElementById('fevd-tbl-h');
-
+  const sel = document.getElementById('fevd-var');
+  const hr = document.getElementById('fevd-horizon');
+  const hlab = document.getElementById('fevd-horizon-label');
   Object.keys(FEVD_DATA).forEach(vn => {
-    const opt = document.createElement('option');
-    opt.value = vn; opt.textContent = FEVD_LABELS[vn] || vn;
-    sel.appendChild(opt);
+    const o = document.createElement('option'); o.value = vn; o.textContent = FEVD_LABELS[vn] || vn; sel.appendChild(o);
   });
 
-  hLabel.textContent = hRange.value + 'Q';
-
-  function buildFEVDTable(vn, h) {
-    const vdata = FEVD_DATA[vn] || {};
-    const shocks = Object.keys(vdata);
-    let html = '<table><thead><tr><th>Sjokk</th><th class="num">h=1</th><th class="num">h=4</th><th class="num">h=8</th><th class="num">h='+h+'</th></tr></thead><tbody>';
+  function table(vn, h) {
+    const v = FEVD_DATA[vn] || {};
+    const shocks = Object.keys(v);
+    let html = `<table class="fin"><thead><tr><th>Sjokk</th><th class="num">h=1</th><th class="num">h=4</th><th class="num">h=8</th><th class="num">h=${h}</th></tr></thead><tbody>`;
     shocks.forEach(s => {
-      const v = vdata[s];
-      html += `<tr><td>${s}</td>
-        <td class="num">${(v[0]||0).toFixed(1)}%</td>
-        <td class="num">${(v[3]||0).toFixed(1)}%</td>
-        <td class="num">${(v[7]||0).toFixed(1)}%</td>
-        <td class="num">${(v[h-1]||0).toFixed(1)}%</td>
-      </tr>`;
+      const a = v[s];
+      html += `<tr><td><span class="swatch" style="background:${SHOCK_COLOR[s]}"></span>${s}</td>
+        <td class="num">${nf(a[0] || 0, 1)} %</td>
+        <td class="num">${nf(a[3] || 0, 1)} %</td>
+        <td class="num">${nf(a[7] || 0, 1)} %</td>
+        <td class="num">${nf(a[h - 1] || 0, 1)} %</td></tr>`;
     });
     html += '</tbody></table>';
     document.getElementById('fevd-table-wrap').innerHTML = html;
   }
 
-  function updateFEVD() {
-    const vn = sel.value;
-    const h  = parseInt(hRange.value);
-    hLabel.textContent = h + 'Q';
-    hTblH.textContent  = h;
-    const vdata = FEVD_DATA[vn] || {};
-    const shocks = Object.keys(vdata);
-    const labels = Array.from({length: h}, (_,i) => `Q${i+1}`);
-    const datasets = shocks.map((s, i) => ({
-      label: s,
-      data: vdata[s].slice(0, h),
-      backgroundColor: COLORS[i % COLORS.length] + 'cc',
-      borderColor: COLORS[i % COLORS.length],
-      borderWidth: 1,
+  function update() {
+    const vn = sel.value, h = parseInt(hr.value);
+    hlab.textContent = h + 'K';
+    const v = FEVD_DATA[vn] || {};
+    const shocks = Object.keys(v);
+    const labels = Array.from({ length: h }, (_, i) => 'K' + (i + 1));
+    const ds = shocks.map(s => ({
+      label: s, data: v[s].slice(0, h),
+      backgroundColor: SHOCK_COLOR[s], borderColor: '#fff', borderWidth: 0.5
     }));
-    if (fevdBarChart) {
-      fevdBarChart.data.labels = labels;
-      fevdBarChart.data.datasets = datasets;
-      fevdBarChart.update();
+    if (chartReg['fevd-bar']) {
+      chartReg['fevd-bar'].data.labels = labels;
+      chartReg['fevd-bar'].data.datasets = ds;
+      chartReg['fevd-bar'].update();
     } else {
-      fevdBarChart = makeChart('fevd-bar', 'bar', labels, datasets, {
-        plugins: { legend: { display: true, position: 'bottom', labels: { font: { size: 11 } } } },
-        scales: { x: { stacked: true }, y: { stacked: true, max: 100 } }
-      });
+      chartReg['fevd-bar'] = makeStacked('fevd-bar', labels, ds, { max: 100, legend: true });
     }
-    buildFEVDTable(vn, h);
+    table(vn, h);
   }
-
-  sel.addEventListener('change', updateFEVD);
-  hRange.addEventListener('input', updateFEVD);
-  updateFEVD();
+  sel.addEventListener('change', update);
+  hr.addEventListener('input', update);
+  update();
 }
 
-// ── Historikk ────────────────────────────────────────────────────────────────
-let histLevelChart = null, histDecompChart = null;
+// ════════════ HISTORIKK ════════════
 function initHistorikk() {
   const sel = document.getElementById('hist-var');
-  const varKeys = Object.keys(HIST_LABELS);
-  varKeys.forEach(k => {
-    const opt = document.createElement('option');
-    opt.value = k; opt.textContent = HIST_LABELS[k]; sel.appendChild(opt);
+  Object.keys(HIST_LABELS).forEach(k => {
+    const o = document.createElement('option'); o.value = k; o.textContent = HIST_LABELS[k]; sel.appendChild(o);
   });
-
   const hl = histLabels();
-  const decompShocks = Object.keys(HIST_DECOMP[varKeys[0]] || {});
 
-  function buildLegend() {
-    const legend = document.getElementById('hist-decomp-legend');
-    legend.innerHTML = decompShocks.map((s,i) =>
-      `<div class="legend-item"><div class="legend-dot" style="background:${COLORS[i%COLORS.length]}"></div>${s}</div>`
-    ).join('');
-  }
-  buildLegend();
-
-  function updateHistorikk() {
+  function update() {
     const vk = sel.value;
-    const levelData = HIST_LEVEL[vk] || [];
+    document.getElementById('hist-level-title').textContent = 'Observert nivå: ' + HIST_LABELS[vk];
+    const level = HIST_LEVEL[vk] || [];
+    const isP = vk !== 'rer';
 
-    if (histLevelChart) {
-      histLevelChart.data.datasets[0].data = levelData;
-      histLevelChart.update();
-    } else {
-      histLevelChart = makeChart('hist-level-chart', 'line', hl,
-        [lineDs(HIST_LABELS[vk], levelData, '#2563eb')]
-      );
+    if (chartReg['hist-level-chart']) {
+      chartReg['hist-level-chart'].destroy();
     }
+    chartReg['hist-level-chart'] = makeLine('hist-level-chart', hl,
+      [lineDs(HIST_LABELS[vk], level, FIN.darkblue)], { isPct: isP });
 
     const decomp = HIST_DECOMP[vk] || {};
     const dShocks = Object.keys(decomp);
-    // Dekomposisjon har T-1 perioder (index 1..T)
-    const dLabels = hl.slice(1);
-    const datasets = dShocks.map((s, i) => ({
-      label: s,
-      data: decomp[s],
-      backgroundColor: COLORS[i % COLORS.length] + 'aa',
-      borderColor: COLORS[i % COLORS.length],
-      borderWidth: 1,
-    }));
+    const legendEl = document.getElementById('hist-decomp-legend');
 
-    if (histDecompChart) {
-      histDecompChart.data.labels = dLabels;
-      histDecompChart.data.datasets = datasets;
-      histDecompChart.update();
-    } else {
-      histDecompChart = makeChart('hist-decomp-chart', 'bar', dLabels, datasets, {
-        plugins: { legend: { display: false } },
-        scales: { x: { stacked: true }, y: { stacked: true } }
-      });
+    if (chartReg['hist-decomp-chart']) chartReg['hist-decomp-chart'].destroy();
+
+    if (dShocks.length === 0) {
+      legendEl.innerHTML = '';
+      const cv = document.getElementById('hist-decomp-chart');
+      const wrap = cv.parentElement;
+      wrap.innerHTML = '<div class="empty">Ingen dekomponering tilgjengelig for denne variabelen.</div>';
+      return;
     }
+    // gjenopprett canvas hvis tidligere tomt
+    const wrap = document.getElementById('hist-decomp-chart')?.parentElement
+              || document.querySelector('#pane-historikk .chart-wrap-tall:last-of-type');
+    if (!document.getElementById('hist-decomp-chart')) {
+      wrap.innerHTML = '<canvas id="hist-decomp-chart"></canvas>';
+    }
+    const dLabels = hl.slice(1);
+    const ds = dShocks.map(s => ({
+      label: s, data: decomp[s], backgroundColor: SHOCK_COLOR[s], borderColor: '#fff', borderWidth: 0.4
+    }));
+    chartReg['hist-decomp-chart'] = makeStacked('hist-decomp-chart', dLabels, ds, { max: null, legend: false });
+    legendEl.innerHTML = dShocks.map(s =>
+      `<span><span class="swatch" style="background:${SHOCK_COLOR[s]}"></span>${s}</span>`).join('');
   }
-
-  sel.addEventListener('change', updateHistorikk);
-  updateHistorikk();
+  sel.addEventListener('change', update);
+  update();
 }
 
-// ── Prognose ──────────────────────────────────────────────────────────────────
+// ════════════ PROGNOSE ════════════
 function initPrognose() {
-  const fl = fcstLabels();
-  function fcstChart(id, histKey, fcstKey, fcstBlKey) {
-    const hd = HIST_LEVEL[histKey] || [];
-    const fd = FCST_LEVEL[fcstKey] || [];
-    const fb = FCST_LEVEL[fcstBlKey] || [];
-    const hl = histLabels();
-    const gap = Array(hl.length).fill(null);
-    const combLabels = [...hl, ...fl];
-    const datasets = [
-      lineDs('Historisk', hd, '#2563eb'),
-      lineDs('Ubetinget', [...gap, ...fd], '#dc2626', { borderDash: [4,3] }),
+  const hl = histLabels(), fl = fcstLabels();
+  const gap = Array(hl.length).fill(null);
+  const comb = [...hl, ...fl];
+  const bnd = hl.length - 0.5;
+
+  function fc(id, key) {
+    const hist = HIST_LEVEL[key] || [];
+    const ub = FCST_LEVEL[key] || [];
+    const bl = FCST_LEVEL[key + '_bl'] || [];
+    const ds = [
+      lineDs('Historikk', hist, FIN.darkblue),
+      lineDs('Ubetinget', [...gap, ...ub], FIN.blue, { borderDash: [5, 4] }),
     ];
-    if (fb.length) datasets.push(lineDs('Betinget', [...gap, ...fb], '#16a34a', { borderDash: [2,2] }));
-    makeChart(id, 'line', combLabels, datasets, {
-      plugins: { legend: { display: true, position: 'bottom', labels: { font: { size: 11 } } } }
-    });
+    if (bl.length) ds.push(lineDs('Betinget', [...gap, ...bl], FIN.tealDark, { borderDash: [2, 3] }));
+    chartReg[id] = makeLine(id, comb, ds, { boundary: bnd });
   }
+  fc('fcst-bnp', 'y');
+  fc('fcst-pi', 'pi');
+  fc('fcst-rente', 'i');
 
-  fcstChart('fcst-bnp',   'y',  'y',  'y_bl');
-  fcstChart('fcst-pi',    'pi', 'pi', 'pi_bl');
-  fcstChart('fcst-rente', 'i',  'i',  'i_bl');
-  makeChart('fcst-rer', 'line', histLabels(),
-    [lineDs('NOK/EUR', HIST_LEVEL.rer || [], '#7c3aed')]
-  );
-
-  // Aktive sjokk (bar)
-  const snames = Object.keys(ACTIVE_SHOCKS);
-  const svals  = snames.map(s => ACTIVE_SHOCKS[s]);
-  makeChart('fcst-shocks', 'bar', snames,
-    [{ label: 'Stdav', data: svals,
-       backgroundColor: svals.map(v => v >= 0 ? '#2563eb88' : '#dc262688'),
-       borderColor: svals.map(v => v >= 0 ? '#2563eb' : '#dc2626'),
-       borderWidth: 1 }],
-    { plugins: { legend: { display: false } } }
-  );
+  // Aktive sjokk (divergerende: bla opp, rod ned)
+  const names = Object.keys(ACTIVE_SHOCKS);
+  const vals = names.map(n => ACTIVE_SHOCKS[n]);
+  chartReg['fcst-shocks'] = new Chart(document.getElementById('fcst-shocks'), {
+    type: 'bar',
+    data: { labels: names, datasets: [{
+      label: 'Standardavvik', data: vals,
+      backgroundColor: vals.map(v => v >= 0 ? FIN.darkblue : FIN.red),
+      borderWidth: 0
+    }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor: FIN.darkblue, padding: 10,
+          callbacks: { label: it => nf(it.parsed.y, 2) + ' std.avvik' } }
+      },
+      scales: {
+        x: { grid: { display: false, drawTicks: false }, border: { color: '#000', width: 0.6 },
+             ticks: { maxRotation: 40, minRotation: 0, font: { size: 10 } } },
+        y: { grid: { color: ctx => ctx.tick.value === 0 ? '#000' : 'rgba(0,0,0,0.12)',
+                     lineWidth: ctx => ctx.tick.value === 0 ? 1.2 : 0.5, tickLength: 4, tickColor: '#000' },
+             border: { color: '#000', width: 0.6 }, ticks: { padding: 4, callback: v => fmtTick(v, 1) } }
+      }
+    }
+  });
 }
 
-// ── Diagnostikk ───────────────────────────────────────────────────────────────
+// ════════════ DIAGNOSTIKK ════════════
 function initDiagnostikk() {
+  const eig = META.eig_max || 0;
   const stats = [
-    { val: (META.eig_max||0).toFixed(4), lbl: 'max|eig(T)| (stabil < 1)' },
-    { val: META.n_states||'?', lbl: 'Antall tilstandsvar. (NZ)' },
-    { val: META.n_shocks||'?', lbl: 'Antall sjokk (NE)' },
-    { val: META.last_obs_date||'—', lbl: 'Siste obs. dato' },
+    { val: nf(eig, 4), lbl: 'Maks |egenverdi| (stabil < 1)' },
+    { val: META.n_states ?? '–', lbl: 'Tilstandsvariabler (NZ)' },
+    { val: META.n_shocks ?? '–', lbl: 'Strukturelle sjokk (NE)' },
+    { val: fmtQ(META.last_obs_date) || '–', lbl: 'Siste observasjon' },
   ];
   document.getElementById('diag-stats').innerHTML = stats.map(s =>
-    `<div class="stat"><div class="val">${s.val}</div><div class="lbl">${s.lbl}</div></div>`
-  ).join('');
+    `<div class="diag"><div class="val">${s.val}</div><div class="lbl">${s.lbl}</div></div>`).join('');
 
-  function doughnutFEVD(id, vn, h) {
-    const vdata = FEVD_DATA[vn] || {};
-    const shocks = Object.keys(vdata);
-    const vals = shocks.map(s => vdata[s][h-1] || 0);
-    const ctx = document.getElementById(id).getContext('2d');
-    new Chart(ctx, {
+  function donut(id, vn) {
+    const v = FEVD_DATA[vn] || {};
+    const shocks = Object.keys(v);
+    if (!shocks.length) return;
+    const vals = shocks.map(s => v[s][7] || 0);
+    new Chart(document.getElementById(id), {
       type: 'doughnut',
-      data: {
-        labels: shocks,
-        datasets: [{ data: vals, backgroundColor: COLORS.slice(0, shocks.length) }]
-      },
+      data: { labels: shocks, datasets: [{
+        data: vals, backgroundColor: shocks.map(s => SHOCK_COLOR[s]),
+        borderColor: '#fff', borderWidth: 1.5
+      }] },
       options: {
-        responsive: true, maintainAspectRatio: false,
+        responsive: true, maintainAspectRatio: false, cutout: '58%',
         plugins: {
-          legend: { display: true, position: 'right', labels: { font: { size: 11 } } },
-          tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed.toFixed(1)}%` } }
+          legend: { position: 'right', labels: { font: { size: 10.5 }, padding: 8 } },
+          tooltip: { backgroundColor: FIN.darkblue, padding: 10,
+            callbacks: { label: it => `${it.label}: ${nf(it.parsed, 1)} %` } }
         }
       }
     });
   }
-
-  doughnutFEVD('diag-fevd-bnp', 'bnp', 8);
-  doughnutFEVD('diag-fevd-rer', 'rer', 8);
+  donut('diag-fevd-bnp', 'bnp');
+  donut('diag-fevd-rer', 'rer');
 }
 
-// ── Tab-init router ───────────────────────────────────────────────────────────
 function initTab(tab) {
-  if (tab === 'irf')         initIRF();
-  else if (tab === 'fevd')   initFEVD();
+  if (tab === 'irf') initIRF();
+  else if (tab === 'fevd') initFEVD();
   else if (tab === 'historikk') initHistorikk();
-  else if (tab === 'prognose')  initPrognose();
+  else if (tab === 'prognose') initPrognose();
   else if (tab === 'diagnostikk') initDiagnostikk();
 }
 </script>
