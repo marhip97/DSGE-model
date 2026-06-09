@@ -340,21 +340,26 @@ ren `nemo.analysis`-pakke.
   produserer samme struktur som det gamle `analyse_resultater.json`
 - [x] Alle 121 tester passerer (+ 3 xfailed)
 
-## Fase 4 — Dashboard (kun NEMO)
+## Fase 4 — Dashboard (kun NEMO) ✅
+
+**Avsluttet 2026-06-09.**
 
 **Mål:** HTML-dashboard som viser IRF, FEVD, prognose, historisk
 dekomposisjon. Ingen kryssjekk.
 
 **Leveranser:**
-- [ ] `src/nemo/dashboard/templates/dashboard.html`
-- [ ] `src/nemo/dashboard/build.py` — fyller template fra `analyse.json`
-- [ ] Faner: Oversikt | IRF | FEVD | Historikk | Prognose | Diagnostikk
-- [ ] Bruke visualization-design skill for figurene
+- [x] `src/nemo/dashboard/templates/dashboard.html` — selvforsynt HTML med inline Chart.js-data
+- [x] `src/nemo/dashboard/build.py` — fyller template fra `analyse.json`
+- [x] `src/nemo/dashboard/__init__.py`
+- [x] `tests/test_dashboard.py` — 4 røyktester
+- [x] Faner: Oversikt | IRF | FEVD | Historikk | Prognose | Diagnostikk
 
 **Akseptansekriterier:**
-- Statisk HTML, ingen serverside-avhengighet
-- Funker offline (alle data inline)
-- Responsiv: leselig på mobil
+- [x] Statisk HTML, ingen serverside-avhengighet
+- [x] Alle data inline (Chart.js lastes via CDN, data embedded)
+- [x] Responsiv: CSS grid med mobile breakpoints
+- [x] `python -m nemo.dashboard.build --input ... --output dashboard.html`
+- [x] 125 tester passerer (+ 3 xfailed)
 
 ## Fase 5 — Realtid og nowcast
 

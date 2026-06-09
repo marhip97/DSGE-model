@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEMO — Norsk makroøkonomisk modell</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:       #f8fafc;
+    --surface:  #ffffff;
+    --border:   #e2e8f0;
+    --text:     #1e293b;
+    --muted:    #64748b;
+    --accent:   #2563eb;
+    --tab-h:    44px;
+    --radius:   8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+  /* ── Header ── */
+  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; align-items: baseline; gap: 12px; }
+  header h1 { font-size: 18px; font-weight: 700; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  #meta-badge { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+  /* ── Tabs ── */
+  nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; gap: 0; overflow-x: auto; }
+  nav button {
+    background: none; border: none; cursor: pointer; padding: 0 18px;
+    height: var(--tab-h); font-size: 13px; font-weight: 500; color: var(--muted);
+    border-bottom: 3px solid transparent; white-space: nowrap;
+    transition: color .15s, border-color .15s;
+  }
+  nav button.active { color: var(--accent); border-bottom-color: var(--accent); }
+  nav button:hover:not(.active) { color: var(--text); }
+
+  /* ── Main ── */
+  main { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
+
+  /* ── Tab panes ── */
+  .pane { display: none; }
+  .pane.active { display: block; }
+
+  /* ── Grid ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+  @media (max-width: 700px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+  /* ── Card ── */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .card h3 { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 12px; }
+
+  /* ── Controls ── */
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; align-items: center; }
+  .controls label { font-size: 13px; color: var(--muted); }
+  select, input[type=range] { font-size: 13px; border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; background: var(--surface); color: var(--text); cursor: pointer; }
+
+  /* ── Stat tiles ── */
+  .stat-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; min-width: 140px; }
+  .stat .val { font-size: 22px; font-weight: 700; color: var(--accent); }
+  .stat .lbl { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* ── Table ── */
+  .tbl-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 6px 10px; border-bottom: 2px solid var(--border); color: var(--muted); font-weight: 600; white-space: nowrap; }
+  td { padding: 5px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* ── Legend ── */
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); cursor: pointer; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── Canvas containers ── */
+  .chart-wrap { position: relative; height: 220px; }
+  .chart-wrap-tall { position: relative; height: 300px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>NEMO</h1>
+  <span class="sub">Norsk makroøkonomisk modell (kj41)</span>
+  <span id="meta-badge"></span>
+</header>
+
+<nav id="tabs">
+  <button class="active" data-tab="oversikt">Oversikt</button>
+  <button data-tab="irf">IRF</button>
+  <button data-tab="fevd">FEVD</button>
+  <button data-tab="historikk">Historikk</button>
+  <button data-tab="prognose">Prognose</button>
+  <button data-tab="diagnostikk">Diagnostikk</button>
+</nav>
+
+<main>
+
+<!-- ══════════════════════════════════════════════════════
+     OVERSIKT
+═══════════════════════════════════════════════════════ -->
+<div class="pane active" id="pane-oversikt">
+  <div id="stat-row" class="stat-row"></div>
+  <div class="grid-2">
+    <div class="card">
+      <h3>BNP-gap (historisk + prognose)</h3>
+      <div class="chart-wrap"><canvas id="ov-bnp"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>KPI-inflasjon (historisk + prognose)</h3>
+      <div class="chart-wrap"><canvas id="ov-pi"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Styringsrente (historisk + prognose)</h3>
+      <div class="chart-wrap"><canvas id="ov-rente"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Valutakurs NOK/EUR (historisk)</h3>
+      <div class="chart-wrap"><canvas id="ov-rer"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     IRF
+═══════════════════════════════════════════════════════ -->
+<div class="pane" id="pane-irf">
+  <div class="controls">
+    <label>Sjokk:</label>
+    <select id="irf-shock"></select>
+    <label style="margin-left:12px;">Horisonter:</label>
+    <input type="range" id="irf-horizon" min="4" max="20" value="20" step="1">
+    <span id="irf-horizon-label" style="font-size:13px;min-width:24px;"></span>
+  </div>
+  <div class="grid-2">
+    <div class="card"><h3>BNP-gap</h3><div class="chart-wrap"><canvas id="irf-bnp"></canvas></div></div>
+    <div class="card"><h3>KPI-inflasjon</h3><div class="chart-wrap"><canvas id="irf-pi"></canvas></div></div>
+    <div class="card"><h3>Styringsrente</h3><div class="chart-wrap"><canvas id="irf-rente"></canvas></div></div>
+    <div class="card"><h3>RER-gap</h3><div class="chart-wrap"><canvas id="irf-rer"></canvas></div></div>
+    <div class="card"><h3>Boligpris-gap</h3><div class="chart-wrap"><canvas id="irf-bolig"></canvas></div></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     FEVD
+═══════════════════════════════════════════════════════ -->
+<div class="pane" id="pane-fevd">
+  <div class="controls">
+    <label>Variabel:</label>
+    <select id="fevd-var"></select>
+    <label style="margin-left:12px;">Horisont:</label>
+    <input type="range" id="fevd-horizon" min="1" max="20" value="8" step="1">
+    <span id="fevd-horizon-label" style="font-size:13px;min-width:24px;"></span>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <h3>Sjokkandeler (stacked bar)</h3>
+      <div class="chart-wrap-tall"><canvas id="fevd-bar"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Tabell — h=<span id="fevd-tbl-h">8</span></h3>
+      <div class="tbl-wrap" id="fevd-table-wrap"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     HISTORIKK
+═══════════════════════════════════════════════════════ -->
+<div class="pane" id="pane-historikk">
+  <div class="controls">
+    <label>Variabel:</label>
+    <select id="hist-var"></select>
+  </div>
+  <div class="card" style="margin-bottom:20px;">
+    <h3>Observert nivå</h3>
+    <div class="chart-wrap-tall"><canvas id="hist-level-chart"></canvas></div>
+  </div>
+  <div class="card">
+    <h3>Historisk dekomposisjon — sjokk-bidrag</h3>
+    <div class="chart-wrap-tall"><canvas id="hist-decomp-chart"></canvas></div>
+    <div class="legend" id="hist-decomp-legend"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     PROGNOSE
+═══════════════════════════════════════════════════════ -->
+<div class="pane" id="pane-prognose">
+  <div class="grid-2">
+    <div class="card"><h3>BNP-gap (prognose)</h3><div class="chart-wrap"><canvas id="fcst-bnp"></canvas></div></div>
+    <div class="card"><h3>KPI-inflasjon (prognose)</h3><div class="chart-wrap"><canvas id="fcst-pi"></canvas></div></div>
+    <div class="card"><h3>Styringsrente (prognose)</h3><div class="chart-wrap"><canvas id="fcst-rente"></canvas></div></div>
+    <div class="card"><h3>Valutakurs / RER (prognose)</h3><div class="chart-wrap"><canvas id="fcst-rer"></canvas></div></div>
+  </div>
+  <div class="card" style="margin-top:20px;">
+    <h3>Aktive sjokk ved siste kvartal (standardavvik)</h3>
+    <div class="chart-wrap"><canvas id="fcst-shocks"></canvas></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     DIAGNOSTIKK
+═══════════════════════════════════════════════════════ -->
+<div class="pane" id="pane-diagnostikk">
+  <div class="stat-row" id="diag-stats"></div>
+  <div class="grid-2">
+    <div class="card">
+      <h3>FEVD — BNP h=8 (sjokkandeler)</h3>
+      <div class="chart-wrap-tall"><canvas id="diag-fevd-bnp"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>FEVD — RER h=8 (sjokkandeler)</h3>
+      <div class="chart-wrap-tall"><canvas id="diag-fevd-rer"></canvas></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:20px;">
+    <h3>Strukturelle begrensninger (fra Fase 0.5/2)</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Begrensning</th><th>Verdi (kj41)</th><th>NB-referanse</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>sigma_rp dominerer FEVD</td><td>sigma_rp = 0.014</td><td>K&amp;M: 0.006</td></tr>
+          <tr><td>2</td><td>h_c habit persistens (fast)</td><td>0.938</td><td>K&amp;M: 0.65</td></tr>
+          <tr><td>3</td><td>sigma_A svakt identifisert (fast)</td><td>0.006</td><td>K&amp;M: 0.006</td></tr>
+          <tr><td>4</td><td>phi_I1 investeringsrigiditet (fast)</td><td>0.50</td><td>K&amp;M: 4.0</td></tr>
+          <tr><td>5</td><td>COVID-hull i estimering</td><td>2020Q1–2021Q4</td><td>—</td></tr>
+          <tr><td>6</td><td>I_R.q12 feil fortegn</td><td>+0.84 vs NB −0.15</td><td>psi_R=0.949 strukturell</td></tr>
+          <tr><td>7</td><td>phi_O–psi_R korrelasjon</td><td>phi_O=0.15 (fast)</td><td>phi_O∼0.21 fritt</td></tr>
+          <tr><td>8</td><td>FX-premie observasjonsekvivalens</td><td>kj50–52 avsluttet</td><td>14 obs utilstrekkelig</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<script>
+// ── Innebygde data ────────────────────────────────────────────────────────────
+const IRF_DATA         = __IRF_DATA__;
+const FEVD_DATA        = __FEVD_DATA__;
+const HIST_LEVEL       = __HIST_LEVEL_DATA__;
+const HIST_DECOMP      = __HIST_DECOMP_DATA__;
+const FCST_LEVEL       = __FCST_LEVEL_DATA__;
+const ACTIVE_SHOCKS    = __ACTIVE_SHOCKS__;
+const META             = __META_DATA__;
+
+// ── Farger ────────────────────────────────────────────────────────────────────
+const COLORS = ['#2563eb','#16a34a','#dc2626','#d97706','#7c3aed','#0891b2','#be185d','#65a30d'];
+const SHOCKS = Object.keys(IRF_DATA);
+const IRF_VARS = { 'BNP-gap':'bnp', 'KPI-inflasjon':'pi', 'Styringsrente':'rente', 'RER-gap':'rer', 'Boligpris-gap':'bolig' };
+const FEVD_LABELS = { bnp:'BNP-gap', pi:'KPI-inflasjon', rente:'Styringsrente', rer:'RER-gap', bolig:'Boligpris-gap' };
+const HIST_LABELS  = { y:'BNP-gap', pi:'KPI-inflasjon', i:'Styringsrente', rer:'Valutakurs', bolig:'Boligpris-gap' };
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function zeros(n) { return Array(n).fill(0); }
+function makeChart(id, type, labels, datasets, opts={}) {
+  const ctx = document.getElementById(id).getContext('2d');
+  return new Chart(ctx, {
+    type,
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
+      scales: {
+        x: { grid: { color: '#e2e8f0' }, ticks: { font: { size: 11 } } },
+        y: { grid: { color: '#e2e8f0' }, ticks: { font: { size: 11 } } },
+      },
+      ...opts
+    }
+  });
+}
+function lineDs(label, data, color, opts={}) {
+  return { label, data, borderColor: color, backgroundColor: color+'22',
+           borderWidth: 2, pointRadius: 2, tension: 0.3, fill: false, ...opts };
+}
+function barDs(label, data, color) {
+  return { label, data, backgroundColor: color+'cc', borderColor: color, borderWidth: 1 };
+}
+function fmtQ(dateStr) {
+  // '2001-01-01' → '2001Q1'
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  const q = Math.floor(d.getMonth() / 3) + 1;
+  return `${d.getFullYear()}Q${q}`;
+}
+function histLabels() { return (HIST_LEVEL.dates || []).map(fmtQ); }
+function fcstLabels() { return (FCST_LEVEL.dates || []).map(fmtQ); }
+
+// ── Meta-badge ────────────────────────────────────────────────────────────────
+document.getElementById('meta-badge').textContent =
+  `Siste obs: ${META.last_obs_date || '—'} · max|λ| = ${(META.eig_max||0).toFixed(4)} · NZ=${META.n_states||'?'}`;
+
+// ── Tab-navigasjon ────────────────────────────────────────────────────────────
+const chartInited = {};
+document.querySelectorAll('nav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.tab;
+    document.getElementById('pane-' + tab).classList.add('active');
+    if (!chartInited[tab]) { initTab(tab); chartInited[tab] = true; }
+  });
+});
+
+// ── Oversikt stats ────────────────────────────────────────────────────────────
+function initOversikt() {
+  const lastY = HIST_LEVEL.y?.at(-1);
+  const lastPi = HIST_LEVEL.pi?.at(-1);
+  const lastI  = HIST_LEVEL.i?.at(-1);
+  const lastRer = HIST_LEVEL.rer?.at(-1);
+  const stats = [
+    { val: lastY  != null ? lastY.toFixed(2)+'%'  : '—', lbl: 'BNP-gap (siste)' },
+    { val: lastPi != null ? lastPi.toFixed(2)+'%' : '—', lbl: 'KPI-inflasjon (siste)' },
+    { val: lastI  != null ? lastI.toFixed(2)+'%'  : '—', lbl: 'Styringsrente (siste)' },
+    { val: lastRer!= null ? lastRer.toFixed(3)    : '—', lbl: 'NOK/EUR (siste)' },
+    { val: (META.eig_max||0).toFixed(4), lbl: 'max|eig(T)|' },
+  ];
+  const row = document.getElementById('stat-row');
+  row.innerHTML = stats.map(s =>
+    `<div class="stat"><div class="val">${s.val}</div><div class="lbl">${s.lbl}</div></div>`
+  ).join('');
+
+  const hl = histLabels(), fl = fcstLabels();
+  const combLabels = [...hl, ...fl];
+  const gap = Array(hl.length).fill(null);
+
+  function ovChart(id, histKey, fcstKey, fcstBlKey) {
+    const hd = HIST_LEVEL[histKey] || [];
+    const fd = FCST_LEVEL[fcstKey] || [];
+    const fb = FCST_LEVEL[fcstBlKey] || [];
+    const datasets = [
+      lineDs('Historisk', hd, '#2563eb'),
+      lineDs('Prognose', [...gap, ...fd], '#dc2626', { borderDash: [4,3] }),
+    ];
+    if (fb.length) datasets.push(lineDs('Betinget', [...gap, ...fb], '#16a34a', { borderDash: [2,2] }));
+    makeChart(id, 'line', combLabels, datasets);
+  }
+  ovChart('ov-bnp',   'y',  'y',  'y_bl');
+  ovChart('ov-pi',    'pi', 'pi', 'pi_bl');
+  ovChart('ov-rente', 'i',  'i',  'i_bl');
+  makeChart('ov-rer', 'line', hl, [lineDs('NOK/EUR', HIST_LEVEL.rer || [], '#7c3aed')]);
+}
+
+// Oversikt initieres med én gang (aktiv fane ved start)
+initOversikt();
+chartInited['oversikt'] = true;
+
+// ── IRF ───────────────────────────────────────────────────────────────────────
+const irfCharts = {};
+function initIRF() {
+  const sel = document.getElementById('irf-shock');
+  SHOCKS.forEach((s,i) => {
+    const opt = document.createElement('option'); opt.value = s; opt.textContent = s; sel.appendChild(opt);
+  });
+
+  const hlabel = document.getElementById('irf-horizon-label');
+  const hrange = document.getElementById('irf-horizon');
+  hlabel.textContent = hrange.value + 'Q';
+
+  const irfVarMap = [
+    { id: 'irf-bnp',   key: 'BNP-gap' },
+    { id: 'irf-pi',    key: 'KPI-inflasjon' },
+    { id: 'irf-rente', key: 'Styringsrente' },
+    { id: 'irf-rer',   key: 'RER-gap' },
+    { id: 'irf-bolig', key: 'Boligpris-gap' },
+  ];
+
+  function updateIRF() {
+    const shock = sel.value;
+    const h     = parseInt(hrange.value);
+    hlabel.textContent = h + 'Q';
+    const labels = Array.from({length: h}, (_,i) => `Q${i+1}`);
+    irfVarMap.forEach(({id, key}) => {
+      const vals = (IRF_DATA[shock]?.[key] || []).slice(0, h);
+      const color = COLORS[SHOCKS.indexOf(shock) % COLORS.length];
+      if (irfCharts[id]) {
+        irfCharts[id].data.labels = labels;
+        irfCharts[id].data.datasets[0].data = vals;
+        irfCharts[id].data.datasets[0].borderColor = color;
+        irfCharts[id].update();
+      } else {
+        irfCharts[id] = makeChart(id, 'line', labels, [lineDs(shock, vals, color)]);
+      }
+    });
+  }
+
+  sel.addEventListener('change', updateIRF);
+  hrange.addEventListener('input', updateIRF);
+  updateIRF();
+}
+
+// ── FEVD ──────────────────────────────────────────────────────────────────────
+let fevdBarChart = null;
+function initFEVD() {
+  const sel  = document.getElementById('fevd-var');
+  const hRange = document.getElementById('fevd-horizon');
+  const hLabel = document.getElementById('fevd-horizon-label');
+  const hTblH  = document.getElementById('fevd-tbl-h');
+
+  Object.keys(FEVD_DATA).forEach(vn => {
+    const opt = document.createElement('option');
+    opt.value = vn; opt.textContent = FEVD_LABELS[vn] || vn;
+    sel.appendChild(opt);
+  });
+
+  hLabel.textContent = hRange.value + 'Q';
+
+  function buildFEVDTable(vn, h) {
+    const vdata = FEVD_DATA[vn] || {};
+    const shocks = Object.keys(vdata);
+    let html = '<table><thead><tr><th>Sjokk</th><th class="num">h=1</th><th class="num">h=4</th><th class="num">h=8</th><th class="num">h='+h+'</th></tr></thead><tbody>';
+    shocks.forEach(s => {
+      const v = vdata[s];
+      html += `<tr><td>${s}</td>
+        <td class="num">${(v[0]||0).toFixed(1)}%</td>
+        <td class="num">${(v[3]||0).toFixed(1)}%</td>
+        <td class="num">${(v[7]||0).toFixed(1)}%</td>
+        <td class="num">${(v[h-1]||0).toFixed(1)}%</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    document.getElementById('fevd-table-wrap').innerHTML = html;
+  }
+
+  function updateFEVD() {
+    const vn = sel.value;
+    const h  = parseInt(hRange.value);
+    hLabel.textContent = h + 'Q';
+    hTblH.textContent  = h;
+    const vdata = FEVD_DATA[vn] || {};
+    const shocks = Object.keys(vdata);
+    const labels = Array.from({length: h}, (_,i) => `Q${i+1}`);
+    const datasets = shocks.map((s, i) => ({
+      label: s,
+      data: vdata[s].slice(0, h),
+      backgroundColor: COLORS[i % COLORS.length] + 'cc',
+      borderColor: COLORS[i % COLORS.length],
+      borderWidth: 1,
+    }));
+    if (fevdBarChart) {
+      fevdBarChart.data.labels = labels;
+      fevdBarChart.data.datasets = datasets;
+      fevdBarChart.update();
+    } else {
+      fevdBarChart = makeChart('fevd-bar', 'bar', labels, datasets, {
+        plugins: { legend: { display: true, position: 'bottom', labels: { font: { size: 11 } } } },
+        scales: { x: { stacked: true }, y: { stacked: true, max: 100 } }
+      });
+    }
+    buildFEVDTable(vn, h);
+  }
+
+  sel.addEventListener('change', updateFEVD);
+  hRange.addEventListener('input', updateFEVD);
+  updateFEVD();
+}
+
+// ── Historikk ────────────────────────────────────────────────────────────────
+let histLevelChart = null, histDecompChart = null;
+function initHistorikk() {
+  const sel = document.getElementById('hist-var');
+  const varKeys = Object.keys(HIST_LABELS);
+  varKeys.forEach(k => {
+    const opt = document.createElement('option');
+    opt.value = k; opt.textContent = HIST_LABELS[k]; sel.appendChild(opt);
+  });
+
+  const hl = histLabels();
+  const decompShocks = Object.keys(HIST_DECOMP[varKeys[0]] || {});
+
+  function buildLegend() {
+    const legend = document.getElementById('hist-decomp-legend');
+    legend.innerHTML = decompShocks.map((s,i) =>
+      `<div class="legend-item"><div class="legend-dot" style="background:${COLORS[i%COLORS.length]}"></div>${s}</div>`
+    ).join('');
+  }
+  buildLegend();
+
+  function updateHistorikk() {
+    const vk = sel.value;
+    const levelData = HIST_LEVEL[vk] || [];
+
+    if (histLevelChart) {
+      histLevelChart.data.datasets[0].data = levelData;
+      histLevelChart.update();
+    } else {
+      histLevelChart = makeChart('hist-level-chart', 'line', hl,
+        [lineDs(HIST_LABELS[vk], levelData, '#2563eb')]
+      );
+    }
+
+    const decomp = HIST_DECOMP[vk] || {};
+    const dShocks = Object.keys(decomp);
+    // Dekomposisjon har T-1 perioder (index 1..T)
+    const dLabels = hl.slice(1);
+    const datasets = dShocks.map((s, i) => ({
+      label: s,
+      data: decomp[s],
+      backgroundColor: COLORS[i % COLORS.length] + 'aa',
+      borderColor: COLORS[i % COLORS.length],
+      borderWidth: 1,
+    }));
+
+    if (histDecompChart) {
+      histDecompChart.data.labels = dLabels;
+      histDecompChart.data.datasets = datasets;
+      histDecompChart.update();
+    } else {
+      histDecompChart = makeChart('hist-decomp-chart', 'bar', dLabels, datasets, {
+        plugins: { legend: { display: false } },
+        scales: { x: { stacked: true }, y: { stacked: true } }
+      });
+    }
+  }
+
+  sel.addEventListener('change', updateHistorikk);
+  updateHistorikk();
+}
+
+// ── Prognose ──────────────────────────────────────────────────────────────────
+function initPrognose() {
+  const fl = fcstLabels();
+  function fcstChart(id, histKey, fcstKey, fcstBlKey) {
+    const hd = HIST_LEVEL[histKey] || [];
+    const fd = FCST_LEVEL[fcstKey] || [];
+    const fb = FCST_LEVEL[fcstBlKey] || [];
+    const hl = histLabels();
+    const gap = Array(hl.length).fill(null);
+    const combLabels = [...hl, ...fl];
+    const datasets = [
+      lineDs('Historisk', hd, '#2563eb'),
+      lineDs('Ubetinget', [...gap, ...fd], '#dc2626', { borderDash: [4,3] }),
+    ];
+    if (fb.length) datasets.push(lineDs('Betinget', [...gap, ...fb], '#16a34a', { borderDash: [2,2] }));
+    makeChart(id, 'line', combLabels, datasets, {
+      plugins: { legend: { display: true, position: 'bottom', labels: { font: { size: 11 } } } }
+    });
+  }
+
+  fcstChart('fcst-bnp',   'y',  'y',  'y_bl');
+  fcstChart('fcst-pi',    'pi', 'pi', 'pi_bl');
+  fcstChart('fcst-rente', 'i',  'i',  'i_bl');
+  makeChart('fcst-rer', 'line', histLabels(),
+    [lineDs('NOK/EUR', HIST_LEVEL.rer || [], '#7c3aed')]
+  );
+
+  // Aktive sjokk (bar)
+  const snames = Object.keys(ACTIVE_SHOCKS);
+  const svals  = snames.map(s => ACTIVE_SHOCKS[s]);
+  makeChart('fcst-shocks', 'bar', snames,
+    [{ label: 'Stdav', data: svals,
+       backgroundColor: svals.map(v => v >= 0 ? '#2563eb88' : '#dc262688'),
+       borderColor: svals.map(v => v >= 0 ? '#2563eb' : '#dc2626'),
+       borderWidth: 1 }],
+    { plugins: { legend: { display: false } } }
+  );
+}
+
+// ── Diagnostikk ───────────────────────────────────────────────────────────────
+function initDiagnostikk() {
+  const stats = [
+    { val: (META.eig_max||0).toFixed(4), lbl: 'max|eig(T)| (stabil < 1)' },
+    { val: META.n_states||'?', lbl: 'Antall tilstandsvar. (NZ)' },
+    { val: META.n_shocks||'?', lbl: 'Antall sjokk (NE)' },
+    { val: META.last_obs_date||'—', lbl: 'Siste obs. dato' },
+  ];
+  document.getElementById('diag-stats').innerHTML = stats.map(s =>
+    `<div class="stat"><div class="val">${s.val}</div><div class="lbl">${s.lbl}</div></div>`
+  ).join('');
+
+  function doughnutFEVD(id, vn, h) {
+    const vdata = FEVD_DATA[vn] || {};
+    const shocks = Object.keys(vdata);
+    const vals = shocks.map(s => vdata[s][h-1] || 0);
+    const ctx = document.getElementById(id).getContext('2d');
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: shocks,
+        datasets: [{ data: vals, backgroundColor: COLORS.slice(0, shocks.length) }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: true, position: 'right', labels: { font: { size: 11 } } },
+          tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed.toFixed(1)}%` } }
+        }
+      }
+    });
+  }
+
+  doughnutFEVD('diag-fevd-bnp', 'bnp', 8);
+  doughnutFEVD('diag-fevd-rer', 'rer', 8);
+}
+
+// ── Tab-init router ───────────────────────────────────────────────────────────
+function initTab(tab) {
+  if (tab === 'irf')         initIRF();
+  else if (tab === 'fevd')   initFEVD();
+  else if (tab === 'historikk') initHistorikk();
+  else if (tab === 'prognose')  initPrognose();
+  else if (tab === 'diagnostikk') initDiagnostikk();
+}
+</script>
+</body>
+</html>
