@@ -1,0 +1,56 @@
+name: Deploy NEMO Dashboard til GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "data/results/analyse_resultater.json"
+      - "src/nemo/dashboard/**"
+      - ".github/workflows/deploy-dashboard.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sett opp Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Installer avhengigheter
+        run: pip install -e ".[dev]" --quiet
+
+      - name: Bygg dashboard
+        run: |
+          python -m nemo.dashboard.build \
+            --input  data/results/analyse_resultater.json \
+            --output docs/index.html
+
+      - name: Last opp Pages-artefakt
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy til GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
