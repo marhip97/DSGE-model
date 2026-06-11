@@ -16,19 +16,30 @@ from nemo.model.equations import (
     Y, PI, I_R, RER, Q_H,
     E_A, E_C, E_P, E_O, E_Ys, E_rp, E_i, E_H,
     build_matrices_v3,
+    build_matrices_v3_forward,
 )
 from nemo.model.parameters import Parameters as P
 from nemo.solver.blanchard_kahn import solve as bk_solve
 
 logger = logging.getLogger(__name__)
 
+# Legacy-liste beholdt for bakoverkompatibilitet (eksportert via nemo.analysis).
+# Selve innlastingen drives nå av posteriorens egne nøkler, se load_posterior.
 PARAM_NAMES: List[str] = [
     'rho_A', 'rho_C', 'rho_O', 'rho_Ys', 'rho_rp', 'rho_H',
     'sigma_C', 'sigma_O', 'sigma_Ys', 'sigma_rp', 'sigma_i',
     'sigma_P', 'sigma_H', 'psi_R', 'psi_P1', 'psi_Y', 'h_c',
 ]
 
+# ── kj41-kalibrering (referanseestimat) ───────────────────────────────────────
+# kj41 fikserer disse utenfor estimeringen (se mcmc_log.md "kj41", PE-godkjent):
+#   sigma_A=0.006, sigma_rp=0.006 (K&M-verdi, 2026-05-24), phi_PQ=150, lambda_pi4=0.
+# Modellen bygges med build_matrices_v3_forward (NZ=50). Øvrige faste parametere
+# (h_c=0.938, phi_u, kappa_M, phi_O ...) arves fra Parameters-defaultene, identisk
+# med scripts/kj41_fevd_hd.py. Reproduserer data/results/kj41_fevd.json eksakt.
 SIGMA_A_FIXED: float = 0.006
+SIGMA_RP_FIXED: float = 0.006
+PHI_PQ_KJ41: float = 150.0
 
 SHOCK_NAMES: Dict[int, str] = {
     E_A: 'TFP', E_C: 'Konsum', E_P: 'Prismarkup', E_O: 'Oljepris',
@@ -41,48 +52,63 @@ VAR_NAMES: Dict[int, str] = {
 }
 
 
-def load_posterior(json_path: str) -> Tuple[np.ndarray, Dict[int, float], Dict[int, float]]:
+def load_posterior(
+    json_path: str,
+) -> Tuple[Dict[str, float], Dict[int, float], Dict[int, float]]:
     """
     Last posterior-oppsummering fra JSON.
 
+    Drives av posteriorens egne nøkler slik at vilkårlige estimerte parametersett
+    (f.eks. kj41 som estimerer gamma_p/phi_I1/phi_I2/rho_s/phi_H1, men fikserer
+    sigma_rp/h_c) håndteres uten å anta en fast liste. sigma_A og sigma_rp settes
+    til de faste kj41-verdiene uavhengig av hva posterioren inneholder.
+
     Returns:
-        theta_post: parameter-vektor (posterior mean)
-        sigma_vals: sjokk-standardavvik per sjokk-indeks
-        rho_vals:   AR-koeffisienter per sjokk-indeks
+        param_means: {parameternavn: posterior mean} for de estimerte parameterne
+        sigma_vals:  sjokk-standardavvik per sjokk-indeks
+        rho_vals:    AR-koeffisienter per sjokk-indeks
     """
     with open(json_path) as f:
         post = json.load(f)
     summ = post['summary']
-    theta_post = np.array([summ[n]['mean'] for n in PARAM_NAMES])
+    param_means: Dict[str, float] = {n: float(summ[n]['mean']) for n in summ}
 
-    idx = PARAM_NAMES.index
+    def _m(name: str, default: float = 0.0) -> float:
+        return param_means.get(name, default)
 
     sigma_vals: Dict[int, float] = {
         E_A:   SIGMA_A_FIXED,
-        E_C:   float(theta_post[idx('sigma_C')]),
-        E_P:   float(theta_post[idx('sigma_P')]),
-        E_O:   float(theta_post[idx('sigma_O')]),
-        E_Ys:  float(theta_post[idx('sigma_Ys')]),
-        E_rp:  float(theta_post[idx('sigma_rp')]),
-        E_i:   float(theta_post[idx('sigma_i')]),
-        E_H:   float(theta_post[idx('sigma_H')]),
+        E_C:   _m('sigma_C'),
+        E_P:   _m('sigma_P'),
+        E_O:   _m('sigma_O'),
+        E_Ys:  _m('sigma_Ys'),
+        E_rp:  SIGMA_RP_FIXED,
+        E_i:   _m('sigma_i'),
+        E_H:   _m('sigma_H'),
     }
     rho_vals: Dict[int, float] = {
-        E_A:   float(theta_post[idx('rho_A')]),
-        E_C:   float(theta_post[idx('rho_C')]),
+        E_A:   _m('rho_A'),
+        E_C:   _m('rho_C'),
         E_P:   0.0,
-        E_O:   float(theta_post[idx('rho_O')]),
-        E_Ys:  float(theta_post[idx('rho_Ys')]),
-        E_rp:  float(theta_post[idx('rho_rp')]),
+        E_O:   _m('rho_O'),
+        E_Ys:  _m('rho_Ys'),
+        E_rp:  _m('rho_rp'),
         E_i:   0.0,
-        E_H:   float(theta_post[idx('rho_H')]),
+        E_H:   _m('rho_H'),
     }
-    return theta_post, sigma_vals, rho_vals
+    return param_means, sigma_vals, rho_vals
 
 
-def build_estimated_model(theta_post: np.ndarray) -> Tuple[np.ndarray, np.ndarray, bool]:
+def build_estimated_model(
+    param_means: Dict[str, float],
+) -> Tuple[np.ndarray, np.ndarray, bool]:
     """
-    Bygg og løs v3-modellen fra en parameter-vektor.
+    Bygg og løs kj41-modellen fra posteriorens estimerte parametere.
+
+    Setter de estimerte parameterne fra ``param_means`` på en Parameters-subklasse
+    med kj41-kalibreringen (phi_PQ=150, lambda_pi4=0; sigma_A/sigma_rp fikseres i
+    ``load_posterior``), og bygger med build_matrices_v3_forward (NZ=50). Identisk
+    konstruksjon som scripts/kj41_fevd_hd.py — reproduserer kj41_fevd.json eksakt.
 
     Returns:
         T:      tilstandsovergangsmatrise (NZ × NZ)
@@ -90,11 +116,14 @@ def build_estimated_model(theta_post: np.ndarray) -> Tuple[np.ndarray, np.ndarra
         stable: True hvis max|eig(T)| < 1
     """
     class Pt(P):
-        pass
-    for i, name in enumerate(PARAM_NAMES):
-        setattr(Pt, name, float(theta_post[i]))
-    setattr(Pt, 'sigma_A', SIGMA_A_FIXED)
-    G0, G1, Psi, Pi = build_matrices_v3(Pt, theta_H=0.05)
+        phi_PQ = PHI_PQ_KJ41
+
+    p = Pt()
+    for name, value in param_means.items():
+        if hasattr(p, name):
+            setattr(p, name, float(value))
+    p.lambda_pi4 = 0.0
+    G0, G1, Psi, Pi = build_matrices_v3_forward(p, lambda_pi4=0.0)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         T, R, d = bk_solve(G0, G1, Psi, Pi, verbose=False)

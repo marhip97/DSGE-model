@@ -42,7 +42,12 @@ _PI = OBS_NAMES.index('pi_obs')
 _IR = OBS_NAMES.index('i_R_obs')
 _DS = OBS_NAMES.index('ds_obs')
 _DH = OBS_NAMES.index('dh_obs')
-_IR_SCALE = 4.0   # kvartalsnivå → prosent per år
+_IR_SCALE = 4.0   # kvartalsrente → annualisert
+# Observasjonsdataene er demeanede ANDELER (f.eks. i_R_obs+demean ≈ 0,01 per kvartal).
+# Dashbordet og IRF-ene (compute_all_irf ×100) er i PROSENT, så nivåseriene må også
+# skaleres med 100. Styringsrenten annualiseres i tillegg (×4). Uten dette vises
+# f.eks. styringsrenten som «0,0 %» i stedet for «4,0 %» (QA-funn: datastørrelser).
+_PCT = 100.0
 
 
 def _load_demean(data_path: str) -> dict:
@@ -95,11 +100,11 @@ def run(
     """
     if verbose:
         print("Laster posterior...")
-    theta_post, sigma_vals, rho_vals = load_posterior(posterior_path)
+    param_means, sigma_vals, rho_vals = load_posterior(posterior_path)
 
     if verbose:
         print("Bygger og løser modell...")
-    T, R, stable = build_estimated_model(theta_post)
+    T, R, stable = build_estimated_model(param_means)
     if not stable:
         raise RuntimeError("Modellen er ikke stabil — sjekk parametere.")
     eig_max = float(np.abs(np.linalg.eigvals(T)).max())
@@ -119,8 +124,27 @@ def run(
     if verbose:
         print("\nLaster data og kjører Kalman-filter...")
     obs_df = pd.read_csv(data_path, index_col=0, parse_dates=True)
-    obs_pre  = obs_df[obs_df.index <= '2019-12-31'][OBS_NAMES]
-    obs_post = obs_df[obs_df.index >= '2022-01-01'][OBS_NAMES]
+    # kj41 estimerte på kjerne-KPI (pi_core_obs) i PI-observasjonsraden — bruk samme
+    # serie her slik at Kalman-filter og historisk dekomposisjon er konsistent med
+    # estimeringen. Samme posisjon (indeks 5) som pi_obs, så H-matrisen treffer riktig.
+    obs_cols = [
+        'pi_core_obs' if c == 'pi_obs' and 'pi_core_obs' in obs_df.columns else c
+        for c in OBS_NAMES
+    ]
+    obs_pre  = obs_df[obs_df.index <= '2019-12-31'][obs_cols]
+    obs_post = obs_df[obs_df.index >= '2022-01-01'][obs_cols]
+
+    # Trim haleskvartaler der HELE observasjonsraden mangler. Forecast-origo må være
+    # et faktisk observert kvartal; ellers blir siste Kalman-innovasjon ≈ 0, og den
+    # betingede prognosen blir identisk med den ubetingede (jf. QA-funn A).
+    def _drop_trailing_allnan(frame: pd.DataFrame) -> pd.DataFrame:
+        valid = ~frame.isna().all(axis=1)
+        if valid.any():
+            last = int(np.where(valid.values)[0][-1])
+            return frame.iloc[:last + 1]
+        return frame
+    obs_post = _drop_trailing_allnan(obs_post)
+
     Y_comb   = np.concatenate([obs_pre.values, obs_post.values])
     dates    = list(obs_pre.index) + list(obs_post.index)
 
@@ -174,11 +198,11 @@ def run(
     rer_levels = _load_rer_levels(data_path)
     hist_level = {
         'dates': date_strs,
-        'y':     [_safe(v, dm[_DY])             for v in Y_comb[:, _DY]],
-        'pi':    [_safe(v, dm[_PI])             for v in Y_comb[:, _PI]],
-        'i':     [_safe(v, dm[_IR], _IR_SCALE)  for v in Y_comb[:, _IR]],
-        'rer':   rer_levels if rer_levels else [_safe(v, dm[_DS]) for v in Y_comb[:, _DS]],
-        'bolig': [_safe(v, dm[_DH])             for v in Y_comb[:, _DH]],
+        'y':     [_safe(v, dm[_DY], _PCT)              for v in Y_comb[:, _DY]],
+        'pi':    [_safe(v, dm[_PI], _PCT)              for v in Y_comb[:, _PI]],
+        'i':     [_safe(v, dm[_IR], _IR_SCALE * _PCT)  for v in Y_comb[:, _IR]],
+        'rer':   rer_levels if rer_levels else [_safe(v, dm[_DS], _PCT) for v in Y_comb[:, _DS]],
+        'bolig': [_safe(v, dm[_DH], _PCT)              for v in Y_comb[:, _DH]],
     }
 
     last_date = pd.Timestamp(dates[-1])
@@ -195,14 +219,14 @@ def run(
 
     forecast_level = {
         'dates': fcst_dates,
-        'y':     _fser(_fcst_obs,  _DY, dm[_DY]),
-        'pi':    _fser(_fcst_obs,  _PI, dm[_PI]),
-        'i':     _fser(_fcst_obs,  _IR, dm[_IR], _IR_SCALE),
-        'rer':   _fser(_fcst_obs,  _DS, dm[_DS]),
-        'bolig': _fser(_fcst_obs,  _DH, dm[_DH]),
-        'y_bl':  _fser(_fcst_cond, _DY, dm[_DY]),
-        'pi_bl': _fser(_fcst_cond, _PI, dm[_PI]),
-        'i_bl':  _fser(_fcst_cond, _IR, dm[_IR], _IR_SCALE),
+        'y':     _fser(_fcst_obs,  _DY, dm[_DY], _PCT),
+        'pi':    _fser(_fcst_obs,  _PI, dm[_PI], _PCT),
+        'i':     _fser(_fcst_obs,  _IR, dm[_IR], _IR_SCALE * _PCT),
+        'rer':   _fser(_fcst_obs,  _DS, dm[_DS], _PCT),
+        'bolig': _fser(_fcst_obs,  _DH, dm[_DH], _PCT),
+        'y_bl':  _fser(_fcst_cond, _DY, dm[_DY], _PCT),
+        'pi_bl': _fser(_fcst_cond, _PI, dm[_PI], _PCT),
+        'i_bl':  _fser(_fcst_cond, _IR, dm[_IR], _IR_SCALE * _PCT),
     }
 
     if verbose:
@@ -227,7 +251,7 @@ def run(
         },
         'meta': {
             'eig_max':       round(eig_max, 6),
-            'n_states':      NZ,
+            'n_states':      int(T.shape[0]),
             'n_shocks':      R.shape[1],
             'last_obs_date': date_strs[-1] if date_strs else None,
         },
