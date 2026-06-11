@@ -442,8 +442,38 @@ def run(
     diagnostics = _build_diagnostics(posterior_path, irf_results)
 
     from nemo.analysis.irf import SHOCK_NAMES
+
+    # ── IRF-normalisering per sjokk (tolkbare sjokkstørrelser) ────────────────
+    # Pengepolitisk sjokk normaliseres til +1 pp topp i styringsrenten (NB-konvensjon);
+    # øvrige sjokk til en fast innovasjonsstørrelse i sjokkets egne enheter. I en lineær
+    # modell skalerer responsen proporsjonalt: skala = mål / σ (1-std-IRF → mål-IRF).
+    _irf_targets = {
+        'TFP':          (0.007, '+0,7 %'),
+        'Konsum':       (0.01,  '+1 %'),
+        'Prismarkup':   (0.003, '+0,3 pp'),
+        'Oljepris':     (0.10,  '+10 %'),
+        'Ettersp.':     (0.01,  '+1 %'),
+        'Risikopremie': (0.01,  '+1 pp'),
+        'Bolig':        (0.10,  '+10 %'),
+    }
+    irf_norm = {}
+    for sidx, sname in SHOCK_NAMES.items():
+        if sname == 'Pengepol.':
+            rate = irf_results.get(sname, {}).get('Styringsrente', [])
+            peak = max((abs(x) for x in rate), default=0.0)
+            irf_norm[sname] = {'scale': round(1.0 / peak, 6) if peak > 1e-9 else 1.0,
+                               'label': '+1 pp'}
+        elif sname in _irf_targets:
+            t, lab = _irf_targets[sname]
+            sig = sigma_vals.get(sidx, 0.0)
+            irf_norm[sname] = {'scale': round(t / sig, 6) if sig > 1e-12 else 1.0,
+                               'label': lab}
+        else:
+            irf_norm[sname] = {'scale': 1.0, 'label': '1 std'}
+
     results = {
         'irf':  irf_results,
+        'irf_norm': irf_norm,
         'fevd': fevd_pct,
         'forecast': {
             'conditional': fcst['conditional'].tolist(),
