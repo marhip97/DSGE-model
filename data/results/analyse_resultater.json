@@ -897,6 +897,40 @@
       ]
     }
   },
+  "irf_norm": {
+    "TFP": {
+      "scale": 1.166667,
+      "label": "+0,7 %"
+    },
+    "Konsum": {
+      "scale": 0.093482,
+      "label": "+1 %"
+    },
+    "Prismarkup": {
+      "scale": 0.424445,
+      "label": "+0,3 pp"
+    },
+    "Oljepris": {
+      "scale": 0.655344,
+      "label": "+10 %"
+    },
+    "Ettersp.": {
+      "scale": 0.585648,
+      "label": "+1 %"
+    },
+    "Risikopremie": {
+      "scale": 1.666667,
+      "label": "+1 pp"
+    },
+    "Pengepol.": {
+      "scale": 10.245902,
+      "label": "+1 pp"
+    },
+    "Bolig": {
+      "scale": 0.300524,
+      "label": "+10 %"
+    }
+  },
   "fevd": {
     "bnp": {
       "TFP": [

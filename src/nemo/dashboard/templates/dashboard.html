@@ -251,6 +251,26 @@
   .pngbtn:hover { background: var(--fin-gray); }
   .card .cardtop { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
 
+  /* ── Sjokk-kort (IRF-valg) ── */
+  .shock-cards {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; width: 100%;
+  }
+  .shock-card {
+    text-align: left; cursor: pointer; font-family: var(--font);
+    background: var(--fin-gray); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 16px; transition: border-color .12s, background .12s;
+  }
+  .shock-card:hover { background: #e4e6ea; }
+  .shock-card[aria-pressed="true"] {
+    background: #eef2fb; border-color: var(--fin-blue); box-shadow: inset 0 0 0 1px var(--fin-blue);
+  }
+  .shock-card .sc-name { font-size: 15px; font-weight: 700; color: var(--fin-darkblue); }
+  .shock-card .sc-norm {
+    font-family: 'Cambria Math', monospace; font-size: 12.5px; color: var(--text-muted); margin-top: 4px;
+  }
+  @media (max-width: 880px) { .shock-cards { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 520px) { .shock-cards { grid-template-columns: 1fr; } }
+
   /* ── Tabell (FIN) ── */
   .tbl-wrap { overflow-x: auto; }
   table.fin { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -447,18 +467,18 @@
       kvartaler du vil se.</p>
     </div>
 
-    <div class="controls">
-      <div class="ctl">
-        <label for="irf-shock">Sjokk</label>
-        <span class="hint">Hvilket sjokk økonomien utsettes for</span>
-        <select id="irf-shock"></select>
+    <div class="controls" style="display:block">
+      <div class="ctl" style="width:100%">
+        <label>Sjokk</label>
+        <span class="hint">Velg hvilket sjokk økonomien utsettes for. Hvert kort viser normaliseringen (sjokkstørrelsen) som responsene er skalert til.</span>
+        <div class="shock-cards" id="irf-shock-cards" role="group" aria-label="Velg sjokk" style="margin-top:8px"></div>
       </div>
-      <div class="ctl">
+      <div class="ctl" style="margin-top:14px">
         <label for="irf-horizon">Horisont</label>
         <span class="hint">Antall kvartaler etter sjokket</span>
         <div class="rangewrap">
           <input type="range" id="irf-horizon" min="4" max="20" value="20" step="1">
-          <span class="rangeval" id="irf-horizon-label">20K</span>
+          <span class="rangeval" id="irf-horizon-label">20 kvartaler</span>
         </div>
       </div>
     </div>
@@ -764,6 +784,7 @@
 <script>
 // ════════════ Innebygde data (fylles av build.py) ════════════
 const IRF_DATA      = __IRF_DATA__;
+const IRF_NORM      = __IRF_NORM__;
 const FEVD_DATA     = __FEVD_DATA__;
 const HIST_LEVEL    = __HIST_LEVEL_DATA__;
 const HIST_DECOMP   = __HIST_DECOMP_DATA__;
@@ -1104,32 +1125,51 @@ function initOversikt() {
 
 // ════════════ IRF ════════════
 function initIRF() {
-  const sel = document.getElementById('irf-shock');
-  Object.keys(IRF_DATA).forEach(s => {
-    const o = document.createElement('option'); o.value = s; o.textContent = s; sel.appendChild(o);
-  });
-  if (IRF_DATA['Pengepol.']) sel.value = 'Pengepol.';   // standardvisning: pengepolitisk sjokk
+  const shocks = Object.keys(IRF_DATA);
+  let current = IRF_DATA['Pengepol.'] ? 'Pengepol.' : shocks[0];
+
+  // Bygg sjokk-kort (erstatter nedtrekksmeny). Hvert kort viser sjokknavn + normalisering.
+  const cardWrap = document.getElementById('irf-shock-cards');
+  cardWrap.innerHTML = shocks.map(s => {
+    const lab = (IRF_NORM[s] && IRF_NORM[s].label) || '1 std';
+    return `<button type="button" class="shock-card" data-shock="${s}" aria-pressed="${s === current}">
+      <div class="sc-name">${s}</div><div class="sc-norm">${lab}</div></button>`;
+  }).join('');
+
   const hr = document.getElementById('irf-horizon');
   const hl = document.getElementById('irf-horizon-label');
   const sub = document.getElementById('irf-bnp-sub');
 
   function update() {
-    const shock = sel.value, h = parseInt(hr.value);
+    const shock = current, h = parseInt(hr.value);
     hl.textContent = h + ' kvartaler';
-    sub.textContent = 'Respons på ett 1 standardavviks ' + shock + '-sjokk. Prosent.';
+    // Hver respons skaleres med den forhåndsberegnede normaliseringen (IRF_NORM.scale):
+    // pengepolitisk sjokk → +1 pp topp i styringsrenten; øvrige → fast sjokkstørrelse.
+    // Lineær modell ⇒ alle grafverdier skaleres proporsjonalt. (Verdiene i FEVD og
+    // Diagnostikk er upåvirket — de bruker rådata.)
+    const norm = IRF_NORM[shock] || { scale: 1.0, label: '1 std' };
+    const scale = norm.scale || 1.0;
+    sub.textContent = shock === 'Pengepol.'
+      ? 'Normalisert til +1 prosentpoeng økning i styringsrenten. Øvrige variabler i prosent.'
+      : `Normalisert til ${norm.label} ${shock}-sjokk. Prosent.`;
     const labels = Array.from({ length: h }, (_, i) => 'K' + (i + 1));
     IRF_VARMAP.forEach(({ id, key }) => {
-      const vals = (IRF_DATA[shock]?.[key] || []).slice(0, h);
-      if (chartReg[id]) {
-        chartReg[id].data.labels = labels;
-        chartReg[id].data.datasets[0].data = vals;
-        chartReg[id].update();
-      } else {
-        chartReg[id] = makeLine(id, labels, [lineDs(shock, vals, FIN.darkblue)]);
-      }
+      const vals = (IRF_DATA[shock]?.[key] || []).slice(0, h)
+        .map(v => Math.round(v * scale * 10000) / 10000);
+      // Gjenoppbygg figuren slik at y-aksen tilpasses de faktiske verdiene (dynamisk skala).
+      if (chartReg[id]) chartReg[id].destroy();
+      chartReg[id] = makeLine(id, labels, [lineDs(shock, vals, FIN.darkblue)]);
     });
   }
-  sel.addEventListener('change', update);
+
+  cardWrap.querySelectorAll('.shock-card').forEach(btn => {
+    btn.addEventListener('click', () => {
+      current = btn.dataset.shock;
+      cardWrap.querySelectorAll('.shock-card').forEach(b =>
+        b.setAttribute('aria-pressed', b.dataset.shock === current ? 'true' : 'false'));
+      update();
+    });
+  });
   hr.addEventListener('input', update);
   update();
 }

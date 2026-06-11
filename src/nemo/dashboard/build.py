@@ -41,6 +41,7 @@ def build_dashboard(analyse_path: str, output_path: str) -> None:
         data = json.load(f)
 
     irf_json        = json.dumps(data.get("irf", {}))
+    irf_norm_json   = json.dumps(data.get("irf_norm", {}))
     fevd_json       = json.dumps(data.get("fevd", {}))
     hist_level_json = json.dumps(data.get("hist_level", {}))
     hist_decomp_json= json.dumps(data.get("hist_decomp", {}))
@@ -58,6 +59,7 @@ def build_dashboard(analyse_path: str, output_path: str) -> None:
     # Les template og fyll inn data
     template = _TEMPLATE_PATH.read_text(encoding="utf-8")
     html = template.replace("__IRF_DATA__",         irf_json) \
+                   .replace("__IRF_NORM__",         irf_norm_json) \
                    .replace("__FEVD_DATA__",        fevd_json) \
                    .replace("__HIST_LEVEL_DATA__",  hist_level_json) \
                    .replace("__HIST_DECOMP_DATA__", hist_decomp_json) \
