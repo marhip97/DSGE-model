@@ -368,10 +368,12 @@
     <div class="section-head"><h2>Oversikt</h2></div>
     <div class="explain">
       <div class="eyebrow">Hva viser fanen</div>
-      <p>Sentrale størrelser i norsk økonomi slik modellen ser dem.
-      <span class="term">Heltrukken</span> linje er historiske, modellfiltrerte verdier;
+      <p>Sentrale størrelser i norsk økonomi.
+      <span class="term">Heltrukken</span> linje er observerte serier;
       <span class="term">stiplet</span> linje er modellens fremskrivning fra siste observasjon.
-      Nivåtallene er avvik fra langsiktig likevekt (gap), målt i prosent, der ikke annet er angitt.</p>
+      Tallene er i prosent: BNP som kvartalsvekst, KPI-JAE som årsvekst, styringsrenten som
+      nivå og valutakursen som kvartalsvis endring. Modellens gap-størrelser vises i IRF-
+      og FEVD-fanene.</p>
     </div>
 
     <div class="kpi-row" id="kpi-row"></div>
@@ -379,8 +381,8 @@
     <div class="grid-2">
       <div class="card">
         <div class="fignum">Figur 1</div>
-        <h3>BNP-gap</h3>
-        <div class="figsub">Avvik fra trend-BNP, Fastlands-Norge. Prosent.</div>
+        <h3>BNP-vekst</h3>
+        <div class="figsub">Kvartalsvekst i BNP. Prosent.</div>
         <div class="plot"><div class="chart-wrap"><canvas id="ov-bnp"></canvas></div></div>
         <div class="linekey">
           <span><i class="ls-solid"></i>Historikk</span>
@@ -390,7 +392,7 @@
       <div class="card">
         <div class="fignum">Figur 2</div>
         <h3>KPI-inflasjon</h3>
-        <div class="figsub">Årsvekst i konsumprisene. Prosent.</div>
+        <div class="figsub">Årsvekst i KPI-JAE (kjerne). Prosent.</div>
         <div class="plot"><div class="chart-wrap"><canvas id="ov-pi"></canvas></div></div>
         <div class="linekey">
           <span><i class="ls-solid"></i>Historikk</span>
@@ -409,13 +411,13 @@
       </div>
       <div class="card">
         <div class="fignum">Figur 4</div>
-        <h3>Valutakurs</h3>
-        <div class="figsub">Importveid kronekurs (I-44), historikk.</div>
+        <h3>Realvalutakurs</h3>
+        <div class="figsub">Kvartalsvis endring i realvalutakursen. Prosent.</div>
         <div class="plot"><div class="chart-wrap"><canvas id="ov-rer"></canvas></div></div>
         <div class="linekey"><span><i class="ls-solid"></i>Historikk</span></div>
       </div>
     </div>
-    <p class="source" style="margin-top:14px">Kilde: NEMO (referanseestimat kj41). Modellfiltrerte og fremskrevne verdier.</p>
+    <p class="source" style="margin-top:14px">Kilde: NEMO (referanseestimat kj41). Observerte og fremskrevne verdier.</p>
   </div>
 
   <!-- ════════════ IRF ════════════ -->
@@ -528,9 +530,10 @@
     </div>
 
     <div class="note" style="margin-top:18px">
-      <b>Kjent begrensning:</b> Risikopremiesjokket forklarer en uforholdsmessig stor del av
-      valutakursvariansen. Dette er en dokumentert strukturell begrensning (UIP-likningen mangler
-      dynamikk) &mdash; se Diagnostikk-fanen, begrensning 1 og 8.
+      <b>Merk:</b> I referanseestimatet kj41 er risikopremiesjokket kalibrert fast til
+      K&amp;M-verdien (sigma_rp = 0,006). Valutakursvariansen drives nå hovedsakelig av
+      oljeprissjokk, ikke av risikopremien &mdash; en tidligere kjent begrensning (sigma_rp
+      = 0,016) som ble løst i Fase 0.5. Se Diagnostikk-fanen.
     </div>
   </div>
 
@@ -674,10 +677,10 @@
         <table class="fin">
           <thead><tr><th>#</th><th>Begrensning</th><th>Verdi (kj41)</th><th>NB-referanse</th></tr></thead>
           <tbody>
-            <tr><td>1</td><td>sigma_rp dominerer FEVD</td><td>sigma_rp = 0,014</td><td>K&amp;M: 0,006</td></tr>
-            <tr><td>2</td><td>h_c habitpersistens (fast)</td><td>0,938</td><td>K&amp;M: 0,65</td></tr>
+            <tr><td>1</td><td>sigma_rp fast til K&amp;M-verdi (løste FEVD-dominans)</td><td>sigma_rp = 0,006</td><td>K&amp;M: 0,006</td></tr>
+            <tr><td>2</td><td>h_c habitpersistens (fast)</td><td>0,938</td><td>K&amp;M: 0,938</td></tr>
             <tr><td>3</td><td>sigma_A svakt identifisert (fast)</td><td>0,006</td><td>K&amp;M: 0,006</td></tr>
-            <tr><td>4</td><td>phi_I1 investeringsrigiditet (fast)</td><td>0,50</td><td>K&amp;M: 4,0</td></tr>
+            <tr><td>4</td><td>phi_I1 investeringsrigiditet (est.)</td><td>0,50</td><td>K&amp;M: 12,54</td></tr>
             <tr><td>5</td><td>COVID-hull i estimeringen</td><td>2020K1–2021K4</td><td>–</td></tr>
             <tr><td>6</td><td>I_R q12 feil fortegn</td><td>+0,84 mot NB −0,15</td><td>psi_R = 0,949 strukturell</td></tr>
             <tr><td>7</td><td>phi_O–psi_R-korrelasjon</td><td>phi_O = 0,15 (fast)</td><td>phi_O ≈ 0,21 fritt</td></tr>
@@ -986,22 +989,26 @@ document.querySelectorAll('.pngbtn').forEach(b => {
 function initOversikt() {
   // KPI-kort
   const kpis = [
-    { key: 'y',  lbl: 'BNP-gap',       unit: '%' },
+    { key: 'y',  lbl: 'BNP-vekst',     unit: '%' },
     { key: 'pi', lbl: 'KPI-inflasjon', unit: '%' },
     { key: 'i',  lbl: 'Styringsrente', unit: '%' },
-    { key: 'rer',lbl: 'Valutakurs',    unit: '' },
+    { key: 'rer',lbl: 'Realvalutakurs',unit: '%' },
   ];
   const row = document.getElementById('kpi-row');
+  // Bruk siste IKKE-null verdi — enkelte serier (f.eks. bolig) kan mangle de
+  // ferskeste kvartalene fordi datakilden publiseres med etterslep.
+  const lastTwoValid = arr => {
+    const v = (arr || []).filter(x => x != null && !isNaN(x));
+    return [v.length ? v[v.length - 1] : null, v.length > 1 ? v[v.length - 2] : null];
+  };
   row.innerHTML = kpis.map(k => {
-    const arr = HIST_LEVEL[k.key] || [];
-    const last = arr.length ? arr[arr.length - 1] : null;
-    const prev = arr.length > 1 ? arr[arr.length - 2] : null;
+    const [last, prev] = lastTwoValid(HIST_LEVEL[k.key]);
     const delta = (last != null && prev != null) ? last - prev : null;
     const deltaTxt = delta == null ? '' :
       `Endring fra forrige kvartal: ${delta >= 0 ? '+' : '−'}${nf(Math.abs(delta), 2)}`;
     return `<div class="kpi">
       <div class="lbl">${k.lbl}</div>
-      <div class="val">${nf(last, k.unit ? 1 : 2)}<span class="unit">${k.unit ? ' ' + k.unit : ''}</span></div>
+      <div class="val">${nf(last, 1)}<span class="unit">${k.unit ? ' ' + k.unit : ''}</span></div>
       <div class="delta">${deltaTxt}</div>
     </div>`;
   }).join('');
@@ -1166,6 +1173,11 @@ function initPrognose() {
   const comb = [...hl, ...fl];
   const bnd = hl.length - 0.5;
 
+  // Hvis ingen sjokk er aktive ved siste kvartal, faller den betingede banen
+  // sammen med den ubetingede. Da skjuler vi den betingede linja og Figur 16.
+  const shockVals = Object.values(ACTIVE_SHOCKS || {});
+  const degenerate = shockVals.length === 0 || shockVals.every(v => Math.abs(v) < 1e-6);
+
   function fc(id, key) {
     const hist = HIST_LEVEL[key] || [];
     const ub = FCST_LEVEL[key] || [];
@@ -1174,12 +1186,18 @@ function initPrognose() {
       lineDs('Historikk', hist, FIN.darkblue),
       lineDs('Ubetinget', [...gap, ...ub], FIN.blue, { borderDash: [5, 4] }),
     ];
-    if (bl.length) ds.push(lineDs('Betinget', [...gap, ...bl], FIN.tealDark, { borderDash: [2, 3] }));
+    if (bl.length && !degenerate) ds.push(lineDs('Betinget', [...gap, ...bl], FIN.tealDark, { borderDash: [2, 3] }));
     chartReg[id] = makeLine(id, comb, ds, { boundary: bnd });
   }
   fc('fcst-bnp', 'y');
   fc('fcst-pi', 'pi');
   fc('fcst-rente', 'i');
+
+  if (degenerate) {
+    const wrap = document.getElementById('fcst-shocks').parentElement;
+    wrap.innerHTML = '<div class="empty">Ingen aktive sjokk ved siste kvartal — betinget bane = ubetinget.</div>';
+    return;
+  }
 
   // Aktive sjokk (divergerende: bla opp, rod ned)
   const names = Object.keys(ACTIVE_SHOCKS);
@@ -1212,10 +1230,11 @@ function initPrognose() {
 // ════════════ DIAGNOSTIKK ════════════
 function initDiagnostikk() {
   const eig = META.eig_max || 0;
+  const nDecomp = SHOCKS.length;   // antall sjokk som faktisk dekomponeres (IRF/FEVD/HD)
   const stats = [
     { val: nf(eig, 4), lbl: 'Maks |egenverdi| (stabil < 1)' },
     { val: META.n_states ?? '–', lbl: 'Tilstandsvariabler (NZ)' },
-    { val: META.n_shocks ?? '–', lbl: 'Strukturelle sjokk (NE)' },
+    { val: `${nDecomp} / ${META.n_shocks ?? '–'}`, lbl: 'Sjokk dekomponert / totalt (NE)' },
     { val: fmtQ(META.last_obs_date) || '–', lbl: 'Siste observasjon' },
   ];
   document.getElementById('diag-stats').innerHTML = stats.map(s =>
