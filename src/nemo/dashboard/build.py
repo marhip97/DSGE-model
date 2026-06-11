@@ -9,6 +9,7 @@ Bruk:
 """
 
 import argparse
+import datetime as _dt
 import json
 import logging
 import os
@@ -44,8 +45,15 @@ def build_dashboard(analyse_path: str, output_path: str) -> None:
     hist_level_json = json.dumps(data.get("hist_level", {}))
     hist_decomp_json= json.dumps(data.get("hist_decomp", {}))
     fcst_level_json = json.dumps(data.get("forecast_level", {}))
+    overview_hist_json = json.dumps(data.get("overview_hist", {}))
+    overview_fcst_json = json.dumps(data.get("overview_fcst", {}))
+    diagnostics_json   = json.dumps(data.get("diagnostics", {}))
     active_shocks_json = json.dumps(data.get("active_shocks", {}))
-    meta_json       = json.dumps(data.get("meta", {}))
+    meta            = data.get("meta", {})
+    meta_json       = json.dumps(meta)
+    # Statisk fallback for headeren (synlig uten JavaScript)
+    last_obs        = meta.get("last_obs_date") or "–"
+    built_date      = _dt.date.today().isoformat()
 
     # Les template og fyll inn data
     template = _TEMPLATE_PATH.read_text(encoding="utf-8")
@@ -54,8 +62,13 @@ def build_dashboard(analyse_path: str, output_path: str) -> None:
                    .replace("__HIST_LEVEL_DATA__",  hist_level_json) \
                    .replace("__HIST_DECOMP_DATA__", hist_decomp_json) \
                    .replace("__FCST_LEVEL_DATA__",  fcst_level_json) \
+                   .replace("__OVERVIEW_HIST__",    overview_hist_json) \
+                   .replace("__OVERVIEW_FCST__",    overview_fcst_json) \
+                   .replace("__DIAGNOSTICS__",      diagnostics_json) \
                    .replace("__ACTIVE_SHOCKS__",    active_shocks_json) \
-                   .replace("__META_DATA__",        meta_json)
+                   .replace("__META_DATA__",        meta_json) \
+                   .replace("__LAST_OBS_FALLBACK__", last_obs) \
+                   .replace("__BUILT_DATE__",       built_date)
 
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     Path(output_path).write_text(html, encoding="utf-8")

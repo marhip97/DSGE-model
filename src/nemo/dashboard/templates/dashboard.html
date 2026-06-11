@@ -287,6 +287,19 @@
     font-variant-numeric: tabular-nums; }
   .diag .lbl { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
 
+  /* ── Likninger ── */
+  .eqs { display: flex; flex-direction: column; gap: 8px; }
+  .eq {
+    font-family: 'Cambria Math', 'Times New Roman', Georgia, serif;
+    font-size: 14.5px; background: var(--plot-bg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 9px 12px; overflow-x: auto; white-space: nowrap;
+  }
+  .eq .eqlab {
+    font-family: var(--font); font-size: 11px; font-weight: 700; color: var(--fin-blue);
+    text-transform: uppercase; letter-spacing: .04em; margin-right: 12px;
+    display: inline-block; min-width: 150px; white-space: normal; vertical-align: top;
+  }
+
   /* ── Footer ── */
   footer {
     max-width: var(--maxw); margin: 28px auto 0; padding: 22px 16px 40px;
@@ -326,20 +339,22 @@
       Bayesiansk estimert likevektsmodell for norsk økonomi. Dashbordet viser
       hvordan sjokk forplanter seg gjennom økonomien, hva som har drevet
       konjunkturene historisk, og modellens fremskrivning.
+      <br><span style="font-size:12.5px;color:#c7cdf0">Uavhengig, forenklet reimplementering inspirert av Norges Banks NEMO &mdash; ikke Norges Banks operative modell, og ikke validert av Norges Bank.</span>
     </p>
     <div class="metastrip">
       <span><span class="ok-dot" id="stab-dot"></span><b id="meta-stab">Modellen er stabil</b></span>
       <span>Referanseestimat: <b>kj41</b></span>
       <span>Estimeringsperiode: <b>2001K1–2025K4</b></span>
-      <span>Siste observasjon: <b id="meta-last">–</b></span>
+      <span>Siste datapunkt modellen er bygget på: <b id="meta-last">__LAST_OBS_FALLBACK__</b></span>
+      <span>Sist oppdatert: <b>__BUILT_DATE__</b></span>
     </div>
   </div>
 </header>
 
 <nav class="tabs" id="tabs" role="tablist" aria-label="Analysefaner">
   <div class="tabs-inner">
-    <button role="tab" aria-selected="true"  aria-controls="pane-oversikt"   id="tab-oversikt"   data-tab="oversikt">Oversikt</button>
-    <button role="tab" aria-selected="false" aria-controls="pane-irf"        id="tab-irf"        data-tab="irf">IRF</button>
+    <button role="tab" aria-selected="true"  aria-controls="pane-irf"        id="tab-irf"        data-tab="irf">IRF</button>
+    <button role="tab" aria-selected="false" aria-controls="pane-oversikt"   id="tab-oversikt"   data-tab="oversikt">Oversikt</button>
     <button role="tab" aria-selected="false" aria-controls="pane-fevd"       id="tab-fevd"       data-tab="fevd">FEVD</button>
     <button role="tab" aria-selected="false" aria-controls="pane-historikk"  id="tab-historikk"  data-tab="historikk">Historikk</button>
     <button role="tab" aria-selected="false" aria-controls="pane-prognose"   id="tab-prognose"   data-tab="prognose">Prognose</button>
@@ -364,16 +379,17 @@
   </details>
 
   <!-- ════════════ OVERSIKT ════════════ -->
-  <div class="pane active" id="pane-oversikt" role="tabpanel" aria-labelledby="tab-oversikt">
+  <div class="pane" id="pane-oversikt" role="tabpanel" aria-labelledby="tab-oversikt">
     <div class="section-head"><h2>Oversikt</h2></div>
     <div class="explain">
       <div class="eyebrow">Hva viser fanen</div>
       <p>Sentrale størrelser i norsk økonomi.
       <span class="term">Heltrukken</span> linje er observerte serier;
       <span class="term">stiplet</span> linje er modellens fremskrivning fra siste observasjon.
-      Tallene er i prosent: BNP som kvartalsvekst, KPI-JAE som årsvekst, styringsrenten som
-      nivå og valutakursen som kvartalsvis endring. Modellens gap-størrelser vises i IRF-
-      og FEVD-fanene.</p>
+      BNP, KPI-JAE og valutakurs vises som 4-kvartalersvekst (å/å) i prosent; styringsrenten
+      som nivå. Modellens gap-størrelser vises i IRF- og FEVD-fanene.</p>
+      <p style="margin-top:8px">Siste datapunkt modellen er bygget på:
+      <b id="ov-last-obs" class="term">–</b>.</p>
     </div>
 
     <div class="kpi-row" id="kpi-row"></div>
@@ -421,7 +437,7 @@
   </div>
 
   <!-- ════════════ IRF ════════════ -->
-  <div class="pane" id="pane-irf" role="tabpanel" aria-labelledby="tab-irf">
+  <div class="pane active" id="pane-irf" role="tabpanel" aria-labelledby="tab-irf">
     <div class="section-head"><h2>Impulsrespons (IRF)</h2></div>
     <div class="explain">
       <div class="eyebrow">Hva viser fanen</div>
@@ -483,7 +499,10 @@
     <div class="note" style="margin-top:18px">
       <b>Merk:</b> Responsene er modellberegnede avvik fra likevekt, ikke observerte tall.
       Nivåene er betinget på referanseestimatet kj41 og er beheftet med samplingsusikkerhet
-      &mdash; se Diagnostikk-fanen.
+      &mdash; se Diagnostikk-fanen. Kurvene er glattet visuelt med monoton interpolasjon mellom de
+      eksakte kvartalspunktene (verdiene er uendret).
+      <b>Inflasjonsresponsen svinger</b> kvartalsvis (periode-2) — dette er en reell egenskap ved den
+      forenklede prisblokken, ikke en renderingsfeil, og er en dokumentert begrensning (se Diagnostikk).
     </div>
   </div>
 
@@ -544,8 +563,9 @@
       <div class="eyebrow">Hva viser fanen</div>
       <p><span class="term">Historisk dekomponering</span> fordeler de observerte bevegelsene i en
       variabel på de underliggende sjokkene modellen identifiserer. Søyler over null trekker
-      variabelen opp i det aktuelle kvartalet; søyler under null trekker ned. Øverst vises det
-      observerte nivået, nederst bidragene.</p>
+      variabelen opp i det aktuelle kvartalet; søyler under null trekker ned. Øverst vises den
+      observerte serien, nederst bidragene. Tallene er i kvartalsvise enheter (ikke 4-kvartalersvekst
+      som i Oversikt/Prognose), slik at nivå og dekomponering er konsistente.</p>
     </div>
 
     <div class="controls">
@@ -557,9 +577,9 @@
     </div>
 
     <div class="card" style="margin-bottom:18px">
-      <div class="cardtop"><div><div class="fignum">Figur 11</div><h3 id="hist-level-title">Observert nivå</h3></div>
+      <div class="cardtop"><div><div class="fignum">Figur 11</div><h3 id="hist-level-title">Observert serie</h3></div>
         <button class="pngbtn" data-png="hist-level-chart" data-name="historikk_niva">Last ned PNG</button></div>
-      <div class="figsub">Modellfiltrert nivå over tid.</div>
+      <div class="figsub">Observert serie (kvartalsvise enheter).</div>
       <div class="plot"><div class="chart-wrap-tall"><canvas id="hist-level-chart"></canvas></div></div>
     </div>
     <div class="card">
@@ -571,8 +591,9 @@
     </div>
 
     <div class="note" style="margin-top:18px">
-      <b>Tolkning:</b> Dekomponeringen er betinget på modellstrukturen. Den fordeler observerte
-      bevegelser på modellens sjokk og er ikke en uavhengig årsaksanalyse.
+      <b>Tolkning:</b> Sjokkbidragene er basert på den toveis (RTS-glattede) tilstandsestimeringen
+      — altså glattet, ikke ensidig filtrert. Dekomponeringen er betinget på modellstrukturen og er
+      ikke en uavhengig årsaksanalyse. COVID-perioden (2020K1–2021K4) er utelatt fra estimeringen.
     </div>
   </div>
 
@@ -581,57 +602,47 @@
     <div class="section-head"><h2>Prognose</h2></div>
     <div class="explain">
       <div class="eyebrow">Hva viser fanen</div>
-      <p>Fremskrivningen viser den <span class="term">ubetingede</span> banen (modellens beste anslag
-      gitt all informasjon, stiplet blå) og en <span class="term">betinget</span> bane (turkis stiplet)
-      som forutsetter de antatte sjokkene ved siste kvartal. Heltrukken linje er historikk.
-      Søylediagrammet nederst viser hvilke sjokk som er aktive ved fremskrivningens start.</p>
+      <p>Heltrukken linje er historikk; <span class="term">stiplet</span> linje er modellens
+      ubetingede anslag fra siste observasjon. BNP, KPI og valutakurs vises som
+      4-kvartalersvekst (å/å); styringsrenten som nivå.</p>
     </div>
 
     <div class="grid-2">
       <div class="card">
-        <div class="cardtop"><div><div class="fignum">Figur 13</div><h3>BNP-gap</h3></div>
+        <div class="cardtop"><div><div class="fignum">Figur 13</div><h3>BNP-vekst (å/å)</h3></div>
           <button class="pngbtn" data-png="fcst-bnp" data-name="prognose_bnp">Last ned PNG</button></div>
-        <div class="figsub">Prosent.</div>
+        <div class="figsub">4-kvartalersvekst. Prosent.</div>
         <div class="plot"><div class="chart-wrap"><canvas id="fcst-bnp"></canvas></div></div>
         <div class="linekey">
           <span><i class="ls-solid"></i>Historikk</span>
-          <span><i class="ls-dash"></i>Ubetinget</span>
-          <span><i class="ls-dash-teal"></i>Betinget</span>
+          <span><i class="ls-dash"></i>Anslag</span>
         </div>
       </div>
       <div class="card">
-        <div class="cardtop"><div><div class="fignum">Figur 14</div><h3>KPI-inflasjon</h3></div>
+        <div class="cardtop"><div><div class="fignum">Figur 14</div><h3>KPI-inflasjon (å/å)</h3></div>
           <button class="pngbtn" data-png="fcst-pi" data-name="prognose_inflasjon">Last ned PNG</button></div>
-        <div class="figsub">Prosent.</div>
+        <div class="figsub">4-kvartalersvekst i KPI-JAE. Prosent.</div>
         <div class="plot"><div class="chart-wrap"><canvas id="fcst-pi"></canvas></div></div>
         <div class="linekey">
           <span><i class="ls-solid"></i>Historikk</span>
-          <span><i class="ls-dash"></i>Ubetinget</span>
-          <span><i class="ls-dash-teal"></i>Betinget</span>
+          <span><i class="ls-dash"></i>Anslag</span>
         </div>
       </div>
       <div class="card">
         <div class="cardtop"><div><div class="fignum">Figur 15</div><h3>Styringsrente</h3></div>
           <button class="pngbtn" data-png="fcst-rente" data-name="prognose_styringsrente">Last ned PNG</button></div>
-        <div class="figsub">Prosent.</div>
+        <div class="figsub">Nivå. Prosent.</div>
         <div class="plot"><div class="chart-wrap"><canvas id="fcst-rente"></canvas></div></div>
         <div class="linekey">
           <span><i class="ls-solid"></i>Historikk</span>
-          <span><i class="ls-dash"></i>Ubetinget</span>
-          <span><i class="ls-dash-teal"></i>Betinget</span>
+          <span><i class="ls-dash"></i>Anslag</span>
         </div>
-      </div>
-      <div class="card">
-        <div class="cardtop"><div><div class="fignum">Figur 16</div><h3>Aktive sjokk ved siste kvartal</h3></div>
-          <button class="pngbtn" data-png="fcst-shocks" data-name="prognose_aktive_sjokk">Last ned PNG</button></div>
-        <div class="figsub">Standardavvik. Blå trekker opp, rød trekker ned.</div>
-        <div class="plot"><div class="chart-wrap"><canvas id="fcst-shocks"></canvas></div></div>
       </div>
     </div>
 
     <div class="note" style="margin-top:18px">
-      <b>Merk:</b> Usikkerhetsbånd er ikke vist i denne versjonen. Fremskrivningen er betinget på
-      referanseestimatet kj41.
+      <b>Merk:</b> Usikkerhetsbånd er ikke vist (krever lagrede posterior-trekk — se Diagnostikk).
+      Anslaget er punktbanen betinget på referanseestimatet kj41.
     </div>
   </div>
 
@@ -640,29 +651,67 @@
     <div class="section-head"><h2>Diagnostikk</h2></div>
     <div class="explain">
       <div class="eyebrow">Hva viser fanen</div>
-      <p>Numerisk stabilitet og de strukturelle begrensningene som er dokumentert i Fase 0.5 og 2.
-      Begrensningene er <span class="term">kjente og bevisste avveininger</span>, ikke feil &mdash; de
-      forteller hvor modellens svar skal tolkes med varsomhet.</p>
+      <p>Numerisk stabilitet, modellens parametere og likninger, estimeringsdiagnostikk og
+      dokumenterte begrensninger. <span class="term">Forkortelsen K&amp;M</span> viser til
+      Kravik &amp; Mimir (2019), <em>Navigating with NEMO</em> (Norges Bank Staff Memo 5/2019).</p>
     </div>
 
-    <div class="note">
-      <b>Usikkerhet i estimatene:</b> Effektivt antall uavhengige trekk (ESS) i estimeringen er lavere
-      enn målkravet. Punktestimatene for sterkt persistente parametere (blant annet renteglatting og
-      habitkonsum) har derfor høyere Monte&nbsp;Carlo-usikkerhet enn standardformelen tilsier.
-      Tolk kvantitative nivåer i IRF og prognose som indikative.
+    <div class="note" style="border-left-color:var(--fin-red)">
+      <b>Ansvarsfraskrivelse:</b> Dette er en uavhengig, forenklet reimplementering inspirert av
+      Norges Banks NEMO (50 tilstandsvariabler) &mdash; <b>ikke</b> Norges Banks operative modell,
+      og verken tilknyttet eller validert av Norges Bank. Parameteriseringen bygger på offentlig
+      dokumentasjon (K&amp;M 2019).
     </div>
 
     <div class="diag-row" id="diag-stats"></div>
 
+    <div class="note">
+      <b>Stabilitet:</b> Modellen er løst med Blanchard–Kahn; løsningen er entydig og stabil når
+      <span class="term">maks |egenverdi| &lt; 1</span> (vist over) og antall eksplosive egenverdier
+      er lik antall forventningsvariabler. <b>Usikkerhet:</b> Effektivt antall uavhengige trekk (ESS)
+      er under målkravet, så punktestimater for sterkt persistente parametere (renteglatting,
+      habitkonsum) har høyere Monte&nbsp;Carlo-usikkerhet enn standardformelen tilsier &mdash; tolk
+      nivåer i IRF og prognose som indikative. <b>Usikkerhetsbånd</b> (IRF-kredibilitetsbånd, fan
+      chart) og trace plots krever lagrede MCMC-trekk og er ikke tilgjengelige i denne versjonen.
+    </div>
+
+    <div class="card" style="margin-bottom:18px">
+      <div class="fignum">Boks 1</div>
+      <h3>Sentrale likninger</h3>
+      <div class="figsub">Kjerne-sammenhengene i modellen (stylisert; fullt linearisert system i <code>equations.py</code>). Symboler matcher parametertabellen under.</div>
+      <div class="eqs">
+        <div class="eq"><span class="eqlab">Renteregel</span> i<sub>t</sub> = ψ_R·i<sub>t−1</sub> + (1−ψ_R)·(ψ_π·π<sub>t</sub> + ψ_y·ŷ<sub>t</sub>) + ε<sup>i</sup><sub>t</sub></div>
+        <div class="eq"><span class="eqlab">Phillips-kurve</span> π<sub>t</sub> = β/(1+βγ_p)·E<sub>t</sub>π<sub>t+1</sub> + γ_p/(1+βγ_p)·π<sub>t−1</sub> + κ_P·m̂c<sub>t</sub>,  κ_P ∝ 1/φ_PQ</div>
+        <div class="eq"><span class="eqlab">Konsum (Euler m/ vane)</span> (c<sub>t</sub> − h_c·c<sub>t−1</sub>) = E<sub>t</sub>(c<sub>t+1</sub> − h_c·c<sub>t</sub>) − (1−h_c)·(i<sub>t</sub> − E<sub>t</sub>π<sub>t+1</sub>)</div>
+        <div class="eq"><span class="eqlab">UIP (valuta)</span> i<sub>t</sub> − i<sup>*</sup><sub>t</sub> = E<sub>t</sub>Δs<sub>t+1</sub> + rp<sub>t</sub> − φ_O·p̂<sup>O</sup><sub>t</sub></div>
+        <div class="eq"><span class="eqlab">Investering</span> Δi<sub>t</sub>: justeringskostnad styrt av φ_I1 (nivå) og φ_I2 (endring)</div>
+        <div class="eq"><span class="eqlab">Ressursskranke</span> ŷ<sub>t</sub> = (C/Y)·ĉ<sub>t</sub> + (I/Y)·î<sub>t</sub> + (G/Y)·ĝ<sub>t</sub> + (X/Y)·x̂<sub>t</sub> − (M/Y)·m̂<sub>t</sub></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:18px">
+      <div class="fignum">Tabell 1</div>
+      <h3>Modellparametere</h3>
+      <div class="figsub">Effektive verdier i referanseestimatet kj41, med matematisk symbol og pedagogisk navn. «Est.» = estimert (posterior mean); ellers kalibrert/fast.</div>
+      <div class="tbl-wrap" id="param-table-wrap" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:18px">
+      <div class="fignum">Tabell 2</div>
+      <h3>Prior og posterior (estimerte parametere)</h3>
+      <div class="figsub">Prior-fordeling og posterior gjennomsnitt med 95 %-intervall. Faste parametere er listet nederst.</div>
+      <div class="tbl-wrap" id="priorpost-wrap" style="margin-top:8px"></div>
+    </div>
+
     <div class="grid-2">
       <div class="card">
-        <div class="fignum">Figur 17</div>
-        <h3>BNP-gap, sjokkandeler (h = 8)</h3>
-        <div class="figsub">Variansdekomponering ved åtte kvartaler.</div>
-        <div class="plot"><div class="chart-wrap-tall"><canvas id="diag-fevd-bnp"></canvas></div></div>
+        <div class="fignum">Tabell 3</div>
+        <h3>Måleresfeil per observabel</h3>
+        <div class="figsub">14 observable &gt; 13 sjokk er veldefinert fordi hver observasjon har måleresfeil (standardavvik under).</div>
+        <div class="tbl-wrap" id="meas-wrap" style="margin-top:8px"></div>
       </div>
       <div class="card">
-        <div class="fignum">Figur 18</div>
+        <div class="fignum">Figur 17</div>
         <h3>Valutakurs, sjokkandeler (h = 8)</h3>
         <div class="figsub">Variansdekomponering ved åtte kvartaler.</div>
         <div class="plot"><div class="chart-wrap-tall"><canvas id="diag-fevd-rer"></canvas></div></div>
@@ -670,21 +719,26 @@
     </div>
 
     <div class="card" style="margin-top:18px">
-      <div class="fignum">Tabell 2</div>
-      <h3>Strukturelle begrensninger (Fase 0.5 og 2)</h3>
+      <div class="fignum">Tabell 4</div>
+      <h3>Validering mot NB Memo 3/2024 (pengepolitisk sjokk)</h3>
+      <div class="figsub">Impulsrespons normalisert til +1 pp topp i styringsrenten. kj41 mot Norges Banks publiserte bane.</div>
+      <div class="tbl-wrap" id="nb-wrap" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+      <div class="fignum">Tabell 5</div>
+      <h3>Kjente begrensninger og valideringsavvik</h3>
       <div class="figsub">Dokumenterte avveininger i referanseestimatet kj41.</div>
       <div class="tbl-wrap" style="margin-top:8px">
         <table class="fin">
-          <thead><tr><th>#</th><th>Begrensning</th><th>Verdi (kj41)</th><th>NB-referanse</th></tr></thead>
+          <thead><tr><th>#</th><th>Type</th><th>Forhold</th><th>Verdi (kj41)</th><th>NB-referanse</th></tr></thead>
           <tbody>
-            <tr><td>1</td><td>sigma_rp fast til K&amp;M-verdi (løste FEVD-dominans)</td><td>sigma_rp = 0,006</td><td>K&amp;M: 0,006</td></tr>
-            <tr><td>2</td><td>h_c habitpersistens (fast)</td><td>0,938</td><td>K&amp;M: 0,938</td></tr>
-            <tr><td>3</td><td>sigma_A svakt identifisert (fast)</td><td>0,006</td><td>K&amp;M: 0,006</td></tr>
-            <tr><td>4</td><td>phi_I1 investeringsrigiditet (est.)</td><td>0,50</td><td>K&amp;M: 12,54</td></tr>
-            <tr><td>5</td><td>COVID-hull i estimeringen</td><td>2020K1–2021K4</td><td>–</td></tr>
-            <tr><td>6</td><td>I_R q12 feil fortegn</td><td>+0,84 mot NB −0,15</td><td>psi_R = 0,949 strukturell</td></tr>
-            <tr><td>7</td><td>phi_O–psi_R-korrelasjon</td><td>phi_O = 0,15 (fast)</td><td>phi_O ≈ 0,21 fritt</td></tr>
-            <tr><td>8</td><td>FX-premie observasjonsekvivalens</td><td>kj50–52 avsluttet</td><td>14 obs. utilstrekkelig</td></tr>
+            <tr><td>1</td><td>Valideringsavvik</td><td><b>I_R feil fortegn på lang sikt</b> (q12): for persistent rentebane vs. NB</td><td>+0,45 (q12, normalisert)</td><td>NB: +0,05</td></tr>
+            <tr><td>2</td><td>Mistenkt identifikasjon</td><td><b>φ_I1 ≈ 25× lavere enn K&amp;M</b> — implausibelt lav investeringsrigiditet, henger trolig sammen med #1</td><td>φ_I1 = 0,50</td><td>K&amp;M: 12,54</td></tr>
+            <tr><td>3</td><td>Begrensning</td><td>σ_rp fast til K&amp;M-verdi (løste tidligere FEVD-dominans)</td><td>σ_rp = 0,006</td><td>K&amp;M: 0,006</td></tr>
+            <tr><td>4</td><td>Begrensning</td><td>h_c, σ_A faste (svakt identifisert fra makrodata)</td><td>0,938 / 0,006</td><td>K&amp;M: 0,938 / 0,006</td></tr>
+            <tr><td>5</td><td>Begrensning</td><td>COVID-hull i estimeringen (splittet likelihood)</td><td>2020K1–2021K4</td><td>–</td></tr>
+            <tr><td>6</td><td>Begrensning</td><td>Inflasjons-IRF svinger kvartalsvis (periode-2) i den forenklede prisblokken</td><td>se IRF-fanen</td><td>NB: glatt</td></tr>
           </tbody>
         </table>
       </div>
@@ -695,9 +749,11 @@
 
 <footer>
   <h4>Om modellen og kildene</h4>
-  <p>NEMO er en bayesiansk estimert DSGE-modell for norsk økonomi, basert på Norges Banks
-  NEMO-rammeverk (Kravik &amp; Mimir 2019). Modellen har 50 tilstandsvariabler og 13 strukturelle
-  sjokk, estimert på 14 observerte serier fra 2001K1 til 2025K4. Estimeringen splitter
+  <p><b>Ansvarsfraskrivelse:</b> Dette er en uavhengig, forenklet reimplementering inspirert av
+  Norges Banks NEMO &mdash; ikke Norges Banks operative modell, og verken tilknyttet eller validert
+  av Norges Bank. Parameteriseringen bygger på offentlig dokumentasjon (Kravik &amp; Mimir 2019).</p>
+  <p>Modellen er en bayesiansk estimert DSGE-modell for norsk økonomi med 50 tilstandsvariabler og
+  13 strukturelle sjokk, estimert på 14 observerte serier fra 2001K1 til 2025K4. Estimeringen splitter
   sannsynligheten rundt et COVID-hull (2020K1–2021K4).</p>
   <p>Kilde: Kravik, E. M. &amp; Mimir, Y. (2019), <em>Navigating with NEMO</em>, Norges Bank Staff
   Memo 5/2019 (<a href="https://www.norges-bank.no/contentassets/685d5f91e22a442c81d2e9680483e137/staff_memo_5_2019_eng.pdf" target="_blank" rel="noopener">staff_memo_5_2019_eng.pdf</a>).
@@ -712,6 +768,9 @@ const FEVD_DATA     = __FEVD_DATA__;
 const HIST_LEVEL    = __HIST_LEVEL_DATA__;
 const HIST_DECOMP   = __HIST_DECOMP_DATA__;
 const FCST_LEVEL    = __FCST_LEVEL_DATA__;
+const OVERVIEW_HIST = __OVERVIEW_HIST__;
+const OVERVIEW_FCST = __OVERVIEW_FCST__;
+const DIAG          = __DIAGNOSTICS__;
 const ACTIVE_SHOCKS = __ACTIVE_SHOCKS__;
 const META          = __META_DATA__;
 
@@ -867,7 +926,11 @@ const xScaleFIN = {
 function lineDs(label, data, color, opts = {}) {
   return {
     label, data, borderColor: color, backgroundColor: 'transparent',
-    borderWidth: 2, pointRadius: 0, pointHoverRadius: 3, tension: 0.2,
+    borderWidth: 2, pointRadius: 0, pointHoverRadius: 3,
+    // Monoton kubisk interpolasjon: glatt visuell finish mellom de eksakte
+    // kvartalspunktene UTEN overshoot — endrer ikke verdiene. (Svingete serier,
+    // som inflasjonsresponsen i IRF, vises fortsatt ærlig.)
+    cubicInterpolationMode: 'monotone', tension: 0,
     borderCapStyle: 'round', spanGaps: false, ...opts
   };
 }
@@ -940,7 +1003,10 @@ function makeStacked(id, labels, datasets, { max = null, legend = true } = {}) {
 
 // ════════════ Header-meta ════════════
 (function initMeta() {
-  document.getElementById('meta-last').textContent = fmtQlong(META.last_obs_date);
+  const lastQ = fmtQlong(META.last_obs_date);
+  document.getElementById('meta-last').textContent = lastQ;
+  const ovLast = document.getElementById('ov-last-obs');
+  if (ovLast) ovLast.textContent = lastQ;
   const eig = META.eig_max || 0;
   const stable = eig < 1.0;
   document.getElementById('meta-stab').textContent =
@@ -989,10 +1055,10 @@ document.querySelectorAll('.pngbtn').forEach(b => {
 function initOversikt() {
   // KPI-kort
   const kpis = [
-    { key: 'y',  lbl: 'BNP-vekst',     unit: '%' },
-    { key: 'pi', lbl: 'KPI-inflasjon', unit: '%' },
-    { key: 'i',  lbl: 'Styringsrente', unit: '%' },
-    { key: 'rer',lbl: 'Realvalutakurs',unit: '%' },
+    { key: 'y',  lbl: 'BNP-vekst (å/å)',     unit: '%' },
+    { key: 'pi', lbl: 'KPI-inflasjon (å/å)', unit: '%' },
+    { key: 'i',  lbl: 'Styringsrente',       unit: '%' },
+    { key: 'rer',lbl: 'Realvalutakurs (å/å)',unit: '%' },
   ];
   const row = document.getElementById('kpi-row');
   // Bruk siste IKKE-null verdi — enkelte serier (f.eks. bolig) kan mangle de
@@ -1002,7 +1068,7 @@ function initOversikt() {
     return [v.length ? v[v.length - 1] : null, v.length > 1 ? v[v.length - 2] : null];
   };
   row.innerHTML = kpis.map(k => {
-    const [last, prev] = lastTwoValid(HIST_LEVEL[k.key]);
+    const [last, prev] = lastTwoValid(OVERVIEW_HIST[k.key]);
     const delta = (last != null && prev != null) ? last - prev : null;
     const deltaTxt = delta == null ? '' :
       `Endring fra forrige kvartal: ${delta >= 0 ? '+' : '−'}${nf(Math.abs(delta), 2)}`;
@@ -1013,14 +1079,17 @@ function initOversikt() {
     </div>`;
   }).join('');
 
-  const hl = histLabels(), fl = fcstLabels();
+  // Oversikt og Prognose viser 4-kvartalersvekst (å/å) for BNP, KPI og valutakurs;
+  // styringsrenten er et nivå. Historikk-fanen bruker kvartalsserier (HIST_LEVEL).
+  const hl = (OVERVIEW_HIST.dates || []).map(fmtQ);
+  const fl = (OVERVIEW_FCST.dates || []).map(fmtQ);
   const comb = [...hl, ...fl];
   const gap = Array(hl.length).fill(null);
   const bnd = hl.length - 0.5;
 
   function ov(id, key) {
-    const hist = HIST_LEVEL[key] || [];
-    const fc = FCST_LEVEL[key] || [];
+    const hist = OVERVIEW_HIST[key] || [];
+    const fc = OVERVIEW_FCST[key] || [];
     const ds = [
       lineDs('Historikk', hist, FIN.darkblue),
       lineDs('Anslag', [...gap, ...fc], FIN.blue, { borderDash: [5, 4] }),
@@ -1030,10 +1099,8 @@ function initOversikt() {
   ov('ov-bnp', 'y');
   ov('ov-pi', 'pi');
   ov('ov-rente', 'i');
-  chartReg['ov-rer'] = makeLine('ov-rer', hl, [lineDs('Valutakurs', HIST_LEVEL.rer || [], FIN.darkblue)], { isPct: false });
+  ov('ov-rer', 'rer');
 }
-initOversikt();
-chartInited['oversikt'] = true;
 
 // ════════════ IRF ════════════
 function initIRF() {
@@ -1041,14 +1108,15 @@ function initIRF() {
   Object.keys(IRF_DATA).forEach(s => {
     const o = document.createElement('option'); o.value = s; o.textContent = s; sel.appendChild(o);
   });
+  if (IRF_DATA['Pengepol.']) sel.value = 'Pengepol.';   // standardvisning: pengepolitisk sjokk
   const hr = document.getElementById('irf-horizon');
   const hl = document.getElementById('irf-horizon-label');
   const sub = document.getElementById('irf-bnp-sub');
 
   function update() {
     const shock = sel.value, h = parseInt(hr.value);
-    hl.textContent = h + 'K';
-    sub.textContent = 'Respons på: ' + shock + '. Prosent.';
+    hl.textContent = h + ' kvartaler';
+    sub.textContent = 'Respons på ett 1 standardavviks ' + shock + '-sjokk. Prosent.';
     const labels = Array.from({ length: h }, (_, i) => 'K' + (i + 1));
     IRF_VARMAP.forEach(({ id, key }) => {
       const vals = (IRF_DATA[shock]?.[key] || []).slice(0, h);
@@ -1074,6 +1142,7 @@ function initFEVD() {
   Object.keys(FEVD_DATA).forEach(vn => {
     const o = document.createElement('option'); o.value = vn; o.textContent = FEVD_LABELS[vn] || vn; sel.appendChild(o);
   });
+  if (FEVD_DATA['rer']) sel.value = 'rer';   // standardvisning: realvalutakurs
 
   function table(vn, h) {
     const v = FEVD_DATA[vn] || {};
@@ -1093,7 +1162,7 @@ function initFEVD() {
 
   function update() {
     const vn = sel.value, h = parseInt(hr.value);
-    hlab.textContent = h + 'K';
+    hlab.textContent = h + ' kvartaler';
     const v = FEVD_DATA[vn] || {};
     const shocks = Object.keys(v);
     const labels = Array.from({ length: h }, (_, i) => 'K' + (i + 1));
@@ -1121,11 +1190,12 @@ function initHistorikk() {
   Object.keys(HIST_LABELS).forEach(k => {
     const o = document.createElement('option'); o.value = k; o.textContent = HIST_LABELS[k]; sel.appendChild(o);
   });
+  if (HIST_LABELS['i']) sel.value = 'i';   // standardvisning: styringsrenten
   const hl = histLabels();
 
   function update() {
     const vk = sel.value;
-    document.getElementById('hist-level-title').textContent = 'Observert nivå: ' + HIST_LABELS[vk];
+    document.getElementById('hist-level-title').textContent = 'Observert serie: ' + HIST_LABELS[vk];
     const level = HIST_LEVEL[vk] || [];
     const isP = vk !== 'rer';
 
@@ -1168,87 +1238,110 @@ function initHistorikk() {
 
 // ════════════ PROGNOSE ════════════
 function initPrognose() {
-  const hl = histLabels(), fl = fcstLabels();
+  // Bruker 4-kvartalersvekst (å/å) for BNP/KPI/valutakurs; styringsrenten er nivå.
+  const hl = (OVERVIEW_HIST.dates || []).map(fmtQ);
+  const fl = (OVERVIEW_FCST.dates || []).map(fmtQ);
   const gap = Array(hl.length).fill(null);
   const comb = [...hl, ...fl];
   const bnd = hl.length - 0.5;
 
-  // Hvis ingen sjokk er aktive ved siste kvartal, faller den betingede banen
-  // sammen med den ubetingede. Da skjuler vi den betingede linja og Figur 16.
-  const shockVals = Object.values(ACTIVE_SHOCKS || {});
-  const degenerate = shockVals.length === 0 || shockVals.every(v => Math.abs(v) < 1e-6);
-
+  // Kun historikk + ubetinget anslag (betinget bane fjernet).
   function fc(id, key) {
-    const hist = HIST_LEVEL[key] || [];
-    const ub = FCST_LEVEL[key] || [];
-    const bl = FCST_LEVEL[key + '_bl'] || [];
+    const hist = OVERVIEW_HIST[key] || [];
+    const ub = OVERVIEW_FCST[key] || [];
     const ds = [
       lineDs('Historikk', hist, FIN.darkblue),
-      lineDs('Ubetinget', [...gap, ...ub], FIN.blue, { borderDash: [5, 4] }),
+      lineDs('Anslag', [...gap, ...ub], FIN.blue, { borderDash: [5, 4] }),
     ];
-    if (bl.length && !degenerate) ds.push(lineDs('Betinget', [...gap, ...bl], FIN.tealDark, { borderDash: [2, 3] }));
     chartReg[id] = makeLine(id, comb, ds, { boundary: bnd });
   }
   fc('fcst-bnp', 'y');
   fc('fcst-pi', 'pi');
   fc('fcst-rente', 'i');
-
-  if (degenerate) {
-    const wrap = document.getElementById('fcst-shocks').parentElement;
-    wrap.innerHTML = '<div class="empty">Ingen aktive sjokk ved siste kvartal — betinget bane = ubetinget.</div>';
-    return;
-  }
-
-  // Aktive sjokk (divergerende: bla opp, rod ned)
-  const names = Object.keys(ACTIVE_SHOCKS);
-  const vals = names.map(n => ACTIVE_SHOCKS[n]);
-  chartReg['fcst-shocks'] = new Chart(document.getElementById('fcst-shocks'), {
-    type: 'bar',
-    data: { labels: names, datasets: [{
-      label: 'Standardavvik', data: vals,
-      backgroundColor: vals.map(v => v >= 0 ? FIN.darkblue : FIN.red),
-      borderWidth: 0
-    }] },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: { backgroundColor: FIN.darkblue, padding: 10,
-          callbacks: { label: it => nf(it.parsed.y, 2) + ' std.avvik' } }
-      },
-      scales: {
-        x: { grid: { display: false, drawTicks: false }, border: { color: '#000', width: 0.6 },
-             ticks: { maxRotation: 40, minRotation: 0, font: { size: 10 } } },
-        y: { grid: { color: ctx => ctx.tick.value === 0 ? '#000' : 'rgba(0,0,0,0.12)',
-                     lineWidth: ctx => ctx.tick.value === 0 ? 1.2 : 0.5, tickLength: 4, tickColor: '#000' },
-             border: { color: '#000', width: 0.6 }, ticks: { padding: 4, callback: v => fmtTick(v, 1) } }
-      }
-    }
-  });
 }
 
 // ════════════ DIAGNOSTIKK ════════════
 function initDiagnostikk() {
   const eig = META.eig_max || 0;
   const nDecomp = SHOCKS.length;   // antall sjokk som faktisk dekomponeres (IRF/FEVD/HD)
+  const cv = (DIAG && DIAG.convergence) || {};
   const stats = [
     { val: nf(eig, 4), lbl: 'Maks |egenverdi| (stabil < 1)' },
     { val: META.n_states ?? '–', lbl: 'Tilstandsvariabler (NZ)' },
     { val: `${nDecomp} / ${META.n_shocks ?? '–'}`, lbl: 'Sjokk dekomponert / totalt (NE)' },
     { val: fmtQ(META.last_obs_date) || '–', lbl: 'Siste observasjon' },
+    { val: cv.psrf != null ? nf(cv.psrf, 3) : '–', lbl: 'PSRF / R-hat (mål < 1,10)' },
+    { val: cv.ess_min != null ? cv.ess_min : '–', lbl: 'ESS (laveste parameter)' },
+    { val: cv.n_draws != null ? cv.n_draws.toLocaleString('nb-NO') : '–', lbl: 'MCMC-trekk (etter burn-in)' },
+    { val: cv.acc_rate != null ? nf(cv.acc_rate * 100, 1) + ' %' : '–', lbl: 'Akseptrate' },
   ];
   document.getElementById('diag-stats').innerHTML = stats.map(s =>
     `<div class="diag"><div class="val">${s.val}</div><div class="lbl">${s.lbl}</div></div>`).join('');
 
-  function donut(id, vn) {
-    const v = FEVD_DATA[vn] || {};
-    const shocks = Object.keys(v);
-    if (!shocks.length) return;
-    const vals = shocks.map(s => v[s][7] || 0);
-    new Chart(document.getElementById(id), {
+  // ── Parametertabell (gruppert, med symbol + pedagogisk navn) ──
+  const pov = (DIAG && DIAG.param_overview) || [];
+  if (pov.length) {
+    const groups = [];
+    pov.forEach(p => { if (!groups.includes(p.group)) groups.push(p.group); });
+    let html = '<table class="fin"><thead><tr><th>Symbol</th><th>Parameter</th><th>Beskrivelse</th><th class="num">Verdi</th><th>Type</th></tr></thead><tbody>';
+    groups.forEach(g => {
+      html += `<tr><td colspan="5" style="background:var(--fin-gray);font-weight:700">${g}</td></tr>`;
+      pov.filter(p => p.group === g).forEach(p => {
+        html += `<tr><td><i>${p.symbol}</i></td><td><code>${p.name}</code></td><td>${p.label}</td>`
+              + `<td class="num">${p.value != null ? nf(p.value, 4) : '–'}</td>`
+              + `<td>${p.est ? 'Est.' : 'Kalibrert'}</td></tr>`;
+      });
+    });
+    html += '</tbody></table>';
+    document.getElementById('param-table-wrap').innerHTML = html;
+  }
+
+  // ── Prior/posterior ──
+  const pp = (DIAG && DIAG.prior_posterior) || {};
+  if (pp.estimated) {
+    let html = '<table class="fin"><thead><tr><th>Parameter</th><th>Prior</th><th class="num">Posterior mean</th><th class="num">95 %-intervall</th></tr></thead><tbody>';
+    pp.estimated.forEach(r => {
+      html += `<tr><td><code>${r.name}</code></td><td>${r.prior}</td>`
+            + `<td class="num">${nf(r.mean, 4)}</td>`
+            + `<td class="num">[${nf(r.lo, 3)}, ${nf(r.hi, 3)}]</td></tr>`;
+    });
+    (pp.fixed || []).forEach(r => {
+      html += `<tr><td><code>${r.name}</code></td><td colspan="2">Fast: ${nf(r.value, 4)}</td><td>${r.note}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    document.getElementById('priorpost-wrap').innerHTML = html;
+  }
+
+  // ── Måleresfeil ──
+  const me = (DIAG && DIAG.meas_error) || [];
+  if (me.length) {
+    let html = '<table class="fin"><thead><tr><th>Observabel</th><th class="num">Std.avvik (måleresfeil)</th></tr></thead><tbody>';
+    me.forEach(r => { html += `<tr><td><code>${r.series}</code></td><td class="num">${nf(r.sd, 4)}</td></tr>`; });
+    html += '</tbody></table>';
+    document.getElementById('meas-wrap').innerHTML = html;
+  }
+
+  // ── NB-sammenligning (pengepolitisk sjokk) ──
+  const nb = (DIAG && DIAG.nb_irf) || {};
+  if (nb.rows) {
+    const lbl = { Y: 'BNP-gap', PI: 'KPI-inflasjon', I_R: 'Styringsrente', RER: 'Realvalutakurs' };
+    let html = '<table class="fin"><thead><tr><th>Variabel</th><th class="num">q1 (kj41/NB)</th><th class="num">q4</th><th class="num">q8</th><th class="num">q12</th></tr></thead><tbody>';
+    nb.rows.forEach(r => {
+      const cell = q => `${r[q].kj41 != null ? nf(r[q].kj41, 2) : '–'} / ${r[q].nb != null ? nf(r[q].nb, 2) : '–'}`;
+      html += `<tr><td>${lbl[r.var] || r.var}</td><td class="num">${cell('q1')}</td><td class="num">${cell('q4')}</td><td class="num">${cell('q8')}</td><td class="num">${cell('q12')}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    document.getElementById('nb-wrap').innerHTML = html + `<p class="source">${nb.note || ''}</p>`;
+  }
+
+  // RER-variansdekomponering (donut)
+  const v = FEVD_DATA['rer'] || {};
+  const shocks = Object.keys(v);
+  if (shocks.length) {
+    new Chart(document.getElementById('diag-fevd-rer'), {
       type: 'doughnut',
       data: { labels: shocks, datasets: [{
-        data: vals, backgroundColor: shocks.map(s => SHOCK_COLOR[s]),
+        data: shocks.map(s => v[s][7] || 0), backgroundColor: shocks.map(s => SHOCK_COLOR[s]),
         borderColor: '#fff', borderWidth: 1.5
       }] },
       options: {
@@ -1261,17 +1354,20 @@ function initDiagnostikk() {
       }
     });
   }
-  donut('diag-fevd-bnp', 'bnp');
-  donut('diag-fevd-rer', 'rer');
 }
 
 function initTab(tab) {
-  if (tab === 'irf') initIRF();
+  if (tab === 'oversikt') initOversikt();
+  else if (tab === 'irf') initIRF();
   else if (tab === 'fevd') initFEVD();
   else if (tab === 'historikk') initHistorikk();
   else if (tab === 'prognose') initPrognose();
   else if (tab === 'diagnostikk') initDiagnostikk();
 }
+
+// Standardfane: IRF (pengepolitisk sjokk). Initialiser den synlige fanen ved last.
+initIRF();
+chartInited['irf'] = true;
 </script>
 </body>
 </html>
