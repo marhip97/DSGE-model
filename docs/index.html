@@ -1116,17 +1116,27 @@ function initIRF() {
   function update() {
     const shock = sel.value, h = parseInt(hr.value);
     hl.textContent = h + ' kvartaler';
-    sub.textContent = 'Respons på ett 1 standardavviks ' + shock + '-sjokk. Prosent.';
+    // Pengepolitisk sjokk normaliseres til +1 prosentpoeng topp i styringsrenten
+    // (Norges Banks konvensjon). Hele responsen skaleres proporsjonalt; rente-toppen
+    // blir 1,0. Øvrige sjokk vises som 1 standardavvik. Skaleringen er enhetsuavhengig
+    // (forholdstall), og samsvarer med NB-sammenligningen i Diagnostikk.
+    const isMP = shock === 'Pengepol.';
+    let scale = 1.0;
+    if (isMP) {
+      const rate = IRF_DATA[shock]?.['Styringsrente'] || [];
+      const peak = Math.max(...rate.map(v => Math.abs(v)), 0);
+      if (peak > 1e-9) scale = 1.0 / peak;
+    }
+    sub.textContent = isMP
+      ? 'Normalisert til +1 prosentpoeng økning i styringsrenten. Øvrige variabler i prosent.'
+      : 'Respons på ett 1 standardavviks ' + shock + '-sjokk. Prosent.';
     const labels = Array.from({ length: h }, (_, i) => 'K' + (i + 1));
     IRF_VARMAP.forEach(({ id, key }) => {
-      const vals = (IRF_DATA[shock]?.[key] || []).slice(0, h);
-      if (chartReg[id]) {
-        chartReg[id].data.labels = labels;
-        chartReg[id].data.datasets[0].data = vals;
-        chartReg[id].update();
-      } else {
-        chartReg[id] = makeLine(id, labels, [lineDs(shock, vals, FIN.darkblue)]);
-      }
+      const vals = (IRF_DATA[shock]?.[key] || []).slice(0, h)
+        .map(v => Math.round(v * scale * 10000) / 10000);
+      // Gjenoppbygg figuren slik at y-aksen tilpasses de faktiske verdiene (dynamisk skala).
+      if (chartReg[id]) chartReg[id].destroy();
+      chartReg[id] = makeLine(id, labels, [lineDs(shock, vals, FIN.darkblue)]);
     });
   }
   sel.addEventListener('change', update);
