@@ -64,9 +64,16 @@ Gjennomgang av alle grafer og datastørrelser i GitHub Pages-dashbordet
 - Aktive sjokk er ikke-null; betinget prognose avviker fra ubetinget.
 - `pytest`: 125 passert, 3 xfailed.
 
+## Besluttet
+
+1. **Oversikt viser observerte serier** (ikke modellens gap-estimater). Begrunnelse:
+   det er konsistent med Historikk- og Prognose-fanene, som også bruker observerte
+   nivåserier, mens modellens gap-/strukturhistorie dekkes i IRF-, FEVD- og
+   Historikk-fanene. Observerte data + modellanslag er dessuten den gjenkjennelige
+   standardpresentasjonen (jf. Norges Bank og SSB). Etikettene er rettet deretter.
+
 ## Anbefalte oppfølginger (PE)
 
-1. Avklar om Oversikt skal vise observerte serier (som nå) eller modellens gap-estimater.
 2. Rydd opp i `analyse.py` vs `analysis/run.py` (dobbel pipeline, funn K).
 3. Vurder å automatisere regenerering av `analyse_resultater.json` i deploy-workflowen,
    slik at dashbordet ikke kan drive fra hverandre fra modellen igjen.
