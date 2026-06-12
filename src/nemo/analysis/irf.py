@@ -43,7 +43,7 @@ PHI_PQ_KJ41: float = 150.0
 
 SHOCK_NAMES: Dict[int, str] = {
     E_A: 'TFP', E_C: 'Konsum', E_P: 'Prismarkup', E_O: 'Oljepris',
-    E_Ys: 'Ettersp.', E_rp: 'Risikopremie', E_i: 'Pengepol.', E_H: 'Bolig',
+    E_Ys: 'Utenl. ettersp.', E_rp: 'Risikopremie', E_i: 'Pengepol.', E_H: 'Bolig',
 }
 
 VAR_NAMES: Dict[int, str] = {

@@ -417,8 +417,15 @@ def run(
     # Historikk-fanen beholder kvartalsserier (hist_level) så nivå og dekomponering
     # er konsistente; Oversikt/Prognose bruker y/y-blokken under.
     def _yoy(q_hist: pd.Series, q_fcst, mean_q: float):
-        idx  = list(q_hist.index) + [pd.Timestamp(d) for d in fcst_dates]
-        vals = list(np.asarray(q_hist.values, dtype=float)) + [float(v) for v in q_fcst]
+        # Sesongjuster historikken (deterministisk): trekk fra kvartalsspesifikt snitt.
+        # Inputseriene er IKKE sesongjustert (sterk Q4↑/Q1↓ i BNP), noe som ellers gir et
+        # hopp i 4-kvartalersveksten der det rullende vinduet møter den ikke-sesongbaserte
+        # modellprognosen. Sesongfaktorene summerer ~0, så full-vindus y/y er uendret.
+        # Se CLAUDE.md «Kjente fallgruver» — egentlig fiks er sesongjustering i pipelinen.
+        qh = pd.Series(np.asarray(q_hist.values, dtype=float), index=q_hist.index)
+        qh = qh - qh.groupby(qh.index.quarter).transform('mean')
+        idx  = list(qh.index) + [pd.Timestamp(d) for d in fcst_dates]
+        vals = list(qh.values) + [float(v) for v in q_fcst]
         s = (pd.Series(vals, index=idx).rolling(4).sum() + 4.0 * mean_q) * 100.0
         def g(d):
             v = s.get(pd.Timestamp(d))
@@ -451,9 +458,9 @@ def run(
         'TFP':          (0.007, '+0,7 %'),
         'Konsum':       (0.01,  '+1 %'),
         'Prismarkup':   (0.003, '+0,3 pp'),
-        'Oljepris':     (0.10,  '+10 %'),
-        'Ettersp.':     (0.01,  '+1 %'),
-        'Risikopremie': (0.01,  '+1 pp'),
+        'Oljepris':       (0.10,  '+10 %'),
+        'Utenl. ettersp.':(0.01,  '+1 %'),
+        'Risikopremie':   (0.01,  '+1 pp'),
         'Bolig':        (0.10,  '+10 %'),
     }
     irf_norm = {}

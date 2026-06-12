@@ -129,6 +129,27 @@ Estimeringen splitter likelihood i pre-COVID (≤2019Q4) og post-COVID
 Kalman-filteret reinitialiseres riktig i `src/nemo/estimation/kalman.py`.
 Endring krever PE-godkjenning (se eskaleringsliste).
 
+### Inputdata er ikke sesongjustert (oppdaget 2026-06, dashbord-QA)
+
+`dy_obs` (og trolig øvrige realserier) viser et sterkt, regelmessig sesongmønster
+(snitt q/q: Q1 −3,98, Q2 −1,14, Q3 −0,53, Q4 +5,64 pp) — dvs. seriene er **ikke
+sesongjustert**. Dette gir et hopp i dashbordets 4-kvartalersvekst der det rullende
+vinduet møter den ikke-sesongbaserte modellprognosen. Dashbordet sesongjusterer nå
+ved *visning* (deterministisk, kvartalssnitt trekkes fra i `analysis/run.py::_yoy`),
+men den **egentlige** fiksen er sesongjustering i datapipelinen (`src/nemo/data/innhenting.py`).
+Det påvirker estimeringen (kj41 er estimert på usesongjusterte data) og krever derfor
+PE-godkjenning. Flagget i dashbordets begrensningstabell (Diagnostikk, Tabell 6).
+
+### Styringsrenten faller på konsumsjokk (mimicking rule, ψ_W-dominans)
+
+IRF for konsumpreferansesjokk (E_C) gir BNP-gap +2 % og KPI-inflasjon +0,6 %, men
+styringsrenten *faller* (−0,14). Verifisert årsak: regelen vekter lønnsvekst tungt
+(ψ_W = 0,87 > ψ_π = 0,56), og konsumsjokket (som treffer lønnslikningen, `Psi[1,E_C]=a2_W`)
+demper lønnsveksten kraftig — lønnsveksleddet dominerer regelen og trekker renten ned.
+En lærebok-Taylor-regel (ψ_W ≈ 0) ville hevet renten. Dette er en
+estimerings-/spesifikasjonsegenskap, ikke en dashbord-feil. Flagget i Diagnostikk (Tabell 6).
+Endring av regelvektene krever reestimering (PE).
+
 ## Spørsmål du skal stille hvis noe er uklart
 
 - "Skal jeg starte ny estimering, eller bruke eksisterende posterior?"
