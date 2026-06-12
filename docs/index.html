@@ -519,10 +519,10 @@
     <div class="note" style="margin-top:18px">
       <b>Merk:</b> Responsene er modellberegnede avvik fra likevekt, ikke observerte tall.
       Nivåene er betinget på referanseestimatet kj41 og er beheftet med samplingsusikkerhet
-      &mdash; se Diagnostikk-fanen. Kurvene er glattet visuelt med monoton interpolasjon mellom de
-      eksakte kvartalspunktene (verdiene er uendret).
-      <b>Inflasjonsresponsen svinger</b> kvartalsvis (periode-2) — dette er en reell egenskap ved den
-      forenklede prisblokken, ikke en renderingsfeil, og er en dokumentert begrensning (se Diagnostikk).
+      &mdash; se Diagnostikk-fanen. Kurvene er <b>lett glattet</b> (3-punkts glidende snitt) for
+      lesbarhet; impulskvartalet er bevart og de underliggende modellverdiene i datafilen er uendret.
+      Den forenklede prisblokken gir en kvartalsvis (periode-2) svingning i inflasjonsresponsen —
+      en dokumentert begrensning (se Diagnostikk) som glattingen demper visuelt.
     </div>
   </div>
 
@@ -1123,6 +1123,21 @@ function initOversikt() {
   ov('ov-rer', 'rer');
 }
 
+// Lett glatting av IRF-kurver for lesbarhet: ett pass 3-punkts glidende snitt
+// [0,25 / 0,5 / 0,25]. Demper den kvartalsvise (periode-2) svingningen i bl.a.
+// inflasjonsresponsen, mens allerede glatte kurver er tilnærmet uendret.
+// Impuls (K1) og siste punkt bevares; rådataene i datafilen er uendret.
+function irfSmooth(a) {
+  const r = v => Math.round(v * 10000) / 10000;
+  if (!a || a.length < 3) return (a || []).map(r);
+  const out = a.slice();
+  for (let i = 1; i < a.length - 1; i++) {
+    if (a[i - 1] == null || a[i] == null || a[i + 1] == null) continue;
+    out[i] = 0.25 * a[i - 1] + 0.5 * a[i] + 0.25 * a[i + 1];
+  }
+  return out.map(r);
+}
+
 // ════════════ IRF ════════════
 function initIRF() {
   const shocks = Object.keys(IRF_DATA);
@@ -1154,8 +1169,8 @@ function initIRF() {
       : `Normalisert til ${norm.label} ${shock}-sjokk. Prosent.`;
     const labels = Array.from({ length: h }, (_, i) => 'K' + (i + 1));
     IRF_VARMAP.forEach(({ id, key }) => {
-      const vals = (IRF_DATA[shock]?.[key] || []).slice(0, h)
-        .map(v => Math.round(v * scale * 10000) / 10000);
+      const vals = irfSmooth((IRF_DATA[shock]?.[key] || []).slice(0, h)
+        .map(v => v * scale));
       // Gjenoppbygg figuren slik at y-aksen tilpasses de faktiske verdiene (dynamisk skala).
       if (chartReg[id]) chartReg[id].destroy();
       chartReg[id] = makeLine(id, labels, [lineDs(shock, vals, FIN.darkblue)]);
