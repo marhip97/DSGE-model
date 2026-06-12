@@ -143,12 +143,13 @@ PE-godkjenning. Flagget i dashbordets begrensningstabell (Diagnostikk, Tabell 6)
 ### Styringsrenten faller på konsumsjokk (mimicking rule, ψ_W-dominans)
 
 IRF for konsumpreferansesjokk (E_C) gir BNP-gap +2 % og KPI-inflasjon +0,6 %, men
-styringsrenten *faller* (−0,14). Verifisert årsak: regelen vekter lønnsvekst tungt
-(ψ_W = 0,87 > ψ_π = 0,56), og konsumsjokket (som treffer lønnslikningen, `Psi[1,E_C]=a2_W`)
-demper lønnsveksten kraftig — lønnsveksleddet dominerer regelen og trekker renten ned.
-En lærebok-Taylor-regel (ψ_W ≈ 0) ville hevet renten. Dette er en
-estimerings-/spesifikasjonsegenskap, ikke en dashbord-feil. Flagget i Diagnostikk (Tabell 6).
-Endring av regelvektene krever reestimering (PE).
+styringsrenten *faller* (−0,14). Verifisert: E_C går korrekt inn i konsum-Euler-likningen
+(rad 1 = c_W, via preferansetilstanden EPS_C) og hever konsum/BNP. Renteregelen
+rekonstruerer IRF-en eksakt — ingen kodefeil. Årsaken er at den estimerte mimicking-regelen
+vekter *lønnsvekst* tyngst (ψ_W = 0,87 > ψ_π = 0,56), og lønnsveksten faller i likevekt på
+dette sjokket, så regelen trekker renten ned. Motfaktisk: med ψ_W = 0 (Taylor-stil) stiger
+renten (+0,04), som forventet. En endring av regelvektene (eller reestimering med ψ_W ≈ 0)
+krever PE-godkjenning. Flagget i Diagnostikk (Tabell 6).
 
 ## Spørsmål du skal stille hvis noe er uklart
 
